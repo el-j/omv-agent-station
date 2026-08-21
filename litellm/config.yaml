@@ -1,0 +1,116 @@
+# ==============================================================================
+# LiteLLM Proxy Configuration: Optimized for Google AI, Claude Code & GitHub Copilot
+# ==============================================================================
+
+model_list:
+  # ----------------------------------------------------------------------------
+  # TIER 1: FAST & WORKHORSE MODELS (Google AI / Gemini)
+  # ----------------------------------------------------------------------------
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 1000
+      tpm: 4000000
+
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 360
+      tpm: 2000000
+
+  - model_name: gemini-1.5-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # TIER 2: TOP-TIER CODING & REASONING (Claude Code / Anthropic API)
+  # ----------------------------------------------------------------------------
+  - model_name: claude-3-7-sonnet
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+      enable_prompt_caching: true
+
+  - model_name: claude-3-5-haiku
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # TIER 3: GITHUB COPILOT / GITHUB MODELS ENDPOINT
+  # (Accessible with your GitHub Personal Access Token / Copilot subscription)
+  # ----------------------------------------------------------------------------
+  - model_name: github-gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-o3-mini
+    litellm_params:
+      model: openai/o3-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ----------------------------------------------------------------------------
+  # VIRTUAL MODEL ROUTER GROUPS WITH AUTOMATIC FAILOVER
+  # ----------------------------------------------------------------------------
+  # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)
+  - model_name: coder-fast
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
+  - model_name: coder-smart
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, logic puzzles)
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openai/o3-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+# ==============================================================================
+# ROUTER & RATE LIMIT SHIELD SETTINGS
+# ==============================================================================
+router_settings:
+  routing_strategy: usage-based-routing
+  set_verbose: false
+  num_retries: 3
+  timeout: 120
+  retry_after: 5
+  cooldown_time: 30 # Cooldown provider for 30s when a 429 occurs
+  allowed_fails: 2
+  fallbacks:
+    - claude-3-7-sonnet: ["gemini-2.5-pro", "github-gpt-4o"]
+    - gemini-2.5-pro: ["claude-3-7-sonnet", "github-gpt-4o"]
+    - gemini-2.5-flash: ["claude-3-5-haiku"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  alerting: []
+  store_model_in_db: false
