@@ -41,10 +41,12 @@ cp openmediavault-ai-orchestrator/usr/share/openmediavault/workbench/navigation.
 cp openmediavault-ai-orchestrator/usr/sbin/omv-ai-orchestrator "$BUILD_DIR/usr/sbin/"
 chmod 755 "$BUILD_DIR/usr/sbin/omv-ai-orchestrator"
 
-# Copy stack files (Docker compose, LiteLLM config, Telegram Bot)
+# Copy stack files (Docker compose, LiteLLM config, Telegram & Signal Bots)
 cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/"
 cp litellm/config.yaml "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/litellm/"
 cp -r telegram-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/telegram-agent-bot/"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/signal-agent-bot"
+cp -r signal-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/signal-agent-bot/"
 
 if command -v dpkg-deb >/dev/null 2>&1; then
     echo "🔨 Building with native dpkg-deb..."

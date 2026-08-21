@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# Install system utilities, git, tmux, curl, nodejs for coding tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
@@ -18,10 +17,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install CLI coding agents (Aider, Claude Code, etc.)
+# Install CLI coding agents (Aider, Claude Code)
 RUN pip install --no-cache-dir aider-chat \
     && npm install -g @anthropic-ai/claude-code
 
-COPY bot.py .
+COPY signal_bot.py .
 
-CMD ["python", "bot.py"]
+CMD ["python", "signal_bot.py"]

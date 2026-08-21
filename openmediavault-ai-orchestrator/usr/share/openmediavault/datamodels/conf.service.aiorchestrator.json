@@ -21,6 +21,23 @@
     "github_token": {
       "type": "string"
     },
+    "git_author_name": {
+      "type": "string",
+      "default": "OMV AI Agent"
+    },
+    "git_author_email": {
+      "type": "string",
+      "default": "agent@proliant-omv.local"
+    },
+    "gitlab_token": {
+      "type": "string"
+    },
+    "bitbucket_username": {
+      "type": "string"
+    },
+    "bitbucket_app_password": {
+      "type": "string"
+    },
     "telegram_bot_token": {
       "type": "string"
     },

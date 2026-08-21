@@ -71,12 +71,19 @@ services:
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITLAB_TOKEN=${GITLAB_TOKEN:-}
+      - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
+      - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
+      - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
+      - ./ssh:/root/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   # ============================================================================
@@ -92,9 +99,60 @@ services:
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/workspace
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/obsidian
+      - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
+      - ./ssh:/root/.ssh:ro
     ports:
       - "7681:7681"
     command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-proliantgen8} tmux new-session -A -s agent-main -c /workspace bash
+
+  # ============================================================================
+  # 5. Signal Messenger Relay (Alternative to Telegram - E2EE Private Messaging)
+  # Run with: docker compose --profile signal up -d
+  # ============================================================================
+  signal-cli:
+    image: bbernhard/signal-cli-rest-api:latest
+    container_name: signal-cli
+    restart: unless-stopped
+    profiles: ["signal"]
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE=true
+    volumes:
+      - ./signal-data:/home/.local/share/signal-cli
+    ports:
+      - "8085:8080"
+
+  signal-bot:
+    build:
+      context: ./signal-agent-bot
+      dockerfile: Dockerfile
+    container_name: signal-agent-bot
+    restart: unless-stopped
+    profiles: ["signal"]
+    depends_on:
+      - signal-cli
+      - litellm
+    environment:
+      - SIGNAL_CLI_URL=http://signal-cli:8080
+      - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
+      - SIGNAL_ALLOWED_PHONE_NUMBER=${SIGNAL_ALLOWED_PHONE_NUMBER}
+      - LITELLM_API_BASE=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
+      - OBSIDIAN_VAULT_PATH=/data/obsidian
+      - WORKSPACE_PATH=/data/workspace
+      - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITLAB_TOKEN=${GITLAB_TOKEN:-}
+      - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
+      - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
+      - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
+      - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
+      - ./ssh:/root/.ssh:ro
 
 networks:
   default:
