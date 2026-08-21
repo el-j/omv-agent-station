@@ -33,10 +33,25 @@
     "bitbucket_app_password": {
       "type": "string"
     },
+    "chat_service": {
+      "type": "string"
+    },
     "telegram_bot_token": {
       "type": "string"
     },
     "telegram_allowed_user_id": {
+      "type": "string"
+    },
+    "signal_phone_number": {
+      "type": "string"
+    },
+    "signal_allowed_phone_number": {
+      "type": "string"
+    },
+    "discord_bot_token": {
+      "type": "string"
+    },
+    "discord_allowed_user_id": {
       "type": "string"
     },
     "litellm_master_key": {

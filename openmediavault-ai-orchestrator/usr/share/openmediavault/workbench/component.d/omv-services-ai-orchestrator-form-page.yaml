@@ -57,15 +57,47 @@ data:
         label: _("Bitbucket App Password")
         hint: _("Optional - Bitbucket token/password with repository write permissions")
       - type: divider
-        title: _("Telegram Remote Control Bot")
+        title: _("Remote Chat & Messenger Relay Service")
+      - type: select
+        name: chat_service
+        label: _("Active Messenger Relay")
+        hint: _("Choose which chat application you want to control your coding agent from")
+        value: "telegram"
+        options:
+          - ["telegram", "Telegram Bot (Zero phone number / Instant setup)"]
+          - ["signal", "Signal Messenger (End-to-End Encrypted Linked Device)"]
+          - ["discord", "Discord Bot (Channels & Code Embeds / Zero phone number)"]
+          - ["none", "Disabled (Web Terminal & SSH Only)"]
+      - type: divider
+        title: _("Telegram Bot Configuration")
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
-        hint: _("From @BotFather")
+        hint: _("From @BotFather (Leave blank if not using Telegram)")
       - type: textInput
         name: telegram_allowed_user_id
         label: _("Allowed Telegram Numeric User ID")
-        hint: _("From @userinfobot (restricts bot access to you only)")
+        hint: _("From @userinfobot (Restricts bot access to you only)")
+      - type: divider
+        title: _("Signal Messenger Configuration")
+      - type: textInput
+        name: signal_phone_number
+        label: _("Signal Bot Phone / Linked Number")
+        hint: _("Server Signal number or linked device number")
+      - type: textInput
+        name: signal_allowed_phone_number
+        label: _("Allowed Personal Signal Number")
+        hint: _("Your personal phone number (e.g. +491701234567)")
+      - type: divider
+        title: _("Discord Bot Configuration")
+      - type: passwordInput
+        name: discord_bot_token
+        label: _("Discord Bot Token")
+        hint: _("From Discord Developer Portal -> Bot -> Token")
+      - type: textInput
+        name: discord_allowed_user_id
+        label: _("Allowed Discord User ID")
+        hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
       - type: divider
         title: _("Security & Web Access")
       - type: passwordInput

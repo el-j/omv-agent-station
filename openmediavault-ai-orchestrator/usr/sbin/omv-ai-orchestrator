@@ -25,8 +25,13 @@ apply_config() {
     GITLAB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gitlab_token', ''))")
     BITBUCKET_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_username', ''))")
     BITBUCKET_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_app_password', ''))")
+    CHAT_SERVICE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('chat_service', 'telegram'))")
     TELEGRAM_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_bot_token', ''))")
     TELEGRAM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_allowed_user_id', ''))")
+    SIGNAL_PHONE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_phone_number', ''))")
+    SIGNAL_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_allowed_phone_number', ''))")
+    DISCORD_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_bot_token', ''))")
+    DISCORD_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_allowed_user_id', ''))")
     MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-master-key'))")
     TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))")
     TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'proliantgen8'))")
@@ -37,6 +42,7 @@ apply_config() {
     mkdir -p "$DATA_DIR/ssh"
     mkdir -p "$STACK_DIR/credentials"
     mkdir -p "$STACK_DIR/ssh"
+    mkdir -p "$STACK_DIR/signal-data"
     mkdir -p "$STACK_DIR/syncthing/config"
 
     # Write .env file
@@ -54,17 +60,30 @@ BITBUCKET_USERNAME=$BITBUCKET_USER
 BITBUCKET_APP_PASSWORD=$BITBUCKET_PASS
 TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN
 TELEGRAM_ALLOWED_USER_ID=$TELEGRAM_USER
+SIGNAL_PHONE_NUMBER=$SIGNAL_PHONE
+SIGNAL_ALLOWED_PHONE_NUMBER=$SIGNAL_USER
+DISCORD_BOT_TOKEN=$DISCORD_TOKEN
+DISCORD_ALLOWED_USER_ID=$DISCORD_USER
 TERMINAL_USER=$TERM_USER
 TERMINAL_PASS=$TERM_PASS
 EOF
 
     cd "$STACK_DIR"
     if [ "$ENABLE" = "True" ]; then
-        echo "Starting AI Orchestrator Stack..."
-        docker compose --env-file .env up -d --remove-orphans
+        echo "Starting AI Orchestrator Stack with chat service: $CHAT_SERVICE..."
+        if [ "$CHAT_SERVICE" = "signal" ]; then
+            docker compose --env-file .env --profile signal up -d --remove-orphans
+        elif [ "$CHAT_SERVICE" = "discord" ]; then
+            docker compose --env-file .env --profile discord up -d --remove-orphans
+        elif [ "$CHAT_SERVICE" = "none" ]; then
+            docker compose --env-file .env up -d litellm syncthing web-terminal --remove-orphans
+        else
+            # Default: Telegram
+            docker compose --env-file .env up -d litellm syncthing web-terminal telegram-bot --remove-orphans
+        fi
     else
         echo "Stopping AI Orchestrator Stack..."
-        docker compose --env-file .env down || true
+        docker compose --env-file .env --profile signal --profile discord down || true
     fi
 }
 

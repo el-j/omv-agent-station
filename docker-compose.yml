@@ -154,6 +154,40 @@ services:
       - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
       - ./ssh:/root/.ssh:ro
 
+  # ============================================================================
+  # 6. Discord Relay (Zero Phone Number, Rich Code Embeds & Channel Control)
+  # Run with: docker compose --profile discord up -d
+  # ============================================================================
+  discord-bot:
+    build:
+      context: ./discord-agent-bot
+      dockerfile: Dockerfile
+    container_name: discord-agent-bot
+    restart: unless-stopped
+    profiles: ["discord"]
+    depends_on:
+      - litellm
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_ALLOWED_USER_ID=${DISCORD_ALLOWED_USER_ID}
+      - LITELLM_API_BASE=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
+      - OBSIDIAN_VAULT_PATH=/data/obsidian
+      - WORKSPACE_PATH=/data/workspace
+      - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITLAB_TOKEN=${GITLAB_TOKEN:-}
+      - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
+      - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
+      - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
+      - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
+      - ./ssh:/root/.ssh:ro
+
 networks:
   default:
     name: ai_orchestrator_net
