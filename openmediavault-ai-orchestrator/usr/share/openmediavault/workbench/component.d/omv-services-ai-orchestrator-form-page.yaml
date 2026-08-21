@@ -1,0 +1,63 @@
+version: "1.0"
+type: component
+data:
+  name: omv-services-aiorchestrator-form-page
+  type: formPage
+  config:
+    request:
+      service: AIOrchestrator
+      get:
+        method: getSettings
+      post:
+        method: setSettings
+    fields:
+      - type: confKey
+        name: enable
+        label: _("Enable")
+        value: false
+      - type: textInput
+        name: data_dir
+        label: _("Data Directory")
+        hint: _("Storage path for Obsidian and Workspace (e.g. /srv/dev-data)")
+        value: "/srv/dev-data"
+      - type: divider
+        title: _("AI Model Subscriptions & Tokens")
+      - type: passwordInput
+        name: gemini_api_key
+        label: _("Google AI Studio Key (Google AI Pro)")
+        hint: _("Powers Gemini 3.7 Flash & Pro (https://aistudio.google.com/app/apikey)")
+      - type: passwordInput
+        name: anthropic_api_key
+        label: _("Anthropic API Key (Claude Pro)")
+        hint: _("Powers Claude 3.7 Sonnet Thinking (https://console.anthropic.com/)")
+      - type: passwordInput
+        name: github_token
+        label: _("GitHub Token (Copilot Pro)")
+        hint: _("Powers GPT-4o, o1, o3-mini & DeepSeek-R1 via GitHub Models")
+      - type: divider
+        title: _("Telegram Remote Control Bot")
+      - type: passwordInput
+        name: telegram_bot_token
+        label: _("Telegram Bot Token")
+        hint: _("From @BotFather")
+      - type: textInput
+        name: telegram_allowed_user_id
+        label: _("Allowed Telegram Numeric User ID")
+        hint: _("From @userinfobot (restricts bot access to you only)")
+      - type: divider
+        title: _("Security & Web Access")
+      - type: passwordInput
+        name: litellm_master_key
+        label: _("LiteLLM Proxy Master Key")
+        value: "sk-omv-secret-master-key"
+      - type: textInput
+        name: terminal_user
+        label: _("Web Terminal Username")
+        value: "admin"
+      - type: passwordInput
+        name: terminal_pass
+        label: _("Web Terminal Password")
+        value: "proliantgen8"
+    buttons:
+      - template: submit
+      - template: cancel

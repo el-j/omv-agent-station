@@ -2,21 +2,33 @@
 
 An always-on, self-hosted AI engineering stack running on your home server (Debian / OpenMediaVault on HP ProLiant MicroServer Gen8).
 
-Control autonomous coding agents from **Telegram**, sync your **Obsidian** Second Brain in real-time with **Syncthing**, multiplex sessions with **cmux / tmux**, and shield yourself from rate limits and high costs using **LiteLLM Proxy** configured for your existing subscriptions (**Google AI / Gemini**, **Claude Code**, and **GitHub Copilot**).
+Control autonomous coding agents from **Telegram**, sync your **Obsidian** Second Brain in real-time with **Syncthing**, multiplex sessions with **cmux / tmux**, and shield yourself from rate limits and high costs using **LiteLLM Proxy** configured for your existing subscriptions (**Google AI Studio / Gemini 3.7**, **Google Cloud Vertex AI Claude**, **Direct Anthropic Claude 3.7 Sonnet**, and **GitHub Copilot**).
+
+---
+
+## ⚡ 1-Liner Quick-Start on OMV Server (SSH Terminal)
+
+Run this single command on your OpenMediaVault SSH console to clone, configure, and launch the entire stack:
+
+```bash
+git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
+```
 
 ---
 
 ## 📑 Table of Contents
 
 1. [Why This Architecture?](#-why-this-architecture)
-2. [Hardware & Server Feasibility (HP ProLiant Gen8)](#-hardware--server-feasibility-hp-proliant-gen8)
-3. [Stack Components & Synergy](#-stack-components--synergy)
-4. [How Your AI Subscriptions Are Maximized](#-how-your-ai-subscriptions-are-maximized)
-5. [Quick Start & Setup Guide](#-quick-start--setup-guide)
-6. [Telegram Bot Commands & Workflow](#-telegram-bot-commands--workflow)
-7. [Obsidian & Syncthing Integration](#-obsidian--syncthing-integration)
-8. [Live Terminal & Session Multiplexing](#-live-terminal--session-multiplexing)
-9. [Troubleshooting & Maintenance](#-troubleshooting--maintenance)
+2. [Official Documentation & Sources](#-official-documentation--sources)
+3. [Hardware & Server Feasibility (HP ProLiant Gen8)](#-hardware--server-feasibility-hp-proliant-gen8)
+4. [Stack Components & Synergy](#-stack-components--synergy)
+5. [Multi-Tier AI Redundancy & Smart Failover](#-multi-tier-ai-redundancy--smart-failover)
+6. [OpenMediaVault (OMV) GUI & OMV-Extras Compose Template](#-openmediavault-omv-gui--omv-extras-compose-template)
+7. [Step-by-Step Setup Guide](#-step-by-step-setup-guide)
+8. [Telegram Bot Commands & Workflow](#-telegram-bot-commands--workflow)
+9. [Obsidian & Syncthing Integration](#-obsidian--syncthing-integration)
+10. [Live Terminal & Session Multiplexing](#-live-terminal--session-multiplexing)
+11. [Troubleshooting & Maintenance](#-troubleshooting--maintenance)
 
 ---
 
@@ -57,19 +69,43 @@ Instead of keeping your primary laptop powered on 24/7 or being tied to your des
 |  +-----------------------------------------------------------------------------+  |
 |  |                    LiteLLM Multi-Provider Proxy Router                      |  |
 |  |  - Prompt Caching (90% savings)    - Rate Limit Shield & 429 Cooldown       |  |
-|  |  - Usage & Budget Telemetry        - Multi-Tier Virtual Aliases             |  |
+|  |  - Dual Claude Failover Router     - Gemini 3.7 Workhorse & Reasoning       |  |
 |  +-----------------------------------+-----------------------------------------+  |
 +--------------------------------------|--------------------------------------------+
                                        |
                                        v
 +-----------------------------------------------------------------------------------+
-|                           YOUR AI SUBSCRIPTIONS                                   |
+|                           YOUR ACTIVE PRO SUBSCRIPTIONS                           |
 |                                                                                   |
-|  1. Google AI:          Gemini 2.5 Flash & Pro (1M-2M Context, Rapid Workhorse)   |
-|  2. GitHub Copilot:     GitHub Models API (GPT-4o & o3-mini via GitHub Token)     |
-|  3. Claude Code:        Anthropic API (Claude 3.7 Sonnet Thinking, 3.5 Haiku)     |
+|  1. Google AI Pro (5 TB):   Gemini 3.7 Flash & Pro (1M-2M Context, Rapid Workhorse)|
+|  2. Claude Pro:             Claude 3.7 Sonnet Thinking (Primary Coding Brain)     |
+|  3. GitHub Copilot Pro:     GPT-4o & o3-mini via GitHub Models (Free Cloud Fallback)|
 +-----------------------------------------------------------------------------------+
 ```
+
+---
+
+## 🎯 How Your 3 Pro Subscriptions Complement Each Other
+
+| Your Subscription | Integration in this Stack | Role & Superpower |
+| :--- | :--- | :--- |
+| 👑 **Google AI Pro (5 TB)** | [Google AI Studio API Key](https://aistudio.google.com/app/apikey) | **The High-Speed Workhorse:** Powers `gemini-3.7-flash` and `gemini-3.7-pro`. Massive 1M+ token context window for reading whole repos, running lint triage, and test generation with high speed and generous tier limits. |
+| 🧠 **Claude Pro** | [Anthropic Console API / Claude Code](https://console.anthropic.com/) | **The Coding Maestro:** Powers `claude-3-7-sonnet-20250219`. Unmatched code synthesis, complex bug fixing, architectural refactoring, and Hybrid Thinking mode. Prompt caching enabled by default (90% savings). |
+| 🛡️ **GitHub Copilot Pro** | [GitHub Personal Access Token](https://github.com/settings/tokens) | **The Zero-Added-Cost Safety Net:** Direct access to `gpt-4o` and `o3-mini` via GitHub Models inference endpoint (`https://models.inference.ai.azure.com`). Automatically kicks in if other providers hit cooldowns. |
+
+---
+
+## 📚 Official Documentation & Sources
+
+All models, routing parameters, and API integration paths strictly adhere to the official vendor documentation:
+
+| Provider / Tool | Documentation Source | Key Models & Capabilities |
+| :--- | :--- | :--- |
+| **Google AI Studio (Google AI Pro)** | [Google AI Studio Documentation](https://ai.google.dev/gemini-api/docs) | `gemini-3.7-flash`, `gemini-3.7-pro`, dynamic reasoning tokens, 1M+ context window |
+| **Anthropic API (Claude Pro)** | [Anthropic Developer Documentation](https://docs.anthropic.com/en/docs/about-claude/models) | `anthropic/claude-3-7-sonnet-20250219`, Prompt Caching, Extended Thinking |
+| **GitHub Models (Copilot Pro)** | [GitHub Models Documentation](https://docs.github.com/en/github-models) | `openai/gpt-4o`, `openai/o3-mini` (Azure inference endpoint) |
+| **LiteLLM Gateway** | [LiteLLM Official Documentation](https://docs.litellm.ai/docs/providers) | Unified proxy, usage-based routing, cooldown periods, multi-provider fallbacks |
+| **OMV-Extras Compose** | [OMV-Extras Compose Repository](https://github.com/OpenMediaVault-Plugin-Developers/packages-openmediavault-compose) | Native OpenMediaVault container compose plugin & template catalog |
 
 ---
 
@@ -85,93 +121,111 @@ Instead of keeping your primary laptop powered on 24/7 or being tied to your des
 
 ## 🧩 Stack Components & Synergy
 
-| Component             | Technology                                                           | Purpose                                                                                                                            |
-| --------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **AI Gateway**        | [LiteLLM Proxy](https://github.com/BerriAI/litellm)                  | Unifies all AI providers into a single OpenAI-compatible endpoint with automatic failover, prompt caching, and rate-limit shields. |
-| **Second Brain**      | [Obsidian](https://obsidian.md) + [Syncthing](https://syncthing.net) | Stores project specs, architecture guides (`AGENTS.md`), memory notes, and task lists, synced bi-directionally across devices.     |
-| **Agent Multiplexer** | `cmux` / `tmux`                                                      | Runs long-running CLI coding agents in detached persistent terminal sessions that survive network drops.                           |
-| **Remote Control**    | Telegram Bot (Python 3.11)                                           | Receive commands on Telegram, run agents in git branches, run tests, and message back diffs & logs.                                |
-| **Web Console**       | `ttyd`                                                               | Optional browser-based terminal (`http://<OMV-IP>:7681`) to inspect running agent sessions from anywhere.                          |
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **AI Gateway** | [LiteLLM Proxy](https://github.com/BerriAI/litellm) | Unifies all AI providers into a single OpenAI-compatible endpoint with automatic failover, prompt caching, and rate-limit shields. |
+| **Second Brain** | [Obsidian](https://obsidian.md) + [Syncthing](https://syncthing.net) | Stores project specs, architecture guides (`AGENTS.md`), memory notes, and task lists, synced bi-directionally across devices. |
+| **Agent Multiplexer** | `cmux` / `tmux` | Runs long-running CLI coding agents in detached persistent terminal sessions that survive network drops. |
+| **Remote Control** | Telegram Bot (Python 3.11) | Receive commands on Telegram, run agents in git branches, run tests, and message back diffs & logs. |
+| **Web Console** | `ttyd` | Browser-based terminal (`http://<OMV-IP>:7681`) to inspect running agent sessions from anywhere. |
 
 ---
 
-## 🎯 How Your AI Subscriptions Are Maximized
+## 🎯 Multi-Tier AI Redundancy & Smart Failover
 
-### 1. Google AI (Gemini 2.5 Flash & Pro)
+### Double Claude Redundancy (Direct Anthropic + Google Vertex AI)
+If your primary direct Anthropic subscription hits a rate limit (HTTP 429) or token ceiling, LiteLLM **automatically fails over to Claude 3.7 Sonnet via your Google Cloud / Vertex AI subscription** without interrupting the agent's work.
 
-- **Role in Stack:** Fast workhorse and entire-repo analyzer.
-- **Why it shines:** 1,000,000 to 2,000,000 token context window, ultra-fast generation, extremely low cost per token.
-- **Assigned Model Group:** `coder-fast` (file discovery, repo mapping, triage, unit test generation).
+```
+[ Coding Agent Request (coder-smart) ]
+│
+▼
+1️⃣ Anthropic API (Claude 3.7 Sonnet) ──[429 / Quota exhausted]──►
+│
+▼
+2️⃣ Google Vertex AI (Claude 3.7 Sonnet / Opus via Google Sub) ──[Fallback]──►
+│
+▼
+3️⃣ Google AI Studio (Gemini 3.7 Pro / Gemini 3.7 Flash) ──[Fallback]──►
+│
+▼
+4️⃣ GitHub Copilot (GitHub Models: GPT-4o / o3-mini)
+```
 
-### 2. Claude Code / Anthropic (Claude 3.7 Sonnet)
-
-- **Role in Stack:** Premier reasoning & autonomous coding engine.
-- **Why it shines:** Gold standard for complex refactoring, multi-file edits, and architectural thinking.
-- **Prompt Caching:** LiteLLM is pre-configured with `enable_prompt_caching: true`, saving up to 90% on repeated system prompts and project context.
-- **Assigned Model Group:** `coder-smart` & `reasoning-heavy`.
-
-### 3. Microsoft Copilot from GitHub (GitHub Models)
-
-- **Role in Stack:** Zero-added-cost cloud fallback.
-- **Why it shines:** Access Azure-hosted `gpt-4o` and `o3-mini` endpoints using your existing `GITHUB_TOKEN`.
-- **Assigned Model Group:** Automated failover tier when other providers hit temporary cooldowns.
+### Virtual Router Aliases in `litellm/config.yaml`:
+- **`coder-fast`**: Ultra-fast triage, search, and repository mapping using **Gemini 3.7 Flash** (fallback: Gemini 2.5 Flash, Claude 3.5 Haiku).
+- **`coder-smart`**: Primary agentic loop model using **Claude 3.7 Sonnet** (fallback: Vertex AI Claude 3.7 Sonnet, Gemini 3.7 Pro, GitHub GPT-4o).
+- **`reasoning-heavy`**: Deep architecture design & mathematical reasoning using **Claude 3.7 Sonnet Thinking** & **Gemini 3.7 Pro** (fallback: GitHub o3-mini).
 
 ---
 
-## 🚀 Quick Start & Setup Guide
+## 🌐 OpenMediaVault Integration Options (Plugin, GUI, CLI)
 
-### 1. Prerequisites on Your OpenMediaVault Server
+You have 3 easy ways to run and manage this stack on your server:
 
-Ensure Docker and Docker Compose are installed on OMV (via OMV-Extras or standard Debian apt):
+### 🏆 Option A: Native OpenMediaVault Plugin (`openmediavault-ai-orchestrator`)
+A full native OpenMediaVault plugin that adds **Services $\to$ AI Orchestrator** directly into the OMV WebGUI Workbench:
+1. Build or download the `.deb` package:
+   ```bash
+   ./build-deb.sh
+   ```
+2. Install the package on your OMV server:
+   ```bash
+   sudo dpkg -i openmediavault-ai-orchestrator_1.0.0_all.deb
+   ```
+3. Refresh your OpenMediaVault WebGUI $\to$ Click **Services $\to$ AI Orchestrator**:
+   - Toggle **Enable**
+   - Enter your **Google AI Pro**, **Claude Pro**, and **GitHub Copilot** keys in the WebGUI form
+   - Click **Save** & **Apply**! The plugin automatically manages Docker containers and logs.
 
+### 📋 Option B: OMV-Extras Compose Plugin (WebGUI Templates)
+1. In the OMV WebGUI, navigate to **Services → Compose → Files**.
+2. Click **+** (Add) and load [omv-compose-template.yaml](file:///Users/rex-fab-alt/Documents/code/playground/omv-stack/omv-compose-template.yaml) or `docker-compose.yml`.
+3. In **Environment**, paste your keys from `env.example`.
+4. Click **Apply** and **Up**.
+
+### ⚡ Option C: 1-Liner Terminal Quick-Start (SSH)
+```bash
+git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
+```
 ```bash
 sudo apt update && sudo apt install -y docker.io docker-compose-plugin
 ```
 
-### 2. Copy the Stack to Your Server
-
-From your local machine:
-
+### 2. Clone and Configure
 ```bash
-scp -r /Users/rex-fab-alt/Documents/code/playground/omv-stack root@<OMV-SERVER-IP>:/srv/dev-data/ai-stack
-```
-
-### 3. SSH into OMV and Configure Environment
-
-```bash
-ssh root@<OMV-SERVER-IP>
+git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack
 cd /srv/dev-data/ai-stack
-
-# Copy example environment file
 cp env.example .env
-
-# Edit configuration with your keys
 nano .env
 ```
 
-#### Required Keys in `.env`:
-
+#### Key Variables in `.env`:
 ```ini
 DATA_DIR=/srv/dev-data
 TZ=Europe/Berlin
 LITELLM_MASTER_KEY=sk-omv-secret-master-key-change-me
 
-# 1. Google AI Studio API Key (https://aistudio.google.com/app/apikey)
+# 1. Google AI Studio (https://aistudio.google.com/app/apikey)
 GEMINI_API_KEY=AIzaSy...
 
-# 2. Anthropic API Key (https://console.anthropic.com/)
+# 2. Anthropic API (https://console.anthropic.com/)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# 3. GitHub Personal Access Token (https://github.com/settings/tokens)
+# 3. Google Cloud Vertex AI (Optional Claude Redundancy)
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=europe-west1
+VERTEX_CREDENTIALS_PATH=/app/credentials/gcp-service-account.json
+
+# 4. GitHub Copilot Token (https://github.com/settings/tokens)
 GITHUB_TOKEN=ghp_...
 
-# 4. Telegram Bot Token (@BotFather) & Your Numeric User ID (@userinfobot)
+# 5. Telegram Bot Token (@BotFather) & User ID (@userinfobot)
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
 TELEGRAM_ALLOWED_USER_ID=123456789
 ```
 
-### 4. Launch the Stack
-
+### 3. Start the Stack
 ```bash
 ./setup.sh
 ```
@@ -183,10 +237,9 @@ TELEGRAM_ALLOWED_USER_ID=123456789
 Once the bot is running, message it in your Telegram app:
 
 ### Everyday Commands:
-
 - `/task <project-folder> <instruction>`: Launches an autonomous agent session on `/data/workspace/<project-folder>`, generates a new git branch, runs tests, and replies with a summary and diff.
   - _Example:_ `/task backend-api "Add rate-limiting middleware to auth routes and write integration tests"`
-- `/chat <question>`: Ask general coding/architecture questions using the smart multi-model router.
+- `/chat <question>`: Ask general coding/architecture questions using Gemini 3.7 / Claude 3.7 with fallback routing.
 - `/projects`: List all repositories available in your server's workspace.
 - `/vault`: Check total notes and recently modified files in your Obsidian vault.
 - `/note <Title> | <Content>`: Save a quick note directly into your Obsidian `Inbox/` folder.
@@ -223,7 +276,6 @@ If you ever want to watch an agent code in real time or take manual control:
 ## 🛠️ Troubleshooting & Maintenance
 
 ### Checking Service Logs:
-
 ```bash
 # Check LiteLLM routing and request metrics
 docker compose logs -f litellm
@@ -236,15 +288,12 @@ docker compose logs -f syncthing
 ```
 
 ### Restarting the Stack:
-
 ```bash
 docker compose restart
 ```
 
 ### Updating Models or Prompt Settings:
-
 Edit `litellm/config.yaml` and restart LiteLLM:
-
 ```bash
 nano litellm/config.yaml
 docker compose restart litellm
@@ -254,4 +303,5 @@ docker compose restart litellm
 
 ## 📜 License
 
-MIT License. Built for seamless self-hosted AI engineering.
+MIT License. Built for seamless self-hosted AI engineering on OpenMediaVault.
+

@@ -11,6 +11,7 @@ echo "📂 Creating storage directories at $DATA_DIR..."
 mkdir -p "$DATA_DIR/obsidian"
 mkdir -p "$DATA_DIR/workspace"
 mkdir -p ./syncthing/config
+mkdir -p ./credentials
 
 if [ ! -f .env ]; then
     echo "⚠️ .env file not found. Copying from env.example..."

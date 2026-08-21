@@ -27,90 +27,63 @@ This production stack turns your **HP ProLiant MicroServer Gen8 (running OpenMed
 |  +-----------------------------------------------------------------------------+  |
 |  |                    LiteLLM Multi-Provider Proxy Router                      |  |
 |  |  - Prompt Caching (90% savings)    - Rate Limit Shield & 429 Cooldown       |  |
-|  |  - Usage & Budget Telemetry        - Multi-Tier Virtual Aliases             |  |
+|  |  - Dual Claude Failover Router     - Gemini 3.7 Workhorse & Reasoning       |  |
 |  +-----------------------------------+-----------------------------------------+  |
 +--------------------------------------|--------------------------------------------+
                                        |
                                        v
 +-----------------------------------------------------------------------------------+
-|                           YOUR AI SUBSCRIPTIONS                                   |
+|                           YOUR ACTIVE PRO SUBSCRIPTIONS                           |
 |                                                                                   |
-|  1. Google AI:          Gemini 2.5 Flash & Pro (1M-2M Context, Rapid Workhorse)   |
-|  2. GitHub Copilot:     GitHub Models API (GPT-4o & o3-mini via GitHub Token)     |
-|  3. Claude Code:        Anthropic API (Claude 3.7 Sonnet Thinking, 3.5 Haiku)     |
+|  1. Google AI Pro (5 TB):   Gemini 3.7 Flash & Pro (1M-2M Context, Rapid Workhorse)|
+|  2. Claude Pro:             Claude 3.7 Sonnet Thinking (Primary Coding Brain)     |
+|  3. GitHub Copilot Pro:     GPT-4o & o3-mini via GitHub Models (Free Cloud Fallback)|
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Leveraging Your Subscriptions to Maximum Advantage
+## 2. Leveraging Your 3 Pro Subscriptions to Maximum Advantage
 
-### A. Google AI (Gemini Studio API)
-
-- **Strengths:** Huge context window (1,000,000 to 2,000,000 tokens), extremely low latency, generous rate limits.
+### A. Google AI Pro (5 TB Subscription)
+- **Official Docs:** [Google AI Studio Documentation](https://ai.google.dev/gemini-api/docs)
+- **API Key Source:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- **Strengths:** Huge context window (1M+ tokens), dynamic reasoning token support, ultra-low latency, generous quota tied to your Google AI Pro account.
 - **Role in Stack:**
-  - **Gemini 2.5 Flash:** Used as the primary **triage & context reader** model (`coder-fast`). It reads whole repositories, summarizes logs, and handles quick edits at almost zero cost.
-  - **Gemini 2.5 Pro:** Secondary heavyweight reasoning model when reviewing large codebases.
+  - **Gemini 3.7 Flash:** Primary **triage & context reader** model (`coder-fast`). It reads entire repositories and summarizes logs.
+  - **Gemini 3.7 Pro:** Secondary heavyweight reasoning model for deep codebase analysis.
 
-### B. Microsoft Copilot from GitHub
+### B. Claude Pro (Anthropic)
+- **Official Docs:** [Anthropic Developer Documentation](https://docs.anthropic.com/en/docs/about-claude/models)
+- **API Key Source:** [https://console.anthropic.com/](https://console.anthropic.com/) (and Claude Code CLI authentication)
+- **Strengths:** Unrivaled code synthesis, Hybrid Thinking mode, and Prompt Caching (90% discount on cached tokens).
+- **Role in Stack:** Primary reasoning engine for autonomous multi-file coding loops (`coder-smart`).
 
-- **Strengths:** Included with your GitHub Copilot subscription; gives access to Azure/GitHub AI inference endpoints.
-- **Role in Stack:**
-  - Uses your `GITHUB_TOKEN` with the GitHub Models inference endpoint (`https://models.inference.ai.azure.com`).
-  - Provides access to **GPT-4o** and **o3-mini** without requiring separate OpenAI credit cards.
-  - Configured as an automatic fallback tier in `coder-smart` and `reasoning-heavy`.
-
-### C. Claude Code / Anthropic
-
-- **Strengths:** Unrivaled state-of-the-art coding, refactoring, and reasoning.
-- **Role in Stack:**
-  - **Claude 3.7 Sonnet (Hybrid Thinking):** The primary brain for autonomous coding agents (`coder-smart`).
-  - **Prompt Caching Enabled:** LiteLLM passes prompt caching headers so repeated system prompts and project context are billed at a 90% discount.
-  - **Claude Code CLI:** Pre-installed inside the container so you can trigger Claude Code directly or via terminal.
+### C. GitHub Copilot Pro (GitHub / Microsoft)
+- **Official Docs:** [GitHub Models Documentation](https://docs.github.com/en/github-models)
+- **PAT Token Source:** [https://github.com/settings/tokens](https://github.com/settings/tokens)
+- **Strengths:** Zero extra cost using your existing Copilot subscription via the GitHub Models inference endpoint (`https://models.inference.ai.azure.com`).
+- **Role in Stack:** Automated cloud fallback for `gpt-4o` and `o3-mini` when other providers are in cooldown.
 
 ---
 
-## 3. Quick-Start Deployment on OpenMediaVault
+## 3. Quick-Start Deployment Options on OpenMediaVault
 
-### Step 1: Copy the Stack to Your Server
+### Option 1: Native OpenMediaVault WebGUI Plugin
+1. Build package: `./build-deb.sh`
+2. Install on OMV: `sudo dpkg -i openmediavault-ai-orchestrator_1.0.0_all.deb`
+3. Go to **OMV WebGUI $\to$ Services $\to$ AI Orchestrator**: Enter your tokens and click **Save & Apply**!
 
-From your computer, copy the `omv-stack` folder to your ProLiant Gen8:
-
+### Option 2: 1-Liner Shell Quick-Start (SSH Terminal)
 ```bash
-scp -r ./omv-stack root@<YOUR-OMV-IP>:/srv/dev-data/ai-stack
+git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
 ```
 
-### Step 2: SSH into Your OMV Server
-
-```bash
-ssh root@<YOUR-OMV-IP>
-cd /srv/dev-data/ai-stack
-```
-
-### Step 3: Configure Your Credentials
-
-Copy `env.example` to `.env` and fill in your API keys and tokens:
-
-```bash
-cp env.example .env
-nano .env
-```
-
-Ensure you set:
-
-- `GEMINI_API_KEY`: From Google AI Studio.
-- `ANTHROPIC_API_KEY`: From Anthropic Console.
-- `GITHUB_TOKEN`: GitHub Personal Access Token (classic or fine-grained with model access).
-- `TELEGRAM_BOT_TOKEN`: From Telegram `@BotFather`.
-- `TELEGRAM_ALLOWED_USER_ID`: Your numeric Telegram ID (from `@userinfobot`).
-
-### Step 4: Run the Setup Script
-
-```bash
-./setup.sh
-```
-
-This script creates storage volumes, builds the containers, and launches the entire stack.
+### Option 3: OMV-Extras WebGUI Compose Plugin
+1. In OMV WebGUI, go to **Services → Compose → Files**.
+2. Click **+** (Add) and load [omv-compose-template.yaml](file:///Users/rex-fab-alt/Documents/code/playground/omv-stack/omv-compose-template.yaml) or `docker-compose.yml`.
+3. Add your environment variables from `env.example`.
+4. Click **Apply** and **Up**.
 
 ---
 
@@ -118,16 +91,16 @@ This script creates storage volumes, builds the containers, and launches the ent
 
 Once launched, open your Telegram chat with your bot and try:
 
-| Command                    | Action                                                                   |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `/start`                   | Display status and available options                                     |
-| `/task <project> <prompt>` | Start an autonomous agent coding session in `/data/workspace/<project>`  |
-| `/chat <question>`         | Ask technical questions using the smart router (Claude 3.7 / Gemini 2.5) |
-| `/projects`                | List all repositories in your workspace directory                        |
-| `/vault`                   | View status and recently modified files in your Obsidian second brain    |
-| `/note <Title> \| <Body>`  | Instantly save a new note to `Inbox/` in your Obsidian vault             |
-| `/models`                  | Query the LiteLLM proxy for active provider endpoints and health         |
-| `/status`                  | View server uptime, RAM, disk space, and active tmux sessions            |
+| Command | Action |
+| :--- | :--- |
+| `/start` | Display status and available options |
+| `/task <project> <prompt>` | Start an autonomous agent coding session in `/data/workspace/<project>` |
+| `/chat <question>` | Ask technical questions using the smart router (Claude 3.7 / Gemini 3.7) |
+| `/projects` | List all repositories in your workspace directory |
+| `/vault` | View status and recently modified files in your Obsidian second brain |
+| `/note <Title> \| <Body>` | Instantly save a new note to `Inbox/` in your Obsidian vault |
+| `/models` | Query the LiteLLM proxy for active provider endpoints and health |
+| `/status` | View server uptime, RAM, disk space, and active tmux sessions |
 
 ---
 

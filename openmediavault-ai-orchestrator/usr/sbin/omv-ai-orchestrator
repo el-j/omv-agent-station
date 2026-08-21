@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# OpenMediaVault AI Orchestrator CLI Helper & Service Lifecycle Manager
+# ==============================================================================
+
+set -e
+
+CONFIG_FILE="/etc/openmediavault-ai-orchestrator.json"
+STACK_DIR="/usr/share/openmediavault/ai-orchestrator"
+
+apply_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Configuration file $CONFIG_FILE does not exist."
+        exit 0
+    fi
+
+    # Read config with python
+    ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))")
+    DATA_DIR=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('data_dir', '/srv/dev-data'))")
+    GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))")
+    ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))")
+    GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))")
+    TELEGRAM_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_bot_token', ''))")
+    TELEGRAM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_allowed_user_id', ''))")
+    MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-master-key'))")
+    TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))")
+    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'proliantgen8'))")
+
+    # Create directories
+    mkdir -p "$DATA_DIR/obsidian"
+    mkdir -p "$DATA_DIR/workspace"
+    mkdir -p "$STACK_DIR/credentials"
+    mkdir -p "$STACK_DIR/syncthing/config"
+
+    # Write .env file
+    cat <<EOF > "$STACK_DIR/.env"
+DATA_DIR=$DATA_DIR
+TZ=$(cat /etc/timezone 2>/dev/null || echo "Europe/Berlin")
+LITELLM_MASTER_KEY=$MASTER_KEY
+GEMINI_API_KEY=$GEMINI_KEY
+ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+GITHUB_TOKEN=$GITHUB_TOKEN
+TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN
+TELEGRAM_ALLOWED_USER_ID=$TELEGRAM_USER
+TERMINAL_USER=$TERM_USER
+TERMINAL_PASS=$TERM_PASS
+EOF
+
+    cd "$STACK_DIR"
+    if [ "$ENABLE" = "True" ]; then
+        echo "Starting AI Orchestrator Stack..."
+        docker compose --env-file .env up -d --remove-orphans
+    else
+        echo "Stopping AI Orchestrator Stack..."
+        docker compose --env-file .env down || true
+    fi
+}
+
+case "$1" in
+    apply)
+        apply_config
+        ;;
+    start)
+        cd "$STACK_DIR" && docker compose --env-file .env up -d
+        ;;
+    stop)
+        cd "$STACK_DIR" && docker compose --env-file .env down
+        ;;
+    restart)
+        cd "$STACK_DIR" && docker compose --env-file .env restart
+        ;;
+    status)
+        cd "$STACK_DIR" && docker compose --env-file .env ps
+        ;;
+    logs)
+        SERVICE=${2:-litellm}
+        cd "$STACK_DIR" && docker compose --env-file .env logs --tail=100 "$SERVICE"
+        ;;
+    *)
+        echo "Usage: $0 {apply|start|stop|restart|status|logs [service]}"
+        exit 1
+        ;;
+esac

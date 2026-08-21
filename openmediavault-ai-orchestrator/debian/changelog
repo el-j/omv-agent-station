@@ -1,0 +1,7 @@
+openmediavault-ai-orchestrator (1.0.0) unstable; urgency=low
+
+  * Initial release for OpenMediaVault 6 / 7.
+  * Support for Google AI Pro (Gemini 3.7 Flash & Pro), Claude Pro (Claude 3.7 Sonnet), and GitHub Copilot Pro (GPT-4o, o1, o3-mini, DeepSeek-R1).
+  * WebGUI integration with token inputs, shared folder selector, and container status.
+
+ -- Fabian <dev@local>  Fri, 21 Aug 2026 12:00:00 +0200

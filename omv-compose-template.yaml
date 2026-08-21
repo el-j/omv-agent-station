@@ -1,7 +1,20 @@
+# ==============================================================================
+# OpenMediaVault Compose Example Template: AI Agent Orchestrator Stack
+# Target: openmediavault-compose plugin (OMV-Extras)
+# ==============================================================================
+# Description:
+# 24/7 Headless AI Development & Remote Coding Server for OpenMediaVault & HP ProLiant Gen8.
+# Includes LiteLLM AI Gateway (Gemini 3.7, Claude 3.7 Sonnet direct & Vertex AI, Copilot),
+# Syncthing bi-directional sync for Obsidian Second Brain, Telegram Remote Agent Bot,
+# and browser-based Web Terminal.
+# ==============================================================================
+
+version: "3.8"
+
 services:
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   # 1. LiteLLM Proxy: Unified Multi-Provider AI Gateway & Rate-Limit Shield
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-proxy
@@ -11,9 +24,7 @@ services:
     environment:
       - LITELLM_CONFIG_PATH=/app/config.yaml
       - STORE_MODEL_IN_DB=False
-      # Master key to secure the proxy endpoint
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
-      # API Keys & Cloud Credentials
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -32,9 +43,9 @@ services:
       timeout: 10s
       retries: 3
 
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   # 2. Syncthing: Continuous Obsidian Vault & Workspace Sync
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   syncthing:
     image: lscr.io/linuxserver/syncthing:latest
     container_name: syncthing
@@ -48,14 +59,14 @@ services:
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
     ports:
-      - "8384:8384" # Web GUI
-      - "22000:22000/tcp" # Sync protocol TCP
-      - "22000:22000/udp" # Sync protocol UDP
-      - "21027:21027/udp" # Local discovery
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
 
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   # 3. Telegram Agent Relay Bot: Remote Control for Coding & Execution
-  # ============================================================================
+  # ----------------------------------------------------------------------------
   telegram-bot:
     build:
       context: ./telegram-agent-bot
@@ -79,9 +90,9 @@ services:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  # ============================================================================
-  # 4. Web Terminal (ttyd / cmux web bridge) - Optional Quick Access
-  # ============================================================================
+  # ----------------------------------------------------------------------------
+  # 4. Web Terminal (ttyd / cmux web bridge) - Browser Terminal Access
+  # ----------------------------------------------------------------------------
   web-terminal:
     image: tsl0922/ttyd:latest
     container_name: omv-agent-terminal

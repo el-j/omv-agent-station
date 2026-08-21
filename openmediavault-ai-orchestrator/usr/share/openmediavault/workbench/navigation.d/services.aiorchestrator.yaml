@@ -1,0 +1,9 @@
+version: "1.0"
+type: navigation
+data:
+  path: services.aiorchestrator
+  text: _("AI Orchestrator")
+  icon: "mdi:robot"
+  position: 120
+  parent: services
+  component: omv-services-aiorchestrator-form-page

@@ -70,7 +70,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Your 24/7 AI-powered development server is online.\n\n"
         "⚡ *Commands:*\n"
         "• `/task <project> <instructions>` - Run autonomous coding agent\n"
-        "• `/chat <message>` - Ask questions using Gemini 2.5 / Claude 3.7\n"
+        "• `/chat <message>` - Ask questions using Gemini 3.7 / Claude 3.7\n"
         "• `/projects` - List all projects in your workspace\n"
         "• `/vault` - Inspect Obsidian knowledge base & recent notes\n"
         "• `/models` - Check available models & proxy health\n"
@@ -87,11 +87,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1️⃣ *Autonomous Task:* `/task my-repo \"Refactor database layer and add unit tests\"`\n"
         "   - Creates branch `agent/task-<timestamp>`\n"
         "   - Reads context from Obsidian vault\n"
-        "   - Runs Aider / Hermes agent with Claude 3.7 / Gemini 2.5\n"
+        "   - Runs Aider / Hermes agent with Claude 3.7 / Gemini 3.7\n"
         "   - Runs tests & commits automatically\n"
         "   - Returns git diff summary\n\n"
         "2️⃣ *Direct Chat:* `/chat How do I optimize SQLite WAL mode in Go?`\n"
-        "   - Uses smart fallback router (Gemini 2.5 Flash / Claude 3.7)\n\n"
+        "   - Uses smart fallback router (Gemini 3.7 Flash / Claude 3.7 Sonnet)\n\n"
         "3️⃣ *Obsidian Memo:* `/note <Topic> <Content>`\n"
         "   - Saves a quick note directly into your Obsidian Inbox"
     )
@@ -216,7 +216,7 @@ async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("💭 Thinking...")
 
     try:
-        # Calls LiteLLM virtual router 'coder-smart' (Claude 3.7 Sonnet / Gemini 2.5 Pro)
+        # Calls LiteLLM virtual router 'coder-smart' (Claude 3.7 Sonnet / Vertex AI / Gemini 3.7 Pro)
         response = ai_client.chat.completions.create(
             model="coder-smart",
             messages=[
