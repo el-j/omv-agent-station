@@ -301,7 +301,47 @@ docker compose restart litellm
 
 ---
 
-## 📜 License
+## 🧪 Quality Assurance, Testing & Security
 
-MIT License. Built for seamless self-hosted AI engineering on OpenMediaVault.
+This repository is maintained with strict automated CI/CD quality checks, secret leak detection, and unit testing:
+
+```bash
+# Run unit tests
+make test
+
+# Run code linter
+make lint
+
+# Scan for vulnerabilities & secret leaks
+make security
+
+# Build OpenMediaVault .deb package
+make deb
+
+# Run full suite
+make all
+```
+
+---
+
+## 🌐 Astro Documentation Website & GitHub Pages
+
+A static documentation site built with **Astro** is available in the [`website/`](website/) directory. It deploys automatically to GitHub Pages via GitHub Actions:
+
+```bash
+cd website
+npm install
+npm run dev   # Start local preview at http://localhost:4321
+npm run build # Build production static bundle to website/dist/
+```
+
+---
+
+## 🤝 Community & Contributing
+
+* 📖 **[Contributing Guidelines](CONTRIBUTING.md)**: How to file issues, submit PRs, and develop locally.
+* 🛡️ **[Security Policy](SECURITY.md)**: Secret management and confidential vulnerability reporting.
+* 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**: Contributor Covenant standards.
+* ⚖️ **[License](LICENSE)**: GNU General Public License v3.0 (GPL-3.0-or-later).
+
 

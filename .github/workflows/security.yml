@@ -1,0 +1,29 @@
+name: Security Scan & Secret Leak Detection
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Weekly Monday at 3 AM
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret Scanning
+        run: |
+          bash scripts/security-check.sh
+
+      - name: Run Bandit Vulnerability Scan
+        uses: PyCQA/bandit-action@v1
+        with:
+          path: "."
+          level: "medium"
+          confidence: "medium"

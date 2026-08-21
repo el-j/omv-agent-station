@@ -1,0 +1,229 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="OMV AI Orchestrator | 24/7 Autonomous Development for OpenMediaVault">
+  <!-- HERO SECTION -->
+  <section style="padding: 5rem 0 3rem 0; text-align: center;">
+    <div class="container">
+      <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+        <span class="badge badge-indigo">🚀 Native OpenMediaVault Plugin & Docker Stack</span>
+      </div>
+      <h1 style="font-family: 'Outfit', sans-serif; font-size: 3.5rem; font-weight: 900; line-height: 1.15; max-width: 900px; margin: 0 auto 1.5rem auto;">
+        Transform Your Home Server Into a <span class="gradient-text">24/7 Autonomous Coding Agent</span>
+      </h1>
+      <p style="font-size: 1.2rem; color: var(--text-muted); max-width: 750px; margin: 0 auto 2.5rem auto;">
+        Leverage your <strong>Google AI Pro (Gemini 3.7)</strong>, <strong>Claude Pro (Claude 3.7 Sonnet)</strong>, and <strong>GitHub Copilot Pro</strong> subscriptions in an automated, self-healing development stack running on Debian & OpenMediaVault.
+      </p>
+
+      <!-- 1-Liner Quickstart -->
+      <div style="max-width: 700px; margin: 0 auto 2.5rem auto;">
+        <div class="terminal-snippet">
+          <span class="terminal-text" id="installCmd">curl -fsSL https://raw.githubusercontent.com/el-j/omv-stack/main/setup.sh | bash</span>
+          <button class="copy-btn" onclick="copyInstallCmd()">📋 Copy</button>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="#quickstart" class="btn btn-primary">⚡ 1-Click Install Guide</a>
+        <a href="https://github.com/el-j/omv-stack" target="_blank" class="btn btn-secondary">⭐ Star on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- HIGHLIGHT STATS -->
+  <section style="padding: 2rem 0;">
+    <div class="container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem;">
+      <div class="glass-card" style="text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 800; color: #818cf8; font-family: 'Outfit';">100%</div>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Automated Fallover Routing</div>
+      </div>
+      <div class="glass-card" style="text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 800; color: #34d399; font-family: 'Outfit';">0 Wasted</div>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Pro Subscription Tokens</div>
+      </div>
+      <div class="glass-card" style="text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 800; color: #38bdf8; font-family: 'Outfit';">E2EE</div>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Signal & Telegram Control</div>
+      </div>
+      <div class="glass-card" style="text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 800; color: #f43f5e; font-family: 'Outfit';">OMV 6 & 7</div>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Native Debian Package</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE & ROUTING -->
+  <section id="models" style="padding: 4rem 0;">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 3rem;">
+        <span class="badge badge-cyan">Intelligent Multi-Model Gateway</span>
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.5rem; font-weight: 800; margin-top: 0.75rem;">
+          Bulletproof Subscription Model Routing
+        </h2>
+        <p style="color: var(--text-muted); max-width: 600px; margin: 0.5rem auto 0 auto;">
+          Never get blocked by 429 rate limits or quota drops again. LiteLLM proxies and routes across your active subscriptions automatically.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem;">
+        <div class="glass-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <span class="badge badge-emerald">Fast Loop</span>
+            <span style="font-size: 0.8rem; color: #34d399;">~800ms latency</span>
+          </div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.4rem; margin-bottom: 0.5rem;">coder-fast</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Rapid edits, quick unit testing, docstrings, and bash scripting.
+          </p>
+          <div style="background: rgba(0,0,0,0.3); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.85rem; color: #cbd5e1;">
+            1️⃣ Gemini 3.7 Flash (Google AI Studio)<br/>
+            2️⃣ Gemini 2.5 Flash<br/>
+            3️⃣ Claude 3.5 Haiku
+          </div>
+        </div>
+
+        <div class="glass-card" style="border-color: var(--border-glow);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <span class="badge badge-indigo">Recommended</span>
+            <span style="font-size: 0.8rem; color: #818cf8;">Smart Architecture</span>
+          </div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.4rem; margin-bottom: 0.5rem;">coder-smart</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Autonomous feature implementation, refactoring, and multi-file codebases.
+          </p>
+          <div style="background: rgba(0,0,0,0.3); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.85rem; color: #cbd5e1;">
+            1️⃣ Claude 3.7 Sonnet (Anthropic Console)<br/>
+            2️⃣ Claude 3.7 Sonnet (Vertex AI)<br/>
+            3️⃣ Gemini 3.7 Pro<br/>
+            4️⃣ GitHub Copilot GPT-4o
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <span class="badge badge-cyan">Deep Reasoning</span>
+            <span style="font-size: 0.8rem; color: #38bdf8;">Complex Logic</span>
+          </div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.4rem; margin-bottom: 0.5rem;">reasoning-heavy</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Mathematical algorithms, distributed systems analysis, and complex debugging.
+          </p>
+          <div style="background: rgba(0,0,0,0.3); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.85rem; color: #cbd5e1;">
+            1️⃣ Claude 3.7 Sonnet Thinking<br/>
+            2️⃣ Gemini 3.7 Pro Thinking<br/>
+            3️⃣ GitHub Models (o1 / o3-mini)<br/>
+            4️⃣ DeepSeek-R1
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAT MESSENGER RELAYS -->
+  <section id="messengers" style="padding: 4rem 0; background: rgba(0,0,0,0.2);">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 3rem;">
+        <span class="badge badge-indigo">Zero Phone Number or E2EE</span>
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.5rem; font-weight: 800; margin-top: 0.75rem;">
+          Control Your Server From Any Chat App
+        </h2>
+        <p style="color: var(--text-muted); max-width: 600px; margin: 0.5rem auto 0 auto;">
+          Select your favorite messenger in the OMV WebGUI. All messengers support full autonomous coding, branch creation, git push, and Obsidian logging.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+        <div class="glass-card">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔒</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.3rem; margin-bottom: 0.5rem;">Signal Messenger</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            End-to-end encrypted bot with zero extra phone number needed using <strong>Linked Device Mode</strong>.
+          </p>
+          <div style="font-size: 0.8rem; color: #34d399;">✓ Scan QR from your phone<br/>✓ Strict E2EE privacy</div>
+        </div>
+
+        <div class="glass-card">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">✈️</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.3rem; margin-bottom: 0.5rem;">Telegram Bot</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Instant setup via @BotFather. Whitelists only your personal numeric user ID for maximum safety.
+          </p>
+          <div style="font-size: 0.8rem; color: #818cf8;">✓ Instant 10-second setup<br/>✓ Group & DM support</div>
+        </div>
+
+        <div class="glass-card">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎮</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.3rem; margin-bottom: 0.5rem;">Discord Bot</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Rich embed cards, syntax highlighted diff blocks, and dedicated channel task dispatching.
+          </p>
+          <div style="font-size: 0.8rem; color: #38bdf8;">✓ Rich code embeds<br/>✓ Zero phone number</div>
+        </div>
+
+        <div class="glass-card">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🖥️</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.3rem; margin-bottom: 0.5rem;">Web Terminal</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Browser-based persistent tmux shell (ttyd) for direct inspection without installing any apps.
+          </p>
+          <div style="font-size: 0.8rem; color: #fbbf24;">✓ Zero setup<br/>✓ Protected by credentials</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICKSTART & OMV INSTALL -->
+  <section id="quickstart" style="padding: 4rem 0;">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 3rem;">
+        <span class="badge badge-emerald">Easy Installation</span>
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.5rem; font-weight: 800; margin-top: 0.75rem;">
+          Get Started in 3 Steps
+        </h2>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+        <div class="glass-card">
+          <div style="font-size: 1.5rem; font-weight: 800; color: #818cf8; margin-bottom: 0.5rem;">Step 1</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.2rem; margin-bottom: 0.5rem;">Install OMV Plugin</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Install the native Debian package directly on your OpenMediaVault server:
+          </p>
+          <pre style="background: #000; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; color: #38bdf8; overflow-x: auto;">sudo dpkg -i openmediavault-ai-orchestrator_1.0.0_all.deb</pre>
+        </div>
+
+        <div class="glass-card">
+          <div style="font-size: 1.5rem; font-weight: 800; color: #34d399; margin-bottom: 0.5rem;">Step 2</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.2rem; margin-bottom: 0.5rem;">Configure in WebGUI</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Navigate to <strong>Services ➔ AI Orchestrator</strong> in your OMV WebGUI, paste your tokens, pick your chat service, and click <strong>Apply</strong>.
+          </p>
+        </div>
+
+        <div class="glass-card">
+          <div style="font-size: 1.5rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.5rem;">Step 3</div>
+          <h3 style="font-family: 'Outfit'; font-size: 1.2rem; margin-bottom: 0.5rem;">Start Coding!</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Message your bot from your phone:
+          </p>
+          <pre style="background: #000; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; color: #34d399; overflow-x: auto;">/task my-repo "Add unit tests and auto-push"</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline>
+  function copyInstallCmd() {
+    const text = document.getElementById('installCmd').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = event.target;
+      const originalText = btn.innerText;
+      btn.innerText = '✅ Copied!';
+      setTimeout(() => {
+        btn.innerText = originalText;
+      }, 2000);
+    });
+  }
+</script>

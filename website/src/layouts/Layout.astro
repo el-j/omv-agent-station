@@ -1,0 +1,55 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "24/7 Autonomous AI Orchestrator Stack & OpenMediaVault Plugin for Self-Hosted Development" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#090d16" />
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <nav style="position: sticky; top: 0; z-index: 50; backdrop-filter: blur(12px); background: rgba(9, 13, 22, 0.8); border-bottom: 1px solid var(--border-color); padding: 1rem 0;">
+      <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+        <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem;">
+          <span style="font-size: 1.5rem;">🤖</span>
+          <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.25rem; color: #fff;">
+            OMV <span class="gradient-text">AI Orchestrator</span>
+          </span>
+        </a>
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+          <a href="#features" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">Features</a>
+          <a href="#models" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">AI Models</a>
+          <a href="#messengers" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">Messengers</a>
+          <a href="#quickstart" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Quick Start</a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer style="border-top: 1px solid var(--border-color); padding: 3rem 0; margin-top: 5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+      <div class="container">
+        <p>Built for the OpenMediaVault Community & Home Server Developers 🚀</p>
+        <p style="margin-top: 0.5rem; font-size: 0.8rem;">Open Source under GNU General Public License v3.0.</p>
+      </div>
+    </footer>
+  </body>
+</html>

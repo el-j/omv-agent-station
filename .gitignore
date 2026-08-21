@@ -1,0 +1,26 @@
+# Environment and secrets
+.env
+credentials/
+ssh/
+signal-data/
+syncthing/config/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node / Astro
+node_modules/
+website/node_modules/
+website/dist/
+website/.astro/
+
+# Build artifacts
+build-pkg/
+*.deb
+
+# OS files
+.DS_Store
+Thumbs.db
