@@ -14,10 +14,21 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-echo "📦 Ensuring essential prerequisites (git, python3, wget)..."
+echo "📦 Ensuring essential prerequisites (git, python3, wget, tmux)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || true
-apt-get install -y -qq git python3 python3-yaml wget curl || true
+apt-get install -y -qq git python3 python3-yaml wget curl tmux || true
+
+# Try installing docker and compose if not present
+if ! command -v docker >/dev/null 2>&1; then
+    echo "📦 Installing Docker engine..."
+    apt-get install -y -qq docker.io || true
+fi
+
+if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+    echo "📦 Installing Docker Compose..."
+    apt-get install -y -qq docker-compose-plugin || apt-get install -y -qq docker-compose-v2 || apt-get install -y -qq docker-compose || true
+fi
 
 INSTALL_DIR="/srv/dev-data/omv-agent-station"
 mkdir -p "$INSTALL_DIR"
@@ -35,8 +46,12 @@ cd "$INSTALL_DIR"
 echo "🔨 Building native Debian package..."
 bash build-deb.sh
 
-echo "📦 Installing .deb package via apt (resolving all dependencies)..."
-apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.deb
+echo "📦 Installing .deb package via apt / dpkg..."
+if ! apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.deb; then
+    echo "⚠️ Apt direct install encountered a dependency preference issue; applying with dpkg + fix-broken..."
+    dpkg -i --force-depends ./openmediavault-ai-orchestrator_1.0.0_all.deb || true
+    apt-get install -f -y || true
+fi
 
 if command -v omv-salt >/dev/null 2>&1; then
     echo "🔄 Refreshing OpenMediaVault Workbench cache & Salt state..."
