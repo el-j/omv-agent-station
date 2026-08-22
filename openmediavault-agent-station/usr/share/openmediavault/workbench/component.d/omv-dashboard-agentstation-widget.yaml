@@ -1,0 +1,23 @@
+version: "1.0"
+type: component
+data:
+  name: omv-dashboard-agentstation-widget
+  type: textWidget
+  config:
+    title: _("Agent Station")
+    icon: "mdi:robot"
+    request:
+      service: AgentStation
+      get:
+        method: getStatus
+    transform:
+      template: |
+        <div style="font-family: inherit; font-size: 13px; line-height: 1.6;">
+          <div style="font-weight: 600; color: #10b981;">⚡ Agent Station 24/7 AI Engine</div>
+          <div style="margin-top: 6px; white-space: pre-wrap; font-family: monospace; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px;">{{ status_text }}</div>
+          <div style="margin-top: 10px; display: flex; gap: 12px;">
+            <a href="{{ litellm_url }}" target="_blank" style="color: #6366f1; text-decoration: none; font-weight: 600;">🤖 AI Gateway (:4000)</a>
+            <a href="{{ syncthing_url }}" target="_blank" style="color: #6366f1; text-decoration: none; font-weight: 600;">📁 Vault Sync (:8384)</a>
+            <a href="{{ terminal_url }}" target="_blank" style="color: #6366f1; text-decoration: none; font-weight: 600;">💻 Terminal (:7681)</a>
+          </div>
+        </div>

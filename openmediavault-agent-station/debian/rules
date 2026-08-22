@@ -8,6 +8,7 @@ override_dh_auto_install:
 	mkdir -p debian/openmediavault-agent-station/usr/share/openmediavault/datamodels
 	mkdir -p debian/openmediavault-agent-station/usr/share/openmediavault/workbench/component.d
 	mkdir -p debian/openmediavault-agent-station/usr/share/openmediavault/workbench/navigation.d
+	mkdir -p debian/openmediavault-agent-station/usr/share/openmediavault/workbench/dashboard.d
 	mkdir -p debian/openmediavault-agent-station/usr/share/openmediavault/agent-station
 	mkdir -p debian/openmediavault-agent-station/usr/sbin
 
@@ -15,6 +16,7 @@ override_dh_auto_install:
 	cp -r usr/share/openmediavault/datamodels/* debian/openmediavault-agent-station/usr/share/openmediavault/datamodels/ 2>/dev/null || true
 	cp -r usr/share/openmediavault/workbench/component.d/* debian/openmediavault-agent-station/usr/share/openmediavault/workbench/component.d/ 2>/dev/null || true
 	cp -r usr/share/openmediavault/workbench/navigation.d/* debian/openmediavault-agent-station/usr/share/openmediavault/workbench/navigation.d/ 2>/dev/null || true
+	cp -r usr/share/openmediavault/workbench/dashboard.d/* debian/openmediavault-agent-station/usr/share/openmediavault/workbench/dashboard.d/ 2>/dev/null || true
 	cp usr/sbin/omv-agent-station debian/openmediavault-agent-station/usr/sbin/
 	chmod +x debian/openmediavault-agent-station/usr/sbin/omv-agent-station
 	cp usr/sbin/omv-ai-orchestrator debian/openmediavault-agent-station/usr/sbin/ 2>/dev/null || true

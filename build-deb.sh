@@ -22,6 +22,7 @@ mkdir -p "$BUILD_DIR/usr/share/openmediavault/engined/rpc"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/datamodels"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/workbench/component.d"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/workbench/navigation.d"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/workbench/dashboard.d"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/litellm"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/telegram-agent-bot"
 mkdir -p "$BUILD_DIR/usr/sbin"
@@ -38,6 +39,7 @@ cp openmediavault-agent-station/usr/share/openmediavault/engined/rpc/* "$BUILD_D
 cp openmediavault-agent-station/usr/share/openmediavault/datamodels/* "$BUILD_DIR/usr/share/openmediavault/datamodels/" 2>/dev/null || true
 cp openmediavault-agent-station/usr/share/openmediavault/workbench/component.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/component.d/" 2>/dev/null || true
 cp openmediavault-agent-station/usr/share/openmediavault/workbench/navigation.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/navigation.d/" 2>/dev/null || true
+cp openmediavault-agent-station/usr/share/openmediavault/workbench/dashboard.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/dashboard.d/" 2>/dev/null || true
 
 # Copy executable helpers
 cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/"
