@@ -3,17 +3,16 @@ set -e
 
 case "$1" in
     configure)
-        # Clear OMV compiled datamodel cache and opcache
-        rm -rf /var/cache/openmediavault/* 2>/dev/null || true
+        # Ensure OMV local repository archives directory exists
+        mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+        # Remove compiled datamodel cache files safely
+        find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
-        # Restart omv-engined and PHP-FPM to reload datamodels into memory cleanly
+        # Restart openmediavault-engined and PHP-FPM
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl restart omv-engined 2>/dev/null || true
+            systemctl restart openmediavault-engined 2>/dev/null || true
             systemctl restart 'php*-fpm' 2>/dev/null || true
-            systemctl restart nginx 2>/dev/null || true
-        fi
-        if command -v omv-salt >/dev/null 2>&1; then
-            omv-salt deploy run workbench 2>/dev/null || true
+            systemctl reload nginx 2>/dev/null || true
         fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)

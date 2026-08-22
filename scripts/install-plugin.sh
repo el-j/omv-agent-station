@@ -14,6 +14,9 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# Ensure required OMV system directories exist before running apt
+mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+
 echo "📦 Ensuring essential prerequisites (git, python3, wget, tmux)..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || true
@@ -48,11 +51,12 @@ cd "$INSTALL_DIR"
 echo "🔨 Building native Debian package..."
 bash build-deb.sh
 
-# Remove legacy/duplicate datamodel files and clear OMV compiled cache
+# Clean duplicate datamodel files and compiled schema caches
 rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json* \
       /usr/share/openmediavault/datamodels/*ai_orchestrator*.json* \
       /usr/share/openmediavault/datamodels/*agentstation*.json* 2>/dev/null || true
-rm -rf /var/cache/openmediavault/* 2>/dev/null || true
+mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
 echo "📦 Installing .deb package via apt / dpkg..."
 DEB_PKG=$(ls -1 openmediavault-agent-station_*.deb openmediavault-ai-orchestrator_*.deb 2>/dev/null | head -n1)
@@ -62,19 +66,15 @@ if ! apt-get install -y --reinstall "./$DEB_PKG"; then
     apt-get install -f -y || true
 fi
 
-# Clear cache again post-installation and reload all OMV daemons
-rm -rf /var/cache/openmediavault/* 2>/dev/null || true
+# Clean cache post-install and reload OMV daemons
+mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
 if command -v systemctl >/dev/null 2>&1; then
-    echo "🔄 Reloading OpenMediaVault daemons (Engined, PHP-FPM, Nginx)..."
-    systemctl restart omv-engined 2>/dev/null || true
+    echo "🔄 Reloading OpenMediaVault daemons (openmediavault-engined, PHP-FPM)..."
+    systemctl restart openmediavault-engined 2>/dev/null || systemctl restart omv-engined 2>/dev/null || true
     systemctl restart 'php*-fpm' 2>/dev/null || true
-    systemctl restart nginx 2>/dev/null || true
-fi
-
-if command -v omv-salt >/dev/null 2>&1; then
-    echo "🔄 Refreshing OpenMediaVault Workbench cache & Salt state..."
-    omv-salt deploy run workbench 2>/dev/null || true
+    systemctl reload nginx 2>/dev/null || true
 fi
 
 echo "=========================================================="
