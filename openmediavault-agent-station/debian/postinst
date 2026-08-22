@@ -8,11 +8,14 @@ case "$1" in
         # Remove compiled datamodel cache files safely
         find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
-        # Restart openmediavault-engined and PHP-FPM
+        # Reload daemons in background so active RPC socket stream can finish cleanly
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl restart openmediavault-engined 2>/dev/null || true
-            systemctl restart 'php*-fpm' 2>/dev/null || true
-            systemctl reload nginx 2>/dev/null || true
+            (
+                sleep 1
+                systemctl restart openmediavault-engined 2>/dev/null || true
+                systemctl restart 'php*-fpm' 2>/dev/null || true
+                systemctl reload nginx 2>/dev/null || true
+            ) >/dev/null 2>&1 &
         fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
