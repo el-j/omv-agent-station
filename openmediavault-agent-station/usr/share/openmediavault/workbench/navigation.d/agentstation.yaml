@@ -1,11 +1,10 @@
 version: "1.0"
 type: navigation
 data:
-  path: "/services/agentstation"
+  path: "/agentstation"
   text: _("Agent Station")
   icon: "mdi:robot"
-  position: 120
-  parent: "/services"
+  position: 55
   component: "omv-services-agentstation-form-page"
   permission:
     role: "admin"

@@ -1,9 +1,9 @@
 version: "1.0"
 type: dashboard
 data:
-  id: "omv-dashboard-agentstation"
+  id: "agentstation"
   text: _("Agent Station")
-  title: _("Agent Station Activity")
+  title: _("Agent Station")
   component: "omv-dashboard-agentstation-widget"
   icon: "mdi:robot"
   permission:

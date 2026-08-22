@@ -11,7 +11,7 @@ data:
       post:
         method: setSettings
     fields:
-      - type: confKey
+      - type: checkbox
         name: enable
         label: _("Enable")
         value: false
