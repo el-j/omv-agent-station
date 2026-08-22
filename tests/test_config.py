@@ -61,5 +61,25 @@ class TestConfig(unittest.TestCase):
         self.assertIn("SIGNAL_PHONE_NUMBER", content)
         self.assertIn("GIT_AUTHOR_NAME", content)
 
+    def test_omv_datamodel_schema_validity(self):
+        import json
+        datamodel_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "datamodels"
+        self.assertTrue(datamodel_dir.exists())
+        
+        for json_file in datamodel_dir.glob("*.json"):
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            self.assertIn("type", data, f"{json_file.name} missing 'type'")
+            self.assertIn("id", data, f"{json_file.name} missing 'id'")
+            self.assertEqual(json_file.stem, data["id"], f"Filename {json_file.name} must match id {data['id']}")
+            
+            if data["type"] == "config":
+                self.assertIn("query", data)
+                self.assertIn("properties", data)
+            elif data["type"] == "rpc":
+                self.assertIn("params", data, f"RPC datamodel {json_file.name} MUST have 'params' attribute")
+                self.assertIn("properties", data["params"])
+
 if __name__ == "__main__":
     unittest.main()
