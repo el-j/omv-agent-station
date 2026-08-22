@@ -55,6 +55,8 @@ bash build-deb.sh
 rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json* \
       /usr/share/openmediavault/datamodels/*ai_orchestrator*.json* \
       /usr/share/openmediavault/datamodels/*agentstation*.json* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/route.d/*aiorchestrator*.yaml* \
+      /usr/share/openmediavault/workbench/route.d/*ai_orchestrator*.yaml* 2>/dev/null || true
 mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
@@ -66,9 +68,14 @@ if ! apt-get install -y --reinstall "./$DEB_PKG"; then
     apt-get install -f -y || true
 fi
 
-# Clean cache post-install and reload OMV daemons
+# Clean cache post-install, compile workbench, and reload OMV daemons
 mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
+
+if command -v omv-mkworkbench >/dev/null 2>&1; then
+    echo "🔨 Compiling OpenMediaVault Workbench routes & widgets..."
+    omv-mkworkbench all 2>/dev/null || true
+fi
 
 if command -v systemctl >/dev/null 2>&1; then
     echo "🔄 Reloading OpenMediaVault daemons in background..."

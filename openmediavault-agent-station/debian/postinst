@@ -8,6 +8,11 @@ case "$1" in
         # Remove compiled datamodel cache files safely
         find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
+        # Recompile OMV Workbench routing, navigation, and dashboard assets
+        if command -v omv-mkworkbench >/dev/null 2>&1; then
+            omv-mkworkbench all 2>/dev/null || true
+        fi
+
         # Reload daemons in background so active RPC socket stream can finish cleanly
         if command -v systemctl >/dev/null 2>&1; then
             (

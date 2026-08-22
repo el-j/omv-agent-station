@@ -39,12 +39,18 @@ class TestBotsAndPackaging(unittest.TestCase):
         rpc_file = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "engined" / "rpc" / "agentstation.inc"
         yaml_page = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "component.d" / "omv-services-agentstation-form-page.yaml"
         nav_file = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d" / "services.agentstation.yaml"
+        nav_root = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d" / "agentstation.yaml"
+        route_root = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "route.d" / "agentstation.yaml"
+        route_serv = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "route.d" / "services.agentstation.yaml"
         dash_file = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "dashboard.d" / "agentstation.yaml"
         dash_comp = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "component.d" / "omv-dashboard-agentstation-widget.yaml"
         cli_helper = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
         self.assertTrue(rpc_file.exists())
         self.assertTrue(yaml_page.exists())
         self.assertTrue(nav_file.exists())
+        self.assertTrue(nav_root.exists())
+        self.assertTrue(route_root.exists())
+        self.assertTrue(route_serv.exists())
         self.assertTrue(dash_file.exists())
         self.assertTrue(dash_comp.exists())
         self.assertTrue(cli_helper.exists())

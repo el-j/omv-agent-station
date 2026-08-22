@@ -41,17 +41,24 @@ rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json* 2>/dev/null ||
 rm -f /usr/share/openmediavault/datamodels/*ai_orchestrator*.json* 2>/dev/null || true
 rm -f /usr/share/openmediavault/engined/rpc/agentstation.inc 2>/dev/null || true
 rm -f /usr/share/openmediavault/engined/rpc/aiorchestrator.inc 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/component.d/omv-services-agentstation-form-page.yaml 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/component.d/omv-services-ai-orchestrator-form-page.yaml 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/navigation.d/services.agentstation.yaml 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/navigation.d/services.aiorchestrator.yaml 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/navigation.d/aiorchestrator.yaml 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/component.d/*agentstation* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/component.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/navigation.d/*agentstation* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/navigation.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/route.d/*agentstation* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/route.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/dashboard.d/*agentstation* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/dashboard.d/*aiorchestrator* 2>/dev/null || true
 rm -f /usr/sbin/omv-agent-station /usr/sbin/omv-ai-orchestrator 2>/dev/null || true
 rm -rf /usr/share/openmediavault/agent-station /usr/share/openmediavault/ai-orchestrator 2>/dev/null || true
 
 # 4. Ensure archives directory exists and clear compiled cache
 mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
+
+if command -v omv-mkworkbench >/dev/null 2>&1; then
+    omv-mkworkbench all 2>/dev/null || true
+fi
 
 # 5. Refresh OpenMediaVault daemons
 echo "🔄 Refreshing OpenMediaVault daemons..."
