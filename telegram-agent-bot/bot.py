@@ -524,9 +524,8 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             stderr=asyncio.subprocess.PIPE
         )  # nosec B603,B607
 
-        stdout, stderr = await process.communicate()
+        stdout, _ = await process.communicate()
         agent_out = stdout.decode("utf-8", errors="replace")
-        agent_err = stderr.decode("utf-8", errors="replace")
 
         # Capture git diff after execution
         diff_summary = "No git changes recorded."
@@ -549,7 +548,7 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )  # nosec B603,B607
-                p_out, p_err = await push_proc.communicate()
+                await push_proc.communicate()
                 if push_proc.returncode == 0:
                     push_status = f"🚀 *Branch Pushed to Remote:* `{task_branch}`\n"
             except Exception as pe:
@@ -577,7 +576,7 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             f"🌿 *Branch:* `{task_branch}`\n"
             f"{push_status}"
             f"📊 *Git Changes:*\n```\n{diff_summary[:1000]}\n```\n\n"
-            f"🔍 *Agent Log Excerpt:*\n```\n{out_text[-1500:] if out_text else 'Done.'}\n```"
+            f"🔍 *Agent Log Excerpt:*\n```\n{agent_out[-1500:] if agent_out else 'Done.'}\n```"
         )
         await status_msg.edit_text(result_text, parse_mode="Markdown")
 
