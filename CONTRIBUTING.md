@@ -22,8 +22,8 @@ Thank you for your interest in contributing to **OMV AI Orchestrator**! We welco
 
 ### 2. Setting Up Your Development Environment
 ```bash
-git clone https://github.com/el-j/hs-ai-worker.git
-cd hs-ai-worker
+git clone https://github.com/el-j/omv-agent-station.git
+cd omv-agent-station
 
 # Install test and lint dependencies
 pip install -r telegram-agent-bot/requirements.txt

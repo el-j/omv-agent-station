@@ -29,7 +29,7 @@ import Layout from '../layouts/Layout.astro';
         <div class="terminal-snippet">
           <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
             <span style="color: #6366f1; font-weight: 700;">$</span>
-            <span class="terminal-text" id="heroInstallCmd">wget -qO- https://raw.githubusercontent.com/el-j/hs-ai-worker/main/scripts/install-plugin.sh | sudo bash</span>
+            <span class="terminal-text" id="heroInstallCmd">wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/install-plugin.sh | sudo bash</span>
           </div>
           <button class="copy-btn" id="heroCopyBtn" onclick="copyHeroCmd()">📋 Copy</button>
         </div>
@@ -433,15 +433,15 @@ import Layout from '../layouts/Layout.astro';
           <div class="terminal-snippet" style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
               <span style="color: #6366f1; font-weight: 700;">$</span>
-              <span class="terminal-text" id="cmdInstallSSH">wget -qO- https://raw.githubusercontent.com/el-j/hs-ai-worker/main/scripts/install-plugin.sh | sudo bash</span>
+              <span class="terminal-text" id="cmdInstallSSH">wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/install-plugin.sh | sudo bash</span>
             </div>
             <button class="copy-btn" onclick="copySnippet('cmdInstallSSH', this)">📋 Copy</button>
           </div>
 
           <div style="background: rgba(99, 102, 241, 0.08); border-left: 3px solid #6366f1; padding: 1rem; border-radius: 0.25rem; font-size: 0.9rem; color: #c7d2fe;">
             <strong>Or manual 3-step clone & build:</strong><br/>
-            <code>git clone https://github.com/el-j/hs-ai-worker.git /srv/dev-data/omv-stack</code><br/>
-            <code>cd /srv/dev-data/omv-stack && bash build-deb.sh && sudo apt install -y ./openmediavault-ai-orchestrator_1.0.0_all.deb</code>
+            <code>git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station</code><br/>
+            <code>cd /srv/dev-data/omv-agent-station && bash build-deb.sh && sudo apt install -y ./openmediavault-ai-orchestrator_1.0.0_all.deb</code>
           </div>
         </div>
       </div>
@@ -466,7 +466,7 @@ import Layout from '../layouts/Layout.astro';
           <div class="terminal-snippet" style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
               <span style="color: #10b981; font-weight: 700;">$</span>
-              <span class="terminal-text" id="cmdInstallGUI">wget -qO- https://raw.githubusercontent.com/el-j/hs-ai-worker/main/scripts/install-plugin.sh | bash</span>
+              <span class="terminal-text" id="cmdInstallGUI">wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/install-plugin.sh | bash</span>
             </div>
             <button class="copy-btn" onclick="copySnippet('cmdInstallGUI', this)">📋 Copy</button>
           </div>
@@ -491,7 +491,7 @@ import Layout from '../layouts/Layout.astro';
 
           <ol style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.8; margin-bottom: 1.5rem; padding-left: 1.5rem;">
             <li>Go to <strong>Services ➔ Compose ➔ Files</strong> and click <strong>Create (+)</strong>.</li>
-            <li>Name it <code>ai-orchestrator</code> and paste the contents of our <a href="https://github.com/el-j/hs-ai-worker/blob/main/omv-compose-template.yaml" target="_blank" style="color: #38bdf8; text-decoration: underline;">omv-compose-template.yaml</a>.</li>
+            <li>Name it <code>ai-orchestrator</code> and paste the contents of our <a href="https://github.com/el-j/omv-agent-station/blob/main/omv-compose-template.yaml" target="_blank" style="color: #38bdf8; text-decoration: underline;">omv-compose-template.yaml</a>.</li>
             <li>In the <strong>Environment</strong> tab, paste your generated <code>.env</code> from our <a href="#configurator" style="color: #818cf8; text-decoration: underline;">Configurator above</a>.</li>
             <li>Click <strong>Save</strong> and then <strong>Up (▶️)</strong> to bring all services online.</li>
           </ol>

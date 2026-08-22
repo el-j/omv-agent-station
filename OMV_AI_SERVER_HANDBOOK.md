@@ -76,7 +76,7 @@ This production stack turns your **HP ProLiant MicroServer Gen8 (running OpenMed
 
 ### Option 2: 1-Liner Shell Quick-Start (SSH Terminal)
 ```bash
-git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
+git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station && cd /srv/dev-data/omv-agent-station && cp env.example .env && nano .env && ./setup.sh
 ```
 
 ### Option 3: OMV-Extras WebGUI Compose Plugin

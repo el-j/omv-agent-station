@@ -11,7 +11,7 @@ Control autonomous coding agents from **Signal (E2EE)**, **Telegram**, or **Disc
 Run this single command on your OpenMediaVault SSH console to clone, configure, and launch the entire stack:
 
 ```bash
-git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
+git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station && cd /srv/dev-data/omv-agent-station && cp env.example .env && nano .env && ./setup.sh
 ```
 
 ---
@@ -178,7 +178,7 @@ A full native OpenMediaVault plugin that adds **Services $\to$ AI Orchestrator**
 
 ### ⚡ Option C: 1-Liner Terminal Quick-Start (SSH)
 ```bash
-git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /srv/dev-data/ai-stack && cp env.example .env && nano .env && ./setup.sh
+git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station && cd /srv/dev-data/omv-agent-station && cp env.example .env && nano .env && ./setup.sh
 ```
 ```bash
 sudo apt update && sudo apt install -y docker.io docker-compose-plugin
@@ -186,8 +186,8 @@ sudo apt update && sudo apt install -y docker.io docker-compose-plugin
 
 ### 2. Clone and Configure
 ```bash
-git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack
-cd /srv/dev-data/ai-stack
+git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station
+cd /srv/dev-data/omv-agent-station
 cp env.example .env
 nano .env
 ```

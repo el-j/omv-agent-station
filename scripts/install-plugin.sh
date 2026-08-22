@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # OpenMediaVault AI Orchestrator Plugin & Stack Automated Installer
-# Repository: https://github.com/el-j/hs-ai-worker
+# Repository: https://github.com/el-j/omv-agent-station
 # ==============================================================================
 set -e
 
@@ -19,12 +19,12 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || true
 apt-get install -y -qq git python3 python3-yaml wget curl || true
 
-INSTALL_DIR="/srv/dev-data/omv-stack"
+INSTALL_DIR="/srv/dev-data/omv-agent-station"
 mkdir -p "$INSTALL_DIR"
 
 if [ ! -d "$INSTALL_DIR/.git" ]; then
-    echo "📥 Cloning hs-ai-worker repository to $INSTALL_DIR..."
-    git clone https://github.com/el-j/hs-ai-worker.git "$INSTALL_DIR"
+    echo "📥 Cloning omv-agent-station repository to $INSTALL_DIR..."
+    git clone https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR"
 else
     echo "🔄 Updating existing installation in $INSTALL_DIR..."
     git -C "$INSTALL_DIR" pull --rebase || true

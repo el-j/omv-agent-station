@@ -5,7 +5,7 @@ Priority: optional
 Architecture: all
 Maintainer: Fabian <dev@local>
 Depends: openmediavault (>= 6.0), docker.io | docker-ce, docker-compose-plugin, tmux
-Homepage: https://github.com/el-j/hs-ai-worker
+Homepage: https://github.com/el-j/omv-agent-station
 Description: OpenMediaVault AI Orchestrator & Remote Coding Stack
  A 24/7 self-hosted AI development & remote coding stack for OpenMediaVault.
  Provides an OpenMediaVault WebGUI management interface for:

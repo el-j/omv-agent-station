@@ -1,6 +1,6 @@
 # Security Policy
 
-We take the security of **OMV AI Orchestrator** seriously. Because this project manages sensitive API keys (Google AI, Anthropic, GitHub) and remote command execution on home servers, security is our top priority.
+We take the security of **OMV Agent Station** seriously. Because this project manages sensitive API keys (Google AI, Anthropic, GitHub) and remote command execution on home servers, security is our top priority.
 
 ---
 
@@ -33,7 +33,7 @@ We take the security of **OMV AI Orchestrator** seriously. Because this project 
 If you discover a security vulnerability, please **DO NOT** open a public issue.
 
 Instead, please report it confidentially:
-* **Email:** `security@omv-stack.local` (or via private GitHub Vulnerability Reporting on this repository).
+* **Email:** `security@omv-agent-station.local` (or via private GitHub Vulnerability Reporting on this repository).
 * **Include:** Description of vulnerability, proof-of-concept steps, and potential impact.
 
 We will acknowledge your report within 48 hours and provide a remediation timeline.
