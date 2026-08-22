@@ -7,7 +7,9 @@ Git repository synchronization, Obsidian second-brain integration, and LiteLLM g
 
 import os
 import sys
+import re
 import json
+import shutil
 import logging
 import asyncio
 import subprocess  # nosec B404
@@ -39,8 +41,6 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
 BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
-
-import shutil
 
 GIT_BIN = shutil.which("git") or "/usr/bin/git"
 TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
@@ -74,8 +74,6 @@ def init_git_credentials():
             ], check=True)  # nosec B603,B607
     except Exception as e:
         logger.warning(f"Could not configure git credentials: {e}")
-
-import re
 
 def sanitize_git_url(url: str) -> str | None:
     """Validates git URL to prevent command argument injection (e.g. leading dashes)."""

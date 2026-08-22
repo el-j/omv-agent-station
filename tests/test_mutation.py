@@ -34,6 +34,7 @@ class TestMutationSurvivalAnalysis(unittest.TestCase):
         class DummyUser:
             def __init__(self, uid):
                 self.id = uid
+
         class DummyUpdate:
             def __init__(self, uid):
                 self.effective_user = DummyUser(uid)

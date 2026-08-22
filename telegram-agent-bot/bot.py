@@ -7,6 +7,8 @@ Obsidian second-brain integration, and LiteLLM gateway telemetry.
 
 import os
 import sys
+import re
+import shutil
 import logging
 import asyncio
 import subprocess  # nosec B404
@@ -43,8 +45,6 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
 BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
-
-import shutil
 
 GIT_BIN = shutil.which("git") or "/usr/bin/git"
 TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
@@ -96,8 +96,6 @@ ai_client = OpenAI(
     api_key=LITELLM_KEY,
     base_url=f"{LITELLM_BASE}/v1"
 )
-
-import re
 
 def sanitize_git_url(url: str) -> str | None:
     """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
