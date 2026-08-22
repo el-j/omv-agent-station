@@ -1,10 +1,12 @@
-.PHONY: all test lint security deb clean help
+.PHONY: all test lint security deb blackbox mutation clean help
 
-all: lint test security deb
+all: lint test blackbox mutation security deb
 
 help:
 	@echo "OpenMediaVault AI Orchestrator Development Commands:"
-	@echo "  make test      - Run unit test suite with pytest"
+	@echo "  make test      - Run all unit, black-box, and mutation tests"
+	@echo "  make blackbox  - Run isolated black-box security & packaging tests"
+	@echo "  make mutation  - Run AST semantic mutation & fault injection tests"
 	@echo "  make lint      - Lint Python and YAML configurations"
 	@echo "  make security  - Scan codebase for security issues & secret leaks"
 	@echo "  make deb       - Build openmediavault-ai-orchestrator .deb package"
@@ -12,6 +14,12 @@ help:
 
 test:
 	@bash scripts/test.sh
+
+blackbox:
+	@bash scripts/blackbox-test.sh
+
+mutation:
+	@bash scripts/mutation-test.sh
 
 lint:
 	@bash scripts/lint.sh

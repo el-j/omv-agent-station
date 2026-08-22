@@ -28,15 +28,14 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID:-}
+      - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID}
       - VERTEX_LOCATION=${VERTEX_LOCATION:-europe-west1}
-      - VERTEX_CREDENTIALS_PATH=${VERTEX_CREDENTIALS_PATH:-}
-      - GOOGLE_APPLICATION_CREDENTIALS=${VERTEX_CREDENTIALS_PATH:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/vertex_creds.json
+      - STORE_MODEL_IN_DB=False
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
       - ./credentials:/app/credentials:ro
+    command: [ "--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2" ]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
       interval: 30s
@@ -44,11 +43,11 @@ services:
       retries: 3
 
   # ----------------------------------------------------------------------------
-  # 2. Syncthing: Continuous Obsidian Vault & Workspace Sync
+  # 2. Syncthing: Continuous Real-Time Obsidian Knowledge Base Sync
   # ----------------------------------------------------------------------------
   syncthing:
     image: lscr.io/linuxserver/syncthing:latest
-    container_name: syncthing
+    container_name: syncthing-agent-hub
     restart: unless-stopped
     environment:
       - PUID=1000
@@ -83,7 +82,7 @@ services:
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
-      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@omv-box.local}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-}
       - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
@@ -106,7 +105,7 @@ services:
     restart: unless-stopped
     environment:
       - TTYD_USER=${TERMINAL_USER:-admin}
-      - TTYD_PASS=${TERMINAL_PASS:-proliantgen8}
+      - TTYD_PASS=${TERMINAL_PASS:-omvsecurepass}
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/workspace
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/obsidian
@@ -114,7 +113,7 @@ services:
       - ./ssh:/root/.ssh:ro
     ports:
       - "7681:7681"
-    command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-proliantgen8} tmux new-session -A -s agent-main -c /workspace bash
+    command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-omvsecurepass} tmux new-session -A -s agent-main -c /workspace bash
 
   # ----------------------------------------------------------------------------
   # 5. Signal Messenger Relay (Alternative E2EE Private Bot)
@@ -151,7 +150,7 @@ services:
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
-      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@omv-box.local}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-}
       - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}

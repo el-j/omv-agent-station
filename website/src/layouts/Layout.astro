@@ -14,41 +14,113 @@ const { title, description = "24/7 Autonomous AI Orchestrator Stack & OpenMediaV
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#070a12" />
     <!-- Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
   </head>
   <body>
-    <nav style="position: sticky; top: 0; z-index: 50; backdrop-filter: blur(12px); background: rgba(9, 13, 22, 0.8); border-bottom: 1px solid var(--border-color); padding: 1rem 0;">
-      <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+    <!-- Top Global Sticky Navbar -->
+    <nav style="position: sticky; top: 0; z-index: 50; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(7, 10, 18, 0.85); border-bottom: 1px solid var(--border-color); padding: 0.9rem 0;">
+      <div class="container" style="display: flex; justify-content: space-between; align-items: center; position: relative;">
+        <!-- Logo -->
         <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem;">
-          <span style="font-size: 1.5rem;">🤖</span>
-          <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.25rem; color: #fff;">
-            OMV <span class="gradient-text">AI Orchestrator</span>
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);">
+            🤖
+          </div>
+          <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.25rem; color: #fff; letter-spacing: -0.02em;">
+            OMV <span class="gradient-text">AI Stack</span>
           </span>
         </a>
-        <div style="display: flex; gap: 1.5rem; align-items: center;">
-          <a href="#features" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">Features</a>
-          <a href="#models" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">AI Models</a>
-          <a href="#messengers" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;">Messengers</a>
-          <a href="#quickstart" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Quick Start</a>
+
+        <!-- Desktop Navigation Links -->
+        <div class="nav-links">
+          <a href="#features" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">Features</a>
+          <a href="#models" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">AI Models</a>
+          <a href="#configurator" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">Configurator</a>
+          <a href="#hardware" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">Tested Hardware</a>
+          <a href="#messengers" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">Messengers</a>
+          <a href="#plugin" style="color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s;">OMV Plugin</a>
+          <a href="https://github.com/el-j/hs-ai-worker" target="_blank" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 0.5rem;">
+            ⭐ GitHub
+          </a>
         </div>
+
+        <!-- Mobile Hamburger Button -->
+        <button class="nav-hamburger" id="navHamburger" aria-label="Toggle navigation" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+
+      <!-- Mobile Dropdown Menu -->
+      <div class="nav-mobile-menu" id="navMobileMenu">
+        <a href="#features" class="mobile-nav-link">✨ Features</a>
+        <a href="#models" class="mobile-nav-link">🧠 AI Redundancy Routing</a>
+        <a href="#configurator" class="mobile-nav-link">⚙️ Subscription Configurator</a>
+        <a href="#hardware" class="mobile-nav-link">📊 Tested Hardware Benchmarks</a>
+        <a href="#messengers" class="mobile-nav-link">💬 Messenger Relays</a>
+        <a href="#plugin" class="mobile-nav-link">📦 OMV Debian Plugin</a>
+        <a href="#quickstart" class="mobile-nav-link">⚡ Quick Start Guide</a>
+        <a href="https://github.com/el-j/hs-ai-worker" target="_blank" class="mobile-nav-link" style="color: #818cf8;">⭐ Star on GitHub</a>
       </div>
     </nav>
+
+    <!-- Mobile Navigation Toggle Script -->
+    <script is:inline>
+      document.addEventListener('DOMContentLoaded', () => {
+        const hamburger = document.getElementById('navHamburger');
+        const mobileMenu = document.getElementById('navMobileMenu');
+        const mobileLinks = document.querySelectorAll('.mobile-nav-link');
+
+        if (hamburger && mobileMenu) {
+          hamburger.addEventListener('click', () => {
+            const isOpen = mobileMenu.classList.toggle('open');
+            hamburger.classList.toggle('active', isOpen);
+            hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          });
+
+          mobileLinks.forEach(link => {
+            link.addEventListener('click', () => {
+              mobileMenu.classList.remove('open');
+              hamburger.classList.remove('active');
+              hamburger.setAttribute('aria-expanded', 'false');
+            });
+          });
+        }
+      });
+    </script>
 
     <main>
       <slot />
     </main>
 
-    <footer style="border-top: 1px solid var(--border-color); padding: 3rem 0; margin-top: 5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+    <!-- Global Footer -->
+    <footer style="border-top: 1px solid var(--border-color); padding: 4rem 0 3rem 0; margin-top: 6rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; background: rgba(4, 7, 14, 0.9);">
       <div class="container">
-        <p>Built for the OpenMediaVault Community & Home Server Developers 🚀</p>
-        <p style="margin-top: 0.5rem; font-size: 0.8rem;">Open Source under GNU General Public License v3.0.</p>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+          <span style="font-size: 1.5rem;">🤖</span>
+          <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.2rem; color: #fff;">
+            OpenMediaVault AI Orchestrator
+          </span>
+        </div>
+        <p style="max-width: 600px; margin: 0 auto 1.5rem auto;">
+          An open-source self-hosted automation stack engineered for OpenMediaVault, Debian, and Linux home servers.
+        </p>
+        <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; font-size: 0.85rem;">
+          <a href="https://github.com/el-j/hs-ai-worker" style="color: var(--text-muted); text-decoration: none;">GitHub Repository</a>
+          <a href="https://github.com/el-j/hs-ai-worker/blob/main/LICENSE" style="color: var(--text-muted); text-decoration: none;">GPL-3.0 License</a>
+          <a href="https://github.com/el-j/hs-ai-worker/blob/main/CONTRIBUTING.md" style="color: var(--text-muted); text-decoration: none;">Contributing</a>
+          <a href="https://github.com/el-j/hs-ai-worker/blob/main/SECURITY.md" style="color: var(--text-muted); text-decoration: none;">Security Policy</a>
+        </div>
+        <p style="font-size: 0.8rem; color: #64748b;">
+          Released under GNU General Public License v3.0. Designed with precision for the self-hosting community.
+        </p>
       </div>
     </footer>
   </body>

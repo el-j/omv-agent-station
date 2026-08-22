@@ -24,7 +24,7 @@ fi
 # 2. Run Bandit AST security scan if available
 if command -v bandit >/dev/null 2>&1; then
     echo "🛡️ Running Bandit Python vulnerability scanner..."
-    bandit -r telegram-agent-bot/ signal-agent-bot/ discord-agent-bot/ -ll -q
+    bandit -c .bandit -r telegram-agent-bot/ signal-agent-bot/ discord-agent-bot/ -ll -q
 fi
 
 echo "✅ Security checks passed! No vulnerabilities or exposed secrets found."

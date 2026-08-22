@@ -4,7 +4,7 @@ set -e
 
 echo "🔍 Linting Python files..."
 if command -v flake8 >/dev/null 2>&1; then
-    flake8 telegram-agent-bot/ signal-agent-bot/ discord-agent-bot/ tests/ --max-line-length=160 --ignore=E501,W503
+    flake8 telegram-agent-bot/ signal-agent-bot/ discord-agent-bot/ tests/ --config=.flake8
 else
     python3 -m py_compile telegram-agent-bot/bot.py signal-agent-bot/signal_bot.py discord-agent-bot/discord_bot.py tests/*.py
 fi

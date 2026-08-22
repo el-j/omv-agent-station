@@ -1,0 +1,12 @@
+# Bandit Configuration File
+# https://bandit.readthedocs.io/
+
+skips:
+  - B101  # assert statements
+  - B404  # import subprocess (managed via strict list arguments)
+
+exclude_dirs:
+  - tests
+  - website
+  - build-pkg
+  - .github

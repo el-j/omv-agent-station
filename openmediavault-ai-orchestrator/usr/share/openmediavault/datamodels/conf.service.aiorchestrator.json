@@ -27,7 +27,7 @@
     },
     "git_author_email": {
       "type": "string",
-      "default": "agent@proliant-omv.local"
+      "default": "agent@omv-box.local"
     },
     "gitlab_token": {
       "type": "string"
@@ -70,7 +70,7 @@
     },
     "terminal_pass": {
       "type": "string",
-      "default": "proliantgen8"
+      "default": "omvsecurepass"
     }
   }
 }

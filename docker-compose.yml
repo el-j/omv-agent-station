@@ -72,7 +72,7 @@ services:
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
-      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@omv-box.local}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-}
       - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
@@ -95,7 +95,7 @@ services:
     restart: unless-stopped
     environment:
       - TTYD_USER=${TERMINAL_USER:-admin}
-      - TTYD_PASS=${TERMINAL_PASS:-proliantgen8}
+      - TTYD_PASS=${TERMINAL_PASS:-omvsecurepass}
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/workspace
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/obsidian
@@ -103,7 +103,7 @@ services:
       - ./ssh:/root/.ssh:ro
     ports:
       - "7681:7681"
-    command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-proliantgen8} tmux new-session -A -s agent-main -c /workspace bash
+    command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-omvsecurepass} tmux new-session -A -s agent-main -c /workspace bash
 
   # ============================================================================
   # 5. Signal Messenger Relay (Alternative to Telegram - E2EE Private Messaging)
@@ -141,7 +141,7 @@ services:
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
-      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@omv-box.local}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-}
       - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}
@@ -175,7 +175,7 @@ services:
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
-      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@proliant-omv.local}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-agent@omv-box.local}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-}
       - BITBUCKET_USERNAME=${BITBUCKET_USERNAME:-}

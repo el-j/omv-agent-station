@@ -2,7 +2,6 @@
 Configuration and YAML validation tests for OMV AI Orchestrator Stack.
 """
 
-import os
 import unittest
 import yaml
 from pathlib import Path

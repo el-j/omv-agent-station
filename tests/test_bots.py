@@ -3,7 +3,6 @@ Unit tests for bot files, syntax, and build scripts.
 """
 
 import os
-import sys
 import unittest
 from pathlib import Path
 

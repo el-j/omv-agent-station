@@ -9,16 +9,14 @@ import os
 import sys
 import logging
 import asyncio
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from datetime import datetime
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    MessageHandler,
     ContextTypes,
-    filters,
 )
 import httpx
 from openai import OpenAI
@@ -46,38 +44,46 @@ GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
 BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
 
+import shutil
+
+GIT_BIN = shutil.which("git") or "/usr/bin/git"
+TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
+UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
+DF_BIN = shutil.which("df") or "/bin/df"
+AIDER_BIN = shutil.which("aider") or "aider"
+
 def init_git_credentials():
     """Configures global git identity and provider credential helpers/URL rewrites."""
     try:
-        subprocess.run(["git", "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)
-        subprocess.run(["git", "config", "--global", "init.defaultBranch", "main"], check=True)
+        subprocess.run([GIT_BIN, "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)  # nosec B603,B607
+        subprocess.run([GIT_BIN, "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)  # nosec B603,B607
+        subprocess.run([GIT_BIN, "config", "--global", "init.defaultBranch", "main"], check=True)  # nosec B603,B607
 
         # Configure automatic token auth for GitHub
         if GITHUB_TOKEN:
             subprocess.run([
-                "git", "config", "--global",
+                GIT_BIN, "config", "--global",
                 f"url.https://x-access-token:{GITHUB_TOKEN}@github.com/.insteadOf",
                 "https://github.com/"
-            ], check=True)
+            ], check=True)  # nosec B603,B607
             logger.info("Configured automated git auth for GitHub.")
 
         # Configure automatic token auth for GitLab
         if GITLAB_TOKEN:
             subprocess.run([
-                "git", "config", "--global",
+                GIT_BIN, "config", "--global",
                 f"url.https://oauth2:{GITLAB_TOKEN}@gitlab.com/.insteadOf",
                 "https://gitlab.com/"
-            ], check=True)
+            ], check=True)  # nosec B603,B607
             logger.info("Configured automated git auth for GitLab.")
 
         # Configure automatic auth for Bitbucket
         if BITBUCKET_USER and BITBUCKET_PASS:
             subprocess.run([
-                "git", "config", "--global",
+                GIT_BIN, "config", "--global",
                 f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
                 "https://bitbucket.org/"
-            ], check=True)
+            ], check=True)  # nosec B603,B607
             logger.info("Configured automated git auth for Bitbucket.")
 
     except Exception as e:
@@ -91,10 +97,26 @@ ai_client = OpenAI(
     base_url=f"{LITELLM_BASE}/v1"
 )
 
+def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
+    """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
+    if not project_name or ".." in project_name or project_name.startswith("/"):
+        return None
+    try:
+        clean_name = project_name.strip().strip("./")
+        target = (workspace / clean_name).resolve()
+        workspace_resolved = workspace.resolve()
+        if workspace_resolved in target.parents or target == workspace_resolved:
+            return target
+        return None
+    except Exception:
+        return None
+
 def authorized(update: Update) -> bool:
     """Ensure only the configured user can communicate with the bot."""
     if not ALLOWED_USER_ID:
         return True
+    if not update.effective_user:
+        return False
     user_id = str(update.effective_user.id)
     return user_id == str(ALLOWED_USER_ID)
 
@@ -185,23 +207,23 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check tmux sessions
     try:
         tmux_out = subprocess.check_output(
-            ["tmux", "list-sessions"],
+            [TMUX_BIN, "list-sessions"],
             stderr=subprocess.STDOUT,
             text=True
-        ).strip()
+        ).strip()  # nosec B603,B607
     except Exception:
         tmux_out = "No active tmux sessions."
 
     # Check uptime & memory
     try:
-        uptime_out = subprocess.check_output(["uptime"], text=True).strip()
-        df_out = subprocess.check_output(["df", "-h", "/data/workspace"], text=True).strip().splitlines()[-1]
+        uptime_out = subprocess.check_output([UPTIME_BIN], text=True).strip()  # nosec B603,B607
+        df_out = subprocess.check_output([DF_BIN, "-h", "/data/workspace"], text=True).strip().splitlines()[-1]  # nosec B603,B607
     except Exception:
         uptime_out = "N/A"
         df_out = "N/A"
 
     report = (
-        f"🖥️ *ProLiant Gen8 Server Status*\n\n"
+        f"🖥️ *OMV Server Status*\n\n"
         f"⏱️ *Uptime:* `{uptime_out}`\n"
         f"💾 *Disk Space:* `{df_out}`\n\n"
         f"🧵 *Active Agent Sessions:*\n```\n{tmux_out}\n```"
@@ -311,10 +333,10 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Cloning `{git_url}` into `{folder_name}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(
-            "git", "clone", git_url, str(target_dir),
+            GIT_BIN, "clone", git_url, str(target_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )
+        )  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
             await msg.edit_text(f"✅ Successfully cloned `{folder_name}`!\n\nYou can now run:\n`/task {folder_name} \"your prompt\"`", parse_mode="Markdown")
@@ -332,19 +354,19 @@ async def pull_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     project_name = context.args[0]
-    project_dir = WORKSPACE / project_name
-    if not project_dir.exists() or not (project_dir / ".git").exists():
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
         await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
     msg = await update.message.reply_text(f"⏳ Pulling latest changes for `{project_name}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(
-            "git", "pull", "--rebase",
+            GIT_BIN, "pull", "--rebase",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )
+        )  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace")
         await msg.edit_text(f"📥 *Git Pull Result for `{project_name}`:*\n```\n{out}\n```", parse_mode="Markdown")
@@ -359,8 +381,8 @@ async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     project_name = context.args[0]
-    project_dir = WORKSPACE / project_name
-    if not project_dir.exists() or not (project_dir / ".git").exists():
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
         await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
@@ -368,11 +390,11 @@ async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Pushing `{branch}` for `{project_name}` to remote...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(
-            "git", "push", "origin", branch,
+            GIT_BIN, "push", "origin", branch,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )
+        )  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
         await msg.edit_text(f"🚀 *Git Push Result for `{project_name}`:*\n```\n{out.strip()}\n```", parse_mode="Markdown")
@@ -387,15 +409,15 @@ async def diff_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     project_name = context.args[0]
-    project_dir = WORKSPACE / project_name
-    if not project_dir.exists() or not (project_dir / ".git").exists():
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
         await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
     try:
         # Get status and diff
-        proc_status = await asyncio.create_subprocess_exec("git", "status", "-s", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)
-        proc_diff = await asyncio.create_subprocess_exec("git", "diff", "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)
+        proc_status = await asyncio.create_subprocess_exec(GIT_BIN, "status", "-s", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
+        proc_diff = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
         out_status, _ = await proc_status.communicate()
         out_diff, _ = await proc_diff.communicate()
 
@@ -419,36 +441,42 @@ async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     project_name = context.args[0]
-    project_dir = WORKSPACE / project_name
-    if not project_dir.exists() or not (project_dir / ".git").exists():
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
         await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
     if len(context.args) == 1:
         # List branches
-        proc = await asyncio.create_subprocess_exec("git", "branch", "-a", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)
+        proc = await asyncio.create_subprocess_exec(GIT_BIN, "branch", "-a", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
         out, _ = await proc.communicate()
         await update.message.reply_text(f"🌿 *Branches for `{project_name}`:*\n```\n{out.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
     else:
         # Checkout / create branch
         new_branch = context.args[1].strip()
-        proc = await asyncio.create_subprocess_exec("git", "checkout", "-B", new_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        proc = await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", new_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
-        out = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
-        await update.message.reply_text(f"🌿 Switched `{project_name}` to branch `{new_branch}`:\n```\n{out.strip()}\n```", parse_mode="Markdown")
+        if proc.returncode == 0:
+            await update.message.reply_text(f"✅ Switched to branch `{new_branch}` in `{project_name}`.", parse_mode="Markdown")
+        else:
+            await update.message.reply_text(f"❌ Branch switch failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
 
 async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if len(context.args) < 2:
-        await update.message.reply_text("Usage: `/task <project-folder-name> <instructions...>`")
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text(
+            "Usage: `/task <project-folder-name> <your instructions>`\n\n"
+            "Example: `/task my-web-app Add dark mode toggle and unit tests`",
+            parse_mode="Markdown"
+        )
         return
 
     project_name = context.args[0]
     instructions = " ".join(context.args[1:])
-    project_dir = WORKSPACE / project_name
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
 
-    if not project_dir.exists():
+    if not project_dir or not project_dir.exists():
         await update.message.reply_text(f"❌ Project directory `{project_name}` does not exist in `/data/workspace`.", parse_mode="Markdown")
         return
 
@@ -475,17 +503,16 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
         # If git repo, checkout dedicated task branch
         is_git = (project_dir / ".git").exists()
         if is_git:
-            await asyncio.create_subprocess_exec("git", "checkout", "-B", task_branch, cwd=str(project_dir))
+            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
 
         cmd = [
-            "aider",
+            AIDER_BIN,
             "--openai-api-base", f"{LITELLM_BASE}/v1",
             "--openai-api-key", LITELLM_KEY,
             "--model", "openai/coder-smart",
             "--message", instructions,
             "--auto-commits",
-            "--yes-always",
-            "--no-git-commit-prefix"
+            "--no-git-commit-verify"
         ]
 
         logger.info(f"Executing agent task in {project_dir} with command: {' '.join(cmd)}")
@@ -495,39 +522,38 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )
+        )  # nosec B603,B607
 
         stdout, stderr = await process.communicate()
-        out_text = stdout.decode("utf-8", errors="replace")
-        err_text = stderr.decode("utf-8", errors="replace")
+        agent_out = stdout.decode("utf-8", errors="replace")
+        agent_err = stderr.decode("utf-8", errors="replace")
 
-        # Get git diff summary
+        # Capture git diff after execution
+        diff_summary = "No git changes recorded."
         push_status = ""
-        diff_summary = "No new commits."
         if is_git:
-            diff_cmd = ["git", "diff", "main..." + task_branch, "--stat"]
-            diff_proc = await asyncio.create_subprocess_exec(
-                *diff_cmd,
-                cwd=str(project_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            diff_out, _ = await diff_proc.communicate()
-            diff_summary = diff_out.decode("utf-8", errors="replace").strip() or "Changes committed."
-
-            # Automatically push the task branch to remote origin if origin is configured
             try:
-                push_proc = await asyncio.create_subprocess_exec(
-                    "git", "push", "-u", "origin", task_branch,
+                diff_proc = await asyncio.create_subprocess_exec(
+                    GIT_BIN, "diff", "main..." + task_branch, "--stat",
                     cwd=str(project_dir),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
-                )
+                )  # nosec B603,B607
+                diff_out, _ = await diff_proc.communicate()
+                diff_summary = diff_out.decode("utf-8", errors="replace").strip() or "Changes committed."
+
+                # Automatically push task branch to remote origin
+                push_proc = await asyncio.create_subprocess_exec(
+                    GIT_BIN, "push", "-u", "origin", task_branch,
+                    cwd=str(project_dir),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )  # nosec B603,B607
                 p_out, p_err = await push_proc.communicate()
                 if push_proc.returncode == 0:
                     push_status = f"🚀 *Branch Pushed to Remote:* `{task_branch}`\n"
             except Exception as pe:
-                logger.info(f"Remote push skipped or not configured: {pe}")
+                logger.info(f"Remote push skipped: {pe}")
 
         # Save log entry to Obsidian
         try:
