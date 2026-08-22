@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge|deconfigure)
+        # Stop running AI stack containers before package removal
+        if [ -x /usr/sbin/omv-ai-orchestrator ]; then
+            /usr/sbin/omv-ai-orchestrator down 2>/dev/null || true
+        fi
+        ;;
+    upgrade|failed-upgrade)
+        ;;
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

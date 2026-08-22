@@ -46,6 +46,9 @@ cd "$INSTALL_DIR"
 echo "🔨 Building native Debian package..."
 bash build-deb.sh
 
+# Remove legacy/duplicate datamodel files before package update
+rm -f /usr/share/openmediavault/datamodels/rpc.aiorchestrator.json 2>/dev/null || true
+
 echo "📦 Installing .deb package via apt / dpkg..."
 if ! apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.deb; then
     echo "⚠️ Apt direct install encountered a dependency preference issue; applying with dpkg + fix-broken..."
@@ -53,9 +56,14 @@ if ! apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.d
     apt-get install -f -y || true
 fi
 
+if command -v systemctl >/dev/null 2>&1; then
+    echo "🔄 Reloading OpenMediaVault Engined daemon..."
+    systemctl restart omv-engined 2>/dev/null || true
+fi
+
 if command -v omv-salt >/dev/null 2>&1; then
     echo "🔄 Refreshing OpenMediaVault Workbench cache & Salt state..."
-    omv-salt deploy run workbench || true
+    omv-salt deploy run workbench 2>/dev/null || true
 fi
 
 echo "=========================================================="

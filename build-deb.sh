@@ -28,8 +28,10 @@ mkdir -p "$BUILD_DIR/usr/sbin"
 
 # Copy package control files
 cp openmediavault-ai-orchestrator/debian/control "$BUILD_DIR/DEBIAN/"
-cp openmediavault-ai-orchestrator/debian/postinst "$BUILD_DIR/DEBIAN/"
-chmod 755 "$BUILD_DIR/DEBIAN/postinst"
+cp openmediavault-ai-orchestrator/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+cp openmediavault-ai-orchestrator/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+cp openmediavault-ai-orchestrator/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
 
 # Copy OMV RPC backend & WebGUI assets
 cp openmediavault-ai-orchestrator/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true

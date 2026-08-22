@@ -178,7 +178,7 @@ case "$1" in
     start)
         cd "$STACK_DIR" && docker compose --env-file .env up -d
         ;;
-    stop)
+    stop|down)
         cd "$STACK_DIR" && docker compose --env-file .env down
         ;;
     restart)
@@ -194,12 +194,21 @@ case "$1" in
         SERVICE=${2:-litellm}
         cd "$STACK_DIR" && docker compose --env-file .env logs --tail=100 "$SERVICE"
         ;;
+    uninstall)
+        echo "🛑 Stopping AI Orchestrator stack..."
+        cd "$STACK_DIR" 2>/dev/null && docker compose --env-file .env down 2>/dev/null || true
+        echo "🧹 Removing package and assets..."
+        apt-get purge -y openmediavault-ai-orchestrator 2>/dev/null || dpkg -P openmediavault-ai-orchestrator 2>/dev/null || true
+        systemctl restart omv-engined 2>/dev/null || true
+        omv-salt deploy run workbench 2>/dev/null || true
+        echo "✅ Uninstallation complete."
+        ;;
     help|-h|--help)
-        echo "Usage: $0 {apply|start|stop|restart|status|performance|logs [service]}"
+        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
         exit 0
         ;;
     *)
-        echo "Usage: $0 {apply|start|stop|restart|status|performance|logs [service]}"
+        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
         exit 1
         ;;
 esac
