@@ -10,7 +10,7 @@ case "$1" in
 
         # Recompile OMV Workbench routing, navigation, and dashboard assets
         if command -v omv-mkworkbench >/dev/null 2>&1; then
-            omv-mkworkbench all 2>/dev/null || true
+            omv-mkworkbench all || true
         fi
 
         # Reload daemons in background so active RPC socket stream can finish cleanly

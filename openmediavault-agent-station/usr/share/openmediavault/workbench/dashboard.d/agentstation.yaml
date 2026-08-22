@@ -1,10 +1,18 @@
 version: "1.0"
-type: dashboard
+type: dashboard-widget
 data:
-  id: "agentstation"
-  text: _("Agent Station")
+  id: 0d28692b-09b6-4c78-b146-5c6b1e2ffb10
   title: _("Agent Station")
-  component: "omv-dashboard-agentstation-widget"
-  icon: "mdi:robot"
-  permission:
-    role: "admin"
+  description: _("Displays the status of the AI Agent Station service.")
+  type: value
+  reloadPeriod: 15000
+  permissions:
+    role:
+      - admin
+  request:
+    service: AgentStation
+    get:
+      method: getSettings
+  value:
+    label: _("Status")
+    value: "{{ enable ? 'Enabled' : 'Disabled' }}"

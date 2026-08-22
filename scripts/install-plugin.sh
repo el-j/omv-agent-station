@@ -51,12 +51,18 @@ cd "$INSTALL_DIR"
 echo "🔨 Building native Debian package..."
 bash build-deb.sh
 
-# Clean duplicate datamodel files and compiled schema caches
+# Full cleanup of any previous broken install artifacts from all workbench dirs
 rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json* \
       /usr/share/openmediavault/datamodels/*ai_orchestrator*.json* \
       /usr/share/openmediavault/datamodels/*agentstation*.json* 2>/dev/null || true
-rm -f /usr/share/openmediavault/workbench/route.d/*aiorchestrator*.yaml* \
-      /usr/share/openmediavault/workbench/route.d/*ai_orchestrator*.yaml* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/navigation.d/*agentstation* \
+      /usr/share/openmediavault/workbench/navigation.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/route.d/*agentstation* \
+      /usr/share/openmediavault/workbench/route.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/dashboard.d/*agentstation* \
+      /usr/share/openmediavault/workbench/dashboard.d/*aiorchestrator* 2>/dev/null || true
+rm -f /usr/share/openmediavault/workbench/component.d/*agentstation* \
+      /usr/share/openmediavault/workbench/component.d/*aiorchestrator* 2>/dev/null || true
 mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
@@ -74,7 +80,7 @@ find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null 
 
 if command -v omv-mkworkbench >/dev/null 2>&1; then
     echo "🔨 Compiling OpenMediaVault Workbench routes & widgets..."
-    omv-mkworkbench all 2>/dev/null || true
+    omv-mkworkbench all || true
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
