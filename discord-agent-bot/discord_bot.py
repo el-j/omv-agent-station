@@ -73,12 +73,39 @@ def init_git_credentials():
     except Exception as e:
         logger.warning(f"Could not configure git credentials: {e}")
 
+import re
+
+def sanitize_git_url(url: str) -> str | None:
+    """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("-"):
+        return None
+    pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
+    if re.match(pattern, url):
+        return url
+    return None
+
+def sanitize_branch_name(branch: str) -> str | None:
+    """Validates git branch names to prevent argument injection."""
+    if not branch:
+        return None
+    branch = branch.strip()
+    if branch.startswith("-") or ".." in branch or "\\" in branch or "@{" in branch:
+        return None
+    if re.match(r"^[a-zA-Z0-9_./-]+$", branch):
+        return branch
+    return None
+
 def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
     """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
-    if not project_name or ".." in project_name or project_name.startswith("/"):
+    if not project_name or ".." in project_name or project_name.startswith(("/", "\\", "-")):
         return None
     try:
         clean_name = project_name.strip().strip("./")
+        if not clean_name or clean_name.startswith("-"):
+            return None
         target = (workspace / clean_name).resolve()
         workspace_resolved = workspace.resolve()
         if workspace_resolved in target.parents or target == workspace_resolved:
@@ -177,14 +204,23 @@ async def cmd_projects(ctx):
 async def cmd_clone(ctx, git_url: str, folder_name: str = None):
     if not is_authorized(ctx):
         return
-    folder = folder_name if folder_name else git_url.rstrip("/").split("/")[-1].replace(".git", "")
-    target = WORKSPACE / folder
+    valid_url = sanitize_git_url(git_url)
+    if not valid_url:
+        await ctx.send("❌ Invalid git URL format.")
+        return
+
+    folder = folder_name if folder_name else valid_url.rstrip("/").split("/")[-1].replace(".git", "")
+    target = sanitize_project_path(WORKSPACE, folder)
+    if not target:
+        await ctx.send("❌ Invalid folder name.")
+        return
+
     if target.exists():
         await ctx.send(f"⚠️ Folder `{folder}` already exists in workspace.")
         return
 
-    msg = await ctx.send(f"⏳ Cloning `{git_url}` into `{folder}`...")
-    proc = await asyncio.create_subprocess_exec(GIT_BIN, "clone", git_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
+    msg = await ctx.send(f"⏳ Cloning `{valid_url}` into `{folder}`...")
+    proc = await asyncio.create_subprocess_exec(GIT_BIN, "clone", "--", valid_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
     _, stderr = await proc.communicate()
     if proc.returncode == 0:
         await msg.edit(content=f"✅ Successfully cloned `{folder}`!\nRun `!task {folder} <instructions>` to begin coding.")

@@ -97,12 +97,39 @@ ai_client = OpenAI(
     base_url=f"{LITELLM_BASE}/v1"
 )
 
+import re
+
+def sanitize_git_url(url: str) -> str | None:
+    """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("-"):
+        return None
+    pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
+    if re.match(pattern, url):
+        return url
+    return None
+
+def sanitize_branch_name(branch: str) -> str | None:
+    """Validates git branch names to prevent argument injection."""
+    if not branch:
+        return None
+    branch = branch.strip()
+    if branch.startswith("-") or ".." in branch or "\\" in branch or "@{" in branch:
+        return None
+    if re.match(r"^[a-zA-Z0-9_./-]+$", branch):
+        return branch
+    return None
+
 def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
     """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
-    if not project_name or ".." in project_name or project_name.startswith("/"):
+    if not project_name or ".." in project_name or project_name.startswith(("/", "\\", "-")):
         return None
     try:
         clean_name = project_name.strip().strip("./")
+        if not clean_name or clean_name.startswith("-"):
+            return None
         target = (workspace / clean_name).resolve()
         workspace_resolved = workspace.resolve()
         if workspace_resolved in target.parents or target == workspace_resolved:
@@ -319,13 +346,22 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: `/clone <git-url> [custom-folder-name]`", parse_mode="Markdown")
         return
 
-    git_url = context.args[0].strip()
+    raw_git_url = context.args[0].strip()
+    git_url = sanitize_git_url(raw_git_url)
+    if not git_url:
+        await update.message.reply_text("❌ Invalid git URL format.", parse_mode="Markdown")
+        return
+
     if len(context.args) > 1:
         folder_name = context.args[1].strip()
     else:
         folder_name = git_url.rstrip("/").split("/")[-1].replace(".git", "")
 
-    target_dir = WORKSPACE / folder_name
+    target_dir = sanitize_project_path(WORKSPACE, folder_name)
+    if not target_dir:
+        await update.message.reply_text("❌ Invalid folder name.", parse_mode="Markdown")
+        return
+
     if target_dir.exists():
         await update.message.reply_text(f"⚠️ Destination folder `{folder_name}` already exists in `/data/workspace`.", parse_mode="Markdown")
         return
@@ -333,7 +369,7 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Cloning `{git_url}` into `{folder_name}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(
-            GIT_BIN, "clone", git_url, str(target_dir),
+            GIT_BIN, "clone", "--", git_url, str(target_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )  # nosec B603,B607
@@ -386,11 +422,18 @@ async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
-    branch = context.args[1] if len(context.args) > 1 else "HEAD"
+    branch = "HEAD"
+    if len(context.args) > 1:
+        valid_branch = sanitize_branch_name(context.args[1])
+        if not valid_branch:
+            await update.message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            return
+        branch = valid_branch
+
     msg = await update.message.reply_text(f"⏳ Pushing `{branch}` for `{project_name}` to remote...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(
-            GIT_BIN, "push", "origin", branch,
+            GIT_BIN, "push", "origin", "--", branch,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
@@ -453,7 +496,11 @@ async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🌿 *Branches for `{project_name}`:*\n```\n{out.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
     else:
         # Checkout / create branch
-        new_branch = context.args[1].strip()
+        raw_branch = context.args[1].strip()
+        new_branch = sanitize_branch_name(raw_branch)
+        if not new_branch:
+            await update.message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            return
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", new_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
