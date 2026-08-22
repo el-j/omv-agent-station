@@ -19,8 +19,8 @@ echo "🛑 Stopping running Agent Station containers..."
 if [ -x /usr/sbin/omv-agent-station ]; then
     /usr/sbin/omv-agent-station down 2>/dev/null || true
 fi
-if [ -x /usr/sbin/omv-ai-orchestrator ]; then
-    /usr/sbin/omv-ai-orchestrator down 2>/dev/null || true
+if [ -x /usr/sbin/omv-agent-station ]; then
+    /usr/sbin/omv-agent-station down 2>/dev/null || true
 fi
 if [ -d "/usr/share/openmediavault/agent-station" ] && command -v docker >/dev/null 2>&1; then
     docker compose -f /usr/share/openmediavault/agent-station/docker-compose.yml down 2>/dev/null || true
@@ -49,7 +49,7 @@ rm -f /usr/share/openmediavault/workbench/route.d/*agentstation* 2>/dev/null || 
 rm -f /usr/share/openmediavault/workbench/route.d/*aiorchestrator* 2>/dev/null || true
 rm -f /usr/share/openmediavault/workbench/dashboard.d/*agentstation* 2>/dev/null || true
 rm -f /usr/share/openmediavault/workbench/dashboard.d/*aiorchestrator* 2>/dev/null || true
-rm -f /usr/sbin/omv-agent-station /usr/sbin/omv-ai-orchestrator 2>/dev/null || true
+rm -f /usr/sbin/omv-agent-station /usr/sbin/omv-agent-station 2>/dev/null || true
 rm -rf /usr/share/openmediavault/agent-station /usr/share/openmediavault/ai-orchestrator 2>/dev/null || true
 
 # 4. Ensure archives directory exists and clear compiled cache

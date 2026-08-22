@@ -46,8 +46,8 @@ cp openmediavault-agent-station/usr/share/openmediavault/workbench/dashboard.d/*
 # Copy executable helpers
 cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/"
 chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station"
-cp openmediavault-agent-station/usr/sbin/omv-ai-orchestrator "$BUILD_DIR/usr/sbin/" 2>/dev/null || true
-chmod 755 "$BUILD_DIR/usr/sbin/omv-ai-orchestrator" 2>/dev/null || true
+cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/" 2>/dev/null || true
+chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station" 2>/dev/null || true
 
 # Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots)
 cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/agent-station/"

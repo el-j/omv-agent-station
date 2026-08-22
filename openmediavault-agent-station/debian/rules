@@ -21,7 +21,7 @@ override_dh_auto_install:
 	cp -r usr/share/openmediavault/workbench/dashboard.d/* debian/openmediavault-agent-station/usr/share/openmediavault/workbench/dashboard.d/ 2>/dev/null || true
 	cp usr/sbin/omv-agent-station debian/openmediavault-agent-station/usr/sbin/
 	chmod +x debian/openmediavault-agent-station/usr/sbin/omv-agent-station
-	cp usr/sbin/omv-ai-orchestrator debian/openmediavault-agent-station/usr/sbin/ 2>/dev/null || true
-	chmod +x debian/openmediavault-agent-station/usr/sbin/omv-ai-orchestrator 2>/dev/null || true
+	cp usr/sbin/omv-agent-station debian/openmediavault-agent-station/usr/sbin/ 2>/dev/null || true
+	chmod +x debian/openmediavault-agent-station/usr/sbin/omv-agent-station 2>/dev/null || true
 
 	cp -r ../docker-compose.yml ../litellm ../telegram-agent-bot ../signal-agent-bot ../discord-agent-bot debian/openmediavault-agent-station/usr/share/openmediavault/agent-station/
