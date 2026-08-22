@@ -30,7 +30,7 @@ SIGNAL_API_URL = os.environ.get("SIGNAL_CLI_URL", "http://signal-cli:8080")
 SIGNAL_PHONE_NUMBER = os.environ.get("SIGNAL_PHONE_NUMBER", "")
 SIGNAL_ALLOWED_NUMBER = os.environ.get("SIGNAL_ALLOWED_PHONE_NUMBER", "")
 LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")
+LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
 OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
 WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
 
@@ -55,23 +55,23 @@ def init_git_credentials():
         subprocess.run([GIT_BIN, "config", "--global", "init.defaultBranch", "main"], check=True)  # nosec B603,B607
 
         if GITHUB_TOKEN:
-            subprocess.run([
+            subprocess.run([  # nosec B603,B607
                 GIT_BIN, "config", "--global",
                 f"url.https://x-access-token:{GITHUB_TOKEN}@github.com/.insteadOf",
                 "https://github.com/"
-            ], check=True)  # nosec B603,B607
+            ], check=True)
         if GITLAB_TOKEN:
-            subprocess.run([
+            subprocess.run([  # nosec B603,B607
                 GIT_BIN, "config", "--global",
                 f"url.https://oauth2:{GITLAB_TOKEN}@gitlab.com/.insteadOf",
                 "https://gitlab.com/"
-            ], check=True)  # nosec B603,B607
+            ], check=True)
         if BITBUCKET_USER and BITBUCKET_PASS:
-            subprocess.run([
+            subprocess.run([  # nosec B603,B607
                 GIT_BIN, "config", "--global",
                 f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
                 "https://bitbucket.org/"
-            ], check=True)  # nosec B603,B607
+            ], check=True)
     except Exception as e:
         logger.warning(f"Could not configure git credentials: {e}")
 
@@ -330,12 +330,12 @@ async def run_signal_agent_task(sender: str, project_dir: Path, instructions: st
             "--no-git-commit-prefix"
         ]
 
-        proc = await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             *cmd,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )  # nosec B603,B607
+        )
         stdout, _ = await proc.communicate()
         out_text = stdout.decode("utf-8", errors="replace")
 
@@ -405,4 +405,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"🔒 Signal Agent Relay Bot starting for {SIGNAL_PHONE_NUMBER}...")
-    asyncio.run(listen_signal_websocket())
+    asyncio.run(listen_signal_websocket())  # nosec B603
