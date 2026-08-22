@@ -1,0 +1,8 @@
+version: "1.0"
+type: navigation-item
+data:
+  path: "agentstation.git"
+  text: _("Git Providers")
+  position: 30
+  icon: "mdi:git"
+  url: "/agentstation/git"

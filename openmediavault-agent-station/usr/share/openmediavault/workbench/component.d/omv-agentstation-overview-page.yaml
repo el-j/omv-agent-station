@@ -1,0 +1,35 @@
+version: "1.0"
+type: component
+data:
+  name: omv-agentstation-overview-page
+  type: formPage
+  config:
+    request:
+      service: AgentStation
+      get:
+        method: getSettings
+      post:
+        method: setSettings
+    fields:
+      - type: checkbox
+        name: enable
+        label: _("Enable Agent Station Engine")
+        value: false
+      - type: textInput
+        name: data_dir
+        label: _("Workspace Data Directory")
+        hint: _("Storage path for Obsidian notes, code repositories, and workspace files (e.g. /srv/dev-data)")
+        value: "/srv/dev-data"
+      - type: divider
+        title: _("Integrated Web Services & Ports")
+      - type: paragraph
+        text: _("When enabled, the following internal endpoints become accessible:")
+      - type: paragraph
+        text: _("• <b>Web Terminal:</b> http://[OMV-IP]:7681 (Full agent shell access)")
+      - type: paragraph
+        text: _("• <b>LiteLLM Proxy:</b> http://[OMV-IP]:4000 (OpenAI-compatible unified API & fallbacks)")
+      - type: paragraph
+        text: _("• <b>Web Chat UI:</b> http://[OMV-IP]:3000 (Interactive Agent Chat & Artifact Studio)")
+    buttons:
+      - template: submit
+      - template: cancel

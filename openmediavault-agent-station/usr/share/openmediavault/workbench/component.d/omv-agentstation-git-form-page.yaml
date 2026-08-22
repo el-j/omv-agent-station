@@ -1,0 +1,44 @@
+version: "1.0"
+type: component
+data:
+  name: omv-agentstation-git-form-page
+  type: formPage
+  config:
+    request:
+      service: AgentStation
+      get:
+        method: getSettings
+      post:
+        method: setSettings
+    fields:
+      - type: checkbox
+        name: enable_git
+        label: _("Enable Automated Git Versioning & Sync")
+        value: true
+      - type: divider
+        title: _("Git Committer Identity")
+      - type: textInput
+        name: git_author_name
+        label: _("Git Author Name")
+        value: "OMV AI Agent"
+      - type: textInput
+        name: git_author_email
+        label: _("Git Author Email")
+        value: "agent@omv-box.local"
+      - type: divider
+        title: _("Remote Git Provider Credentials")
+      - type: passwordInput
+        name: gitlab_token
+        label: _("GitLab Personal Access Token")
+        hint: _("Optional - for cloning & pushing to GitLab repositories")
+      - type: textInput
+        name: bitbucket_username
+        label: _("Bitbucket Username")
+        hint: _("Optional - for Bitbucket Cloud repositories")
+      - type: passwordInput
+        name: bitbucket_app_password
+        label: _("Bitbucket App Password")
+        hint: _("Optional - Bitbucket token/password with repository write permissions")
+    buttons:
+      - template: submit
+      - template: cancel

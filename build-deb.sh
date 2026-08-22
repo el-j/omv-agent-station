@@ -7,13 +7,13 @@
 set -e
 
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="1.0.0"
+VERSION="0.0.1"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"
 
 echo "=========================================================="
-echo "📦 Building $DEB_FILE for OpenMediaVault 6 & 7"
+echo "📦 Building $DEB_FILE for OpenMediaVault 6, 7 & 8"
 echo "=========================================================="
 
 rm -rf "$BUILD_DIR" "$DEB_FILE"
@@ -30,10 +30,12 @@ mkdir -p "$BUILD_DIR/usr/sbin"
 
 # Copy package control files
 cp openmediavault-agent-station/debian/control "$BUILD_DIR/DEBIAN/"
+cp openmediavault-agent-station/debian/triggers "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
+chmod 644 "$BUILD_DIR/DEBIAN/control" "$BUILD_DIR/DEBIAN/triggers" 2>/dev/null || true
 
 # Copy OMV RPC backend & WebGUI assets
 cp openmediavault-agent-station/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true

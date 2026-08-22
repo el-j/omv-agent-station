@@ -1,0 +1,8 @@
+version: "1.0"
+type: navigation-item
+data:
+  path: "agentstation.security"
+  text: _("Security & Web Access")
+  position: 50
+  icon: "mdi:shield-lock-outline"
+  url: "/agentstation/security"

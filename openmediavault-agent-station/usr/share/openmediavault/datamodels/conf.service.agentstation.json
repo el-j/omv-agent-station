@@ -12,6 +12,10 @@
       "type": "string",
       "default": "/srv/dev-data"
     },
+    "enable_aimodels": {
+      "type": "boolean",
+      "default": true
+    },
     "gemini_api_key": {
       "type": "string"
     },
@@ -20,6 +24,10 @@
     },
     "github_token": {
       "type": "string"
+    },
+    "enable_git": {
+      "type": "boolean",
+      "default": true
     },
     "git_author_name": {
       "type": "string",
@@ -37,6 +45,10 @@
     },
     "bitbucket_app_password": {
       "type": "string"
+    },
+    "enable_chat": {
+      "type": "boolean",
+      "default": true
     },
     "chat_service": {
       "type": "string",
@@ -60,9 +72,13 @@
     "discord_allowed_user_id": {
       "type": "string"
     },
+    "enable_security": {
+      "type": "boolean",
+      "default": true
+    },
     "litellm_master_key": {
       "type": "string",
-      "default": "sk-omv-master-key"
+      "default": "sk-omv-secret-master-key"
     },
     "terminal_user": {
       "type": "string",

@@ -49,22 +49,26 @@ class AgentStation extends ServiceAbstract
         return [
             "enable" => (bool)($data["enable"] ?? false),
             "data_dir" => (string)($data["data_dir"] ?? self::DEFAULT_DATA_DIR),
-            "chat_service" => (string)($data["chat_service"] ?? "telegram"),
+            "enable_aimodels" => (bool)($data["enable_aimodels"] ?? true),
             "gemini_api_key" => (string)($data["gemini_api_key"] ?? ""),
             "anthropic_api_key" => (string)($data["anthropic_api_key"] ?? ""),
             "github_token" => (string)($data["github_token"] ?? ""),
+            "enable_git" => (bool)($data["enable_git"] ?? true),
             "git_author_name" => (string)($data["git_author_name"] ?? "OMV AI Agent"),
             "git_author_email" => (string)($data["git_author_email"] ?? "agent@omv-box.local"),
             "gitlab_token" => (string)($data["gitlab_token"] ?? ""),
             "bitbucket_username" => (string)($data["bitbucket_username"] ?? ""),
             "bitbucket_app_password" => (string)($data["bitbucket_app_password"] ?? ""),
+            "enable_chat" => (bool)($data["enable_chat"] ?? true),
+            "chat_service" => (string)($data["chat_service"] ?? "telegram"),
             "telegram_bot_token" => (string)($data["telegram_bot_token"] ?? ""),
             "telegram_allowed_user_id" => (string)($data["telegram_allowed_user_id"] ?? ""),
             "signal_phone_number" => (string)($data["signal_phone_number"] ?? ""),
             "signal_allowed_phone_number" => (string)($data["signal_allowed_phone_number"] ?? ""),
             "discord_bot_token" => (string)($data["discord_bot_token"] ?? ""),
             "discord_allowed_user_id" => (string)($data["discord_allowed_user_id"] ?? ""),
-            "litellm_master_key" => (string)($data["litellm_master_key"] ?? "sk-omv-master-key"),
+            "enable_security" => (bool)($data["enable_security"] ?? true),
+            "litellm_master_key" => (string)($data["litellm_master_key"] ?? "sk-omv-secret-master-key"),
             "terminal_user" => (string)($data["terminal_user"] ?? "admin"),
             "terminal_pass" => (string)($data["terminal_pass"] ?? "omvsecurepass"),
         ];
@@ -75,34 +79,21 @@ class AgentStation extends ServiceAbstract
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
         $this->validateMethodParams($params, "rpc.agentstation.setsettings");
 
-        $config = [
-            "enable" => (bool)($params["enable"] ?? false),
-            "data_dir" => (string)($params["data_dir"] ?? self::DEFAULT_DATA_DIR),
-            "chat_service" => (string)($params["chat_service"] ?? "telegram"),
-            "gemini_api_key" => (string)($params["gemini_api_key"] ?? ""),
-            "anthropic_api_key" => (string)($params["anthropic_api_key"] ?? ""),
-            "github_token" => (string)($params["github_token"] ?? ""),
-            "git_author_name" => (string)($params["git_author_name"] ?? "OMV AI Agent"),
-            "git_author_email" => (string)($params["git_author_email"] ?? "agent@omv-box.local"),
-            "gitlab_token" => (string)($params["gitlab_token"] ?? ""),
-            "bitbucket_username" => (string)($params["bitbucket_username"] ?? ""),
-            "bitbucket_app_password" => (string)($params["bitbucket_app_password"] ?? ""),
-            "telegram_bot_token" => (string)($params["telegram_bot_token"] ?? ""),
-            "telegram_allowed_user_id" => (string)($params["telegram_allowed_user_id"] ?? ""),
-            "signal_phone_number" => (string)($params["signal_phone_number"] ?? ""),
-            "signal_allowed_phone_number" => (string)($params["signal_allowed_phone_number"] ?? ""),
-            "discord_bot_token" => (string)($params["discord_bot_token"] ?? ""),
-            "discord_allowed_user_id" => (string)($params["discord_allowed_user_id"] ?? ""),
-            "litellm_master_key" => (string)($params["litellm_master_key"] ?? "sk-omv-master-key"),
-            "terminal_user" => (string)($params["terminal_user"] ?? "admin"),
-            "terminal_pass" => (string)($params["terminal_pass"] ?? "omvsecurepass"),
-        ];
+        // Merge with existing configuration so partial submenu updates preserve other tabs
+        $existing = [];
+        if (file_exists(self::CONFIG_PATH)) {
+            $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        }
+
+        $config = array_merge($existing, $params);
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
 
         // Call omv-agent-station CLI to sync .env and docker lifecycle
-        $cmd = new Process("omv-agent-station", ["apply"]);
-        $cmd->execute();
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["apply"]);
+            $cmd->execute();
+        }
 
         return $config;
     }
@@ -111,15 +102,35 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-agent-station", ["status"]);
-        $cmd->execute($output);
+        $settings = $this->getSettings([], $context);
+        $masterEnabled = (bool)($settings["enable"] ?? false);
 
         return [
-            "running" => true,
-            "status_text" => implode("\n", $output),
-            "litellm_url" => "http://" . $_SERVER["SERVER_NAME"] . ":4000",
-            "syncthing_url" => "http://" . $_SERVER["SERVER_NAME"] . ":8384",
-            "terminal_url" => "http://" . $_SERVER["SERVER_NAME"] . ":7681",
+            [
+                "name" => "Engine",
+                "enabled" => $masterEnabled,
+                "detail" => $masterEnabled ? "Docker stack active" : "Stopped"
+            ],
+            [
+                "name" => "AI Models",
+                "enabled" => $masterEnabled && (bool)($settings["enable_aimodels"] ?? true),
+                "detail" => !empty($settings["gemini_api_key"]) || !empty($settings["anthropic_api_key"]) || !empty($settings["github_token"]) ? "Keys configured" : "No keys set"
+            ],
+            [
+                "name" => "Git Sync",
+                "enabled" => $masterEnabled && (bool)($settings["enable_git"] ?? true),
+                "detail" => (string)($settings["git_author_name"] ?? "OMV AI Agent")
+            ],
+            [
+                "name" => "Messenger",
+                "enabled" => $masterEnabled && (bool)($settings["enable_chat"] ?? true) && ($settings["chat_service"] ?? "none") !== "none",
+                "detail" => ucfirst((string)($settings["chat_service"] ?? "telegram"))
+            ],
+            [
+                "name" => "Security",
+                "enabled" => $masterEnabled && (bool)($settings["enable_security"] ?? true),
+                "detail" => "Port 7681 protected"
+            ]
         ];
     }
 
@@ -127,20 +138,24 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-agent-station", ["performance"]);
-        $cmd->execute($output);
-        $json_str = implode("", $output);
-        $metrics = json_decode($json_str, true) ?: [];
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["performance"]);
+            $cmd->execute($output);
+            $json_str = implode("", $output);
+            return json_decode($json_str, true) ?: [];
+        }
 
-        return $metrics;
+        return [];
     }
 
     public function restartServices($params, $context): void
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-agent-station", ["restart"]);
-        $cmd->execute();
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["restart"]);
+            $cmd->execute();
+        }
     }
 
     public function getLogs($params, $context): array
@@ -148,11 +163,16 @@ class AgentStation extends ServiceAbstract
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
         $service = $params["service"] ?? "litellm";
 
-        $cmd = new Process("omv-agent-station", ["logs", $service]);
-        $cmd->execute($output);
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["logs", $service]);
+            $cmd->execute($output);
+            return [
+                "logs" => implode("\n", $output)
+            ];
+        }
 
         return [
-            "logs" => implode("\n", $output)
+            "logs" => ""
         ];
     }
 }

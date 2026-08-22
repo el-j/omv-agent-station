@@ -1,31 +1,21 @@
 #!/bin/sh
+# postrm for openmediavault-agent-station
 set -e
+
+. /etc/default/openmediavault
+. /usr/share/openmediavault/scripts/helper-functions
 
 case "$1" in
     remove|purge|disappear)
-        # Ensure archives directory exists and clear compiled cache
-        mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
-        find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
-
-        # Recompile OMV Workbench after removing plugin assets
-        if command -v omv-mkworkbench >/dev/null 2>&1; then
-            omv-mkworkbench all 2>/dev/null || true
-        fi
-
-        # Refresh openmediavault-engined and PHP-FPM
-        if command -v systemctl >/dev/null 2>&1; then
-            (
-                sleep 1
-                systemctl restart openmediavault-engined 2>/dev/null || true
-                systemctl restart 'php*-fpm' 2>/dev/null || true
-                systemctl reload nginx 2>/dev/null || true
-            ) >/dev/null 2>&1 &
-        fi
+        # Queue workbench recompile via trigger
+        dpkg-trigger update-workbench
         ;;
+
     upgrade|failed-upgrade|abort-install|abort-upgrade)
         ;;
+
     *)
-        echo "postrm called with unknown argument \`$1'" >&2
+        echo "postrm called with unknown argument '$1'" >&2
         exit 1
         ;;
 esac

@@ -74,23 +74,13 @@ if ! apt-get install -y --reinstall "./$DEB_PKG"; then
     apt-get install -f -y || true
 fi
 
-# Clean cache post-install, compile workbench, and reload OMV daemons
-mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
-find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
+# Process any pending dpkg triggers (compiles workbench and restarts engined cleanly)
+dpkg --configure --pending 2>/dev/null || true
 
+# If omv-mkworkbench is available, ensure all compiled assets are generated
 if command -v omv-mkworkbench >/dev/null 2>&1; then
     echo "🔨 Compiling OpenMediaVault Workbench routes & widgets..."
     omv-mkworkbench all || true
-fi
-
-if command -v systemctl >/dev/null 2>&1; then
-    echo "🔄 Reloading OpenMediaVault daemons in background..."
-    (
-        sleep 2
-        systemctl restart openmediavault-engined 2>/dev/null || systemctl restart omv-engined 2>/dev/null || true
-        systemctl restart 'php*-fpm' 2>/dev/null || true
-        systemctl reload nginx 2>/dev/null || true
-    ) >/dev/null 2>&1 &
 fi
 
 echo "=========================================================="

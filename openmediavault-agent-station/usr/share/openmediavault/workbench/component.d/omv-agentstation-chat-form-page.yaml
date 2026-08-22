@@ -1,0 +1,64 @@
+version: "1.0"
+type: component
+data:
+  name: omv-agentstation-chat-form-page
+  type: formPage
+  config:
+    request:
+      service: AgentStation
+      get:
+        method: getSettings
+      post:
+        method: setSettings
+    fields:
+      - type: checkbox
+        name: enable_chat
+        label: _("Enable Remote Messenger Relay")
+        value: true
+      - type: select
+        name: chat_service
+        label: _("Active Messenger Relay")
+        hint: _("Choose which chat application controls your AI coding agent")
+        value: "telegram"
+        options:
+          - value: "telegram"
+            text: _("Telegram Bot (Instant setup, BotFather token)")
+          - value: "signal"
+            text: _("Signal Messenger (E2E Encrypted Linked Device)")
+          - value: "discord"
+            text: _("Discord Bot (Channels & Code Embeds)")
+          - value: "none"
+            text: _("Disabled (Web Terminal & SSH Only)")
+      - type: divider
+        title: _("Telegram Bot Credentials")
+      - type: passwordInput
+        name: telegram_bot_token
+        label: _("Telegram Bot Token")
+        hint: _("From @BotFather (Leave blank if not using Telegram)")
+      - type: textInput
+        name: telegram_allowed_user_id
+        label: _("Allowed Telegram Numeric User ID")
+        hint: _("From @userinfobot (Restricts bot access exclusively to you)")
+      - type: divider
+        title: _("Signal Messenger Credentials")
+      - type: textInput
+        name: signal_phone_number
+        label: _("Signal Bot Phone / Linked Number")
+        hint: _("Server Signal number or linked device number")
+      - type: textInput
+        name: signal_allowed_phone_number
+        label: _("Allowed Personal Signal Number")
+        hint: _("Your personal phone number (e.g. +491701234567)")
+      - type: divider
+        title: _("Discord Bot Credentials")
+      - type: passwordInput
+        name: discord_bot_token
+        label: _("Discord Bot Token")
+        hint: _("From Discord Developer Portal -> Bot -> Token")
+      - type: textInput
+        name: discord_allowed_user_id
+        label: _("Allowed Discord User ID")
+        hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
+    buttons:
+      - template: submit
+      - template: cancel

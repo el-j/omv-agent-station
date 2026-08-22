@@ -1,0 +1,36 @@
+version: "1.0"
+type: component
+data:
+  name: omv-agentstation-security-form-page
+  type: formPage
+  config:
+    request:
+      service: AgentStation
+      get:
+        method: getSettings
+      post:
+        method: setSettings
+    fields:
+      - type: checkbox
+        name: enable_security
+        label: _("Enable Security Enforcement & Auth")
+        value: true
+      - type: divider
+        title: _("LiteLLM Proxy Security")
+      - type: passwordInput
+        name: litellm_master_key
+        label: _("LiteLLM Proxy Master Key")
+        value: "sk-omv-secret-master-key"
+      - type: divider
+        title: _("Web Terminal Access Control")
+      - type: textInput
+        name: terminal_user
+        label: _("Web Terminal Username")
+        value: "admin"
+      - type: passwordInput
+        name: terminal_pass
+        label: _("Web Terminal Password")
+        value: "omvsecurepass"
+    buttons:
+      - template: submit
+      - template: cancel

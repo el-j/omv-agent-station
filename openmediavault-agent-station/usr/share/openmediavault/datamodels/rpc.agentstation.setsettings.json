@@ -11,6 +11,9 @@
       "data_dir": {
         "type": "string"
       },
+      "enable_aimodels": {
+        "type": "boolean"
+      },
       "gemini_api_key": {
         "type": "string"
       },
@@ -19,6 +22,9 @@
       },
       "github_token": {
         "type": "string"
+      },
+      "enable_git": {
+        "type": "boolean"
       },
       "git_author_name": {
         "type": "string"
@@ -34,6 +40,9 @@
       },
       "bitbucket_app_password": {
         "type": "string"
+      },
+      "enable_chat": {
+        "type": "boolean"
       },
       "chat_service": {
         "type": "string"
@@ -56,6 +65,9 @@
       "discord_allowed_user_id": {
         "type": "string"
       },
+      "enable_security": {
+        "type": "boolean"
+      },
       "litellm_master_key": {
         "type": "string"
       },
@@ -65,7 +77,6 @@
       "terminal_pass": {
         "type": "string"
       }
-    },
-    "required": ["enable"]
+    }
   }
 }

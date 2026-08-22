@@ -81,5 +81,47 @@ class TestConfig(unittest.TestCase):
                 self.assertIn("params", data, f"RPC datamodel {json_file.name} MUST have 'params' attribute")
                 self.assertIn("properties", data["params"])
 
+    def test_workbench_yaml_schema_validity(self):
+        import uuid
+        workbench_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench"
+        
+        # 1. Navigation items
+        nav_dir = workbench_dir / "navigation.d"
+        for nav_file in nav_dir.glob("*.yaml"):
+            with open(nav_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            self.assertEqual(data.get("type"), "navigation-item", f"{nav_file.name} must be type: navigation-item")
+            nav_data = data.get("data", {})
+            self.assertIn("path", nav_data, f"{nav_file.name} missing path")
+            self.assertIn("text", nav_data, f"{nav_file.name} missing text")
+            if nav_file.stem == "agentstation":
+                self.assertNotIn("url", nav_data, "Root navigation item must NOT have a url field (acts as container group)")
+            else:
+                self.assertIn("url", nav_data, f"Submenu {nav_file.name} must have a url field")
+
+        # 2. Routes
+        route_dir = workbench_dir / "route.d"
+        for route_file in route_dir.glob("*.yaml"):
+            with open(route_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            self.assertEqual(data.get("type"), "route", f"{route_file.name} must be type: route")
+            route_data = data.get("data", {})
+            self.assertIn("url", route_data)
+            self.assertIn("component", route_data)
+
+        # 3. Dashboard Widget
+        dash_dir = workbench_dir / "dashboard.d"
+        for dash_file in dash_dir.glob("*.yaml"):
+            with open(dash_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            self.assertEqual(data.get("type"), "dashboard-widget", f"{dash_file.name} must be type: dashboard-widget")
+            dash_data = data.get("data", {})
+            self.assertIn("id", dash_data)
+            # Verify UUID format
+            val_uuid = uuid.UUID(str(dash_data["id"]))
+            self.assertIsNotNone(val_uuid)
+            self.assertEqual(dash_data.get("type"), "grid")
+
 if __name__ == "__main__":
     unittest.main()
+

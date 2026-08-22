@@ -1,0 +1,9 @@
+{
+  "type": "rpc",
+  "id": "rpc.agentstation.getstatus",
+  "title": "Get Agent Station Status",
+  "params": {
+    "type": "object",
+    "properties": {}
+  }
+}
