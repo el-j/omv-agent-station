@@ -33,12 +33,14 @@ fi
 INSTALL_DIR="/srv/dev-data/omv-agent-station"
 mkdir -p "$INSTALL_DIR"
 
-if [ ! -d "$INSTALL_DIR/.git" ]; then
+if [ -d "$INSTALL_DIR/.git" ]; then
+    echo "🔄 Resetting and fetching latest clean code in $INSTALL_DIR..."
+    git -C "$INSTALL_DIR" fetch origin main || true
+    git -C "$INSTALL_DIR" reset --hard origin/main || true
+    git -C "$INSTALL_DIR" clean -fdx || true
+else
     echo "📥 Cloning omv-agent-station repository to $INSTALL_DIR..."
     git clone https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR"
-else
-    echo "🔄 Updating existing installation in $INSTALL_DIR..."
-    git -C "$INSTALL_DIR" pull --rebase || true
 fi
 
 cd "$INSTALL_DIR"
@@ -46,8 +48,9 @@ cd "$INSTALL_DIR"
 echo "🔨 Building native Debian package..."
 bash build-deb.sh
 
-# Remove legacy/duplicate datamodel files before package update
-rm -f /usr/share/openmediavault/datamodels/rpc.aiorchestrator.json 2>/dev/null || true
+# Remove legacy/duplicate datamodel files from past attempts to prevent registration conflicts
+rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json \
+      /usr/share/openmediavault/datamodels/*ai_orchestrator*.json 2>/dev/null || true
 
 echo "📦 Installing .deb package via apt / dpkg..."
 if ! apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.deb; then
