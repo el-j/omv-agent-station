@@ -1,8 +1,8 @@
-# 🚀 24/7 Headless AI Agent Orchestrator for OpenMediaVault (OMV) & HP ProLiant Gen8
+# 🚀 24/7 Headless AI Agent Orchestrator for OpenMediaVault (OMV)
 
-An always-on, self-hosted AI engineering stack running on your home server (Debian / OpenMediaVault on HP ProLiant MicroServer Gen8).
+An always-on, self-hosted AI engineering stack that **turns your OpenMediaVault (OMV) box into a 24/7 autonomous AI development agent**.
 
-Control autonomous coding agents from **Telegram**, sync your **Obsidian** Second Brain in real-time with **Syncthing**, multiplex sessions with **cmux / tmux**, and shield yourself from rate limits and high costs using **LiteLLM Proxy** configured for your existing subscriptions (**Google AI Studio / Gemini 3.7**, **Google Cloud Vertex AI Claude**, **Direct Anthropic Claude 3.7 Sonnet**, and **GitHub Copilot**).
+Control autonomous coding agents from **Signal (E2EE)**, **Telegram**, or **Discord**, sync your **Obsidian** Second Brain in real-time with **Syncthing**, multiplex sessions with **tmux / cmux**, and shield yourself from rate limits and high costs using **LiteLLM Proxy** configured for your existing subscriptions (**Google AI Studio / Gemini 3.7**, **Google Cloud Vertex AI Claude**, **Direct Anthropic Claude 3.7 Sonnet**, and **GitHub Copilot**).
 
 ---
 
@@ -20,12 +20,12 @@ git clone https://github.com/el-j/omv-stack.git /srv/dev-data/ai-stack && cd /sr
 
 1. [Why This Architecture?](#-why-this-architecture)
 2. [Official Documentation & Sources](#-official-documentation--sources)
-3. [Hardware & Server Feasibility (HP ProLiant Gen8)](#-hardware--server-feasibility-hp-proliant-gen8)
+3. [Tested Hardware & Verified Benchmarks](#-tested-hardware--verified-benchmarks)
 4. [Stack Components & Synergy](#-stack-components--synergy)
 5. [Multi-Tier AI Redundancy & Smart Failover](#-multi-tier-ai-redundancy--smart-failover)
 6. [OpenMediaVault (OMV) GUI & OMV-Extras Compose Template](#-openmediavault-omv-gui--omv-extras-compose-template)
 7. [Step-by-Step Setup Guide](#-step-by-step-setup-guide)
-8. [Telegram Bot Commands & Workflow](#-telegram-bot-commands--workflow)
+8. [Messenger Bot Commands & Workflow](#-messenger-bot-commands--workflow)
 9. [Obsidian & Syncthing Integration](#-obsidian--syncthing-integration)
 10. [Live Terminal & Session Multiplexing](#-live-terminal--session-multiplexing)
 11. [Troubleshooting & Maintenance](#-troubleshooting--maintenance)
@@ -46,25 +46,17 @@ Traditional AI tools operated on a rigid **"Single Prompt → Single LLM Respons
 
 ### The Always-On Advantage
 
-Instead of keeping your primary laptop powered on 24/7 or being tied to your desk, your **HP ProLiant Gen8 server runs the orchestrator stack 24/7**. You can send prompts and review code directly from your **phone via Telegram** while on the go.
+Instead of keeping your primary laptop powered on 24/7 or being tied to your desk, your **OpenMediaVault home server runs the orchestrator stack 24/7**. You can send prompts and review code directly from your **phone via Signal, Telegram, or Discord** while on the go.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                           YOUR MOBILE & WORKSTATION                               |
-|   [ Telegram App ]          [ Obsidian App (Mobile/Mac) ]    [ Browser / Terminal]|
+|   [ Signal / Telegram ]     [ Obsidian App (Mobile/Mac) ]    [ Browser / Terminal]|
 +----------+--------------------------------+----------------------------+----------+
            |                                |                            |
            | Encrypted HTTPS/WSS            | Syncthing Sync             | SSH / HTTP
            v                                v                            v
 +-----------------------------------------------------------------------------------+
-|                HP PROLIANT GEN8 SERVER (OpenMediaVault / Docker)                  |
-|                                                                                   |
-|  +-----------------------+   +-----------------------+  +----------------------+  |
-|  |  Telegram Agent Bot   |   |   Syncthing Daemon    |  |  Web Terminal (ttyd) |  |
-|  |  (Python + Aider/CLI) |<->|  (/data/obsidian)     |  |  (:7681 / tmux)      |  |
-|  +-----------+-----------+   +-----------------------+  +----------------------+  |
-|              |                                                                    |
-|              | OpenAI-Compatible API (:4000)                                      |
 |              v                                                                    |
 |  +-----------------------------------------------------------------------------+  |
 |  |                    LiteLLM Multi-Provider Proxy Router                      |  |
@@ -207,10 +199,10 @@ TZ=Europe/Berlin
 LITELLM_MASTER_KEY=sk-omv-secret-master-key-change-me
 
 # 1. Google AI Studio (https://aistudio.google.com/app/apikey)
-GEMINI_API_KEY=AIzaSy...
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # 2. Anthropic API (https://console.anthropic.com/)
-ANTHROPIC_API_KEY=sk-ant-api03-...
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # 3. Google Cloud Vertex AI (Optional Claude Redundancy)
 VERTEX_PROJECT_ID=your-gcp-project-id
@@ -218,11 +210,11 @@ VERTEX_LOCATION=europe-west1
 VERTEX_CREDENTIALS_PATH=/app/credentials/gcp-service-account.json
 
 # 4. GitHub Copilot Token (https://github.com/settings/tokens)
-GITHUB_TOKEN=ghp_...
+GITHUB_TOKEN=your_github_token_here
 
 # 5. Telegram Bot Token (@BotFather) & User ID (@userinfobot)
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
-TELEGRAM_ALLOWED_USER_ID=123456789
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_ALLOWED_USER_ID=your_numeric_user_id
 ```
 
 ### 3. Start the Stack

@@ -1,18 +1,15 @@
-Source: openmediavault-ai-orchestrator
+Package: openmediavault-ai-orchestrator
+Version: 1.0.0
 Section: net
 Priority: optional
-Maintainer: Fabian <dev@local>
-Build-Depends: debhelper (>= 12), openmediavault (>= 6.0)
-Standards-Version: 4.5.0
-Homepage: https://github.com/el-j/omv-stack
-
-Package: openmediavault-ai-orchestrator
 Architecture: all
-Depends: ${misc:Depends}, openmediavault (>= 6.0), docker.io | docker-ce, docker-compose-plugin, curl, tmux
+Maintainer: Fabian <dev@local>
+Depends: openmediavault (>= 6.0), docker.io | docker-ce, docker-compose-plugin, tmux
+Homepage: https://github.com/el-j/hs-ai-worker
 Description: OpenMediaVault AI Orchestrator & Remote Coding Stack
  A 24/7 self-hosted AI development & remote coding stack for OpenMediaVault.
  Provides an OpenMediaVault WebGUI management interface for:
   - LiteLLM Multi-Provider AI Gateway (Gemini 3.7, Claude 3.7 Sonnet, Copilot)
   - Syncthing bi-directional Obsidian Second Brain sync
-  - Telegram Remote Control Coding Bot
+  - Telegram, Signal & Discord Remote Control Coding Bots
   - Browser-based Web Terminal

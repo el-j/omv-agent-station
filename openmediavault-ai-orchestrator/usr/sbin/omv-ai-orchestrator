@@ -5,8 +5,8 @@
 
 set -e
 
-CONFIG_FILE="/etc/openmediavault-ai-orchestrator.json"
-STACK_DIR="/usr/share/openmediavault/ai-orchestrator"
+CONFIG_FILE="${CONFIG_FILE:-/etc/openmediavault-ai-orchestrator.json}"
+STACK_DIR="${STACK_DIR:-/usr/share/openmediavault/ai-orchestrator}"
 
 apply_config() {
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -21,7 +21,7 @@ apply_config() {
     ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))")
     GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))")
     GIT_NAME=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_name', 'OMV AI Agent'))")
-    GIT_EMAIL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_email', 'agent@proliant-omv.local'))")
+    GIT_EMAIL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_email', 'agent@omv-box.local'))")
     GITLAB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gitlab_token', ''))")
     BITBUCKET_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_username', ''))")
     BITBUCKET_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_app_password', ''))")
@@ -34,7 +34,7 @@ apply_config() {
     DISCORD_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_allowed_user_id', ''))")
     MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-master-key'))")
     TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))")
-    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'proliantgen8'))")
+    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'omvsecurepass'))")
 
     # Create directories
     mkdir -p "$DATA_DIR/obsidian"
@@ -87,6 +87,90 @@ EOF
     fi
 }
 
+get_performance() {
+    python3 - << 'PYEOF'
+import os
+import json
+import time
+import subprocess
+import urllib.request
+
+# CPU Info
+cpu_model = "Generic x86_64 / ARM CPU"
+cpu_cores = os.cpu_count() or 1
+try:
+    if os.path.exists("/proc/cpuinfo"):
+        for line in open("/proc/cpuinfo"):
+            if "model name" in line:
+                cpu_model = line.split(":", 1)[1].strip()
+                break
+    elif sys.platform == "darwin":
+        cpu_model = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
+except Exception:
+    pass
+
+# Load Averages
+try:
+    load1, load5, load15 = os.getloadavg()
+except Exception:
+    load1, load5, load15 = 0.0, 0.0, 0.0
+
+# Memory Info
+mem_total_mb = 0
+mem_available_mb = 0
+try:
+    if os.path.exists("/proc/meminfo"):
+        for line in open("/proc/meminfo"):
+            if line.startswith("MemTotal:"):
+                mem_total_mb = int(line.split()[1]) // 1024
+            elif line.startswith("MemAvailable:"):
+                mem_available_mb = int(line.split()[1]) // 1024
+    elif sys.platform == "darwin":
+        total_bytes = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"]).decode().strip())
+        mem_total_mb = total_bytes // (1024 * 1024)
+        mem_available_mb = mem_total_mb // 2  # Approximate for test env
+except Exception:
+    pass
+
+mem_used_mb = max(0, mem_total_mb - mem_available_mb)
+mem_used_pct = round((mem_used_mb / mem_total_mb * 100), 1) if mem_total_mb > 0 else 0
+
+# LiteLLM Proxy Ping
+proxy_ping_ms = 0.0
+proxy_healthy = False
+try:
+    t0 = time.time()
+    req = urllib.request.Request("http://127.0.0.1:4000/health/liveliness")
+    with urllib.request.urlopen(req, timeout=1.5) as resp:
+        if resp.status == 200:
+            proxy_healthy = True
+            proxy_ping_ms = round((time.time() - t0) * 1000, 2)
+except Exception:
+    proxy_healthy = False
+
+data = {
+    "cpu": {
+        "model": cpu_model,
+        "cores": cpu_cores,
+        "load_1m": load1,
+        "load_5m": load5,
+        "load_15m": load15
+    },
+    "memory": {
+        "total_mb": mem_total_mb,
+        "used_mb": mem_used_mb,
+        "used_percent": mem_used_pct
+    },
+    "gateway": {
+        "healthy": proxy_healthy,
+        "latency_ms": proxy_ping_ms
+    },
+    "status": "Optimal" if load1 < cpu_cores * 1.5 else "High Load"
+}
+print(json.dumps(data, indent=2))
+PYEOF
+}
+
 case "$1" in
     apply)
         apply_config
@@ -103,12 +187,19 @@ case "$1" in
     status)
         cd "$STACK_DIR" && docker compose --env-file .env ps
         ;;
+    performance)
+        get_performance
+        ;;
     logs)
         SERVICE=${2:-litellm}
         cd "$STACK_DIR" && docker compose --env-file .env logs --tail=100 "$SERVICE"
         ;;
+    help|-h|--help)
+        echo "Usage: $0 {apply|start|stop|restart|status|performance|logs [service]}"
+        exit 0
+        ;;
     *)
-        echo "Usage: $0 {apply|start|stop|restart|status|logs [service]}"
+        echo "Usage: $0 {apply|start|stop|restart|status|performance|logs [service]}"
         exit 1
         ;;
 esac

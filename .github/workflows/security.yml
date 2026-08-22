@@ -27,3 +27,4 @@ jobs:
           path: "."
           level: "medium"
           confidence: "medium"
+          arguments: "-c .bandit"

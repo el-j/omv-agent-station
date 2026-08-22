@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================================="
-echo "🚀 Initializing OMV AI Orchestrator Stack on ProLiant Gen8"
+echo "🚀 Initializing OMV AI Orchestrator Stack on OpenMediaVault"
 echo "=========================================================="
 
 DATA_DIR=${DATA_DIR:-/srv/dev-data}

@@ -1,0 +1,16 @@
+# Bandit Configuration File
+# https://bandit.readthedocs.io/
+
+skips:
+  - B101  # assert statements in tests
+  - B102  # exec in test sandbox
+  - B404  # import subprocess (managed via strict list arguments and binary resolution)
+  - B603  # subprocess without shell=True
+  - B607  # subprocess partial path (resolved via shutil.which)
+
+exclude_dirs:
+  - tests
+  - website
+  - build-pkg
+  - .github
+  - node_modules

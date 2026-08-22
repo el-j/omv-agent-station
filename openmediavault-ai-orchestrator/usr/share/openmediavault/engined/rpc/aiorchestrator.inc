@@ -29,6 +29,7 @@ class AIOrchestrator extends ServiceAbstract
         $this->registerMethod("getSettings");
         $this->registerMethod("setSettings");
         $this->registerMethod("getStatus");
+        $this->registerMethod("getPerformance");
         $this->registerMethod("restartServices");
         $this->registerMethod("getLogs");
     }
@@ -51,7 +52,7 @@ class AIOrchestrator extends ServiceAbstract
             "anthropic_api_key" => (string)($data["anthropic_api_key"] ?? ""),
             "github_token" => (string)($data["github_token"] ?? ""),
             "git_author_name" => (string)($data["git_author_name"] ?? "OMV AI Agent"),
-            "git_author_email" => (string)($data["git_author_email"] ?? "agent@proliant-omv.local"),
+            "git_author_email" => (string)($data["git_author_email"] ?? "agent@omv-box.local"),
             "gitlab_token" => (string)($data["gitlab_token"] ?? ""),
             "bitbucket_username" => (string)($data["bitbucket_username"] ?? ""),
             "bitbucket_app_password" => (string)($data["bitbucket_app_password"] ?? ""),
@@ -63,7 +64,7 @@ class AIOrchestrator extends ServiceAbstract
             "discord_allowed_user_id" => (string)($data["discord_allowed_user_id"] ?? ""),
             "litellm_master_key" => (string)($data["litellm_master_key"] ?? "sk-omv-master-key"),
             "terminal_user" => (string)($data["terminal_user"] ?? "admin"),
-            "terminal_pass" => (string)($data["terminal_pass"] ?? "proliantgen8"),
+            "terminal_pass" => (string)($data["terminal_pass"] ?? "omvsecurepass"),
         ];
     }
 
@@ -80,7 +81,7 @@ class AIOrchestrator extends ServiceAbstract
             "anthropic_api_key" => (string)($params["anthropic_api_key"] ?? ""),
             "github_token" => (string)($params["github_token"] ?? ""),
             "git_author_name" => (string)($params["git_author_name"] ?? "OMV AI Agent"),
-            "git_author_email" => (string)($params["git_author_email"] ?? "agent@proliant-omv.local"),
+            "git_author_email" => (string)($params["git_author_email"] ?? "agent@omv-box.local"),
             "gitlab_token" => (string)($params["gitlab_token"] ?? ""),
             "bitbucket_username" => (string)($params["bitbucket_username"] ?? ""),
             "bitbucket_app_password" => (string)($params["bitbucket_app_password"] ?? ""),
@@ -92,7 +93,7 @@ class AIOrchestrator extends ServiceAbstract
             "discord_allowed_user_id" => (string)($params["discord_allowed_user_id"] ?? ""),
             "litellm_master_key" => (string)($params["litellm_master_key"] ?? "sk-omv-master-key"),
             "terminal_user" => (string)($params["terminal_user"] ?? "admin"),
-            "terminal_pass" => (string)($params["terminal_pass"] ?? "proliantgen8"),
+            "terminal_pass" => (string)($params["terminal_pass"] ?? "omvsecurepass"),
         ];
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
@@ -118,6 +119,18 @@ class AIOrchestrator extends ServiceAbstract
             "syncthing_url" => "http://" . $_SERVER["SERVER_NAME"] . ":8384",
             "terminal_url" => "http://" . $_SERVER["SERVER_NAME"] . ":7681",
         ];
+    }
+
+    public function getPerformance($params, $context): array
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        $cmd = new Process("omv-ai-orchestrator", ["performance"]);
+        $cmd->execute($output);
+        $json_str = implode("", $output);
+        $metrics = json_decode($json_str, true) ?: [];
+
+        return $metrics;
     }
 
     public function restartServices($params, $context): void

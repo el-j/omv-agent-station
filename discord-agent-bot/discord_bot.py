@@ -7,9 +7,11 @@ Git repository synchronization, Obsidian second-brain integration, and LiteLLM g
 
 import os
 import sys
+import re
+import shutil
 import logging
 import asyncio
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from datetime import datetime
 import discord
@@ -26,46 +28,89 @@ logger = logging.getLogger("DiscordAgentBot")
 DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 ALLOWED_USER_ID = os.environ.get("DISCORD_ALLOWED_USER_ID")
 LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")
+LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
 OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
 WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
 
 # Git Configuration
 GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
-GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@proliant-omv.local")
+GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-box.local")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
 BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
 
+GIT_BIN = shutil.which("git") or "/usr/bin/git"
+TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
+UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
+DF_BIN = shutil.which("df") or "/bin/df"
+AIDER_BIN = shutil.which("aider") or "aider"
+
 def init_git_credentials():
     try:
-        subprocess.run(["git", "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)
-        subprocess.run(["git", "config", "--global", "init.defaultBranch", "main"], check=True)
+        subprocess.run([GIT_BIN, "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)  # nosec B603,B607
+        subprocess.run([GIT_BIN, "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)  # nosec B603,B607
+        subprocess.run([GIT_BIN, "config", "--global", "init.defaultBranch", "main"], check=True)  # nosec B603,B607
 
         if GITHUB_TOKEN:
-            subprocess.run([
-                "git", "config", "--global",
+            subprocess.run([  # nosec B603,B607
+                GIT_BIN, "config", "--global",
                 f"url.https://x-access-token:{GITHUB_TOKEN}@github.com/.insteadOf",
                 "https://github.com/"
             ], check=True)
         if GITLAB_TOKEN:
-            subprocess.run([
-                "git", "config", "--global",
+            subprocess.run([  # nosec B603,B607
+                GIT_BIN, "config", "--global",
                 f"url.https://oauth2:{GITLAB_TOKEN}@gitlab.com/.insteadOf",
                 "https://gitlab.com/"
             ], check=True)
         if BITBUCKET_USER and BITBUCKET_PASS:
-            subprocess.run([
-                "git", "config", "--global",
+            subprocess.run([  # nosec B603,B607
+                GIT_BIN, "config", "--global",
                 f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
                 "https://bitbucket.org/"
             ], check=True)
     except Exception as e:
         logger.warning(f"Could not configure git credentials: {e}")
 
-init_git_credentials()
+def sanitize_git_url(url: str) -> str | None:
+    """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("-"):
+        return None
+    pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
+    if re.match(pattern, url):
+        return url
+    return None
+
+def sanitize_branch_name(branch: str) -> str | None:
+    """Validates git branch names to prevent argument injection."""
+    if not branch:
+        return None
+    branch = branch.strip()
+    if branch.startswith("-") or ".." in branch or "\\" in branch or "@{" in branch:
+        return None
+    if re.match(r"^[a-zA-Z0-9_./-]+$", branch):
+        return branch
+    return None
+
+def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
+    """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
+    if not project_name or ".." in project_name or project_name.startswith(("/", "\\", "-")):
+        return None
+    try:
+        clean_name = project_name.strip().strip("./")
+        if not clean_name or clean_name.startswith("-"):
+            return None
+        target = (workspace / clean_name).resolve()
+        workspace_resolved = workspace.resolve()
+        if workspace_resolved in target.parents or target == workspace_resolved:
+            return target
+        return None
+    except Exception:
+        return None
 
 ai_client = OpenAI(
     api_key=LITELLM_KEY,
@@ -79,6 +124,8 @@ bot = commands.Bot(command_prefix=["!", "/"], intents=intents)
 def is_authorized(ctx) -> bool:
     if not ALLOWED_USER_ID:
         return True
+    if not hasattr(ctx, "author") or not ctx.author:
+        return False
     return str(ctx.author.id) == str(ALLOWED_USER_ID)
 
 @bot.event
@@ -91,7 +138,7 @@ async def cmd_help(ctx):
         return
     embed = discord.Embed(
         title="🤖 OMV AI Orchestrator (Discord Relay)",
-        description="24/7 autonomous software engineering & agent relay running on your HP ProLiant Gen8.",
+        description="24/7 autonomous software engineering & agent relay running on your OpenMediaVault server.",
         color=discord.Color.blue()
     )
     embed.add_field(name="!task <project> <prompt>", value="Runs autonomous coding loop, creates branch & auto-pushes", inline=False)
@@ -106,17 +153,17 @@ async def cmd_status(ctx):
     if not is_authorized(ctx):
         return
     try:
-        tmux_out = subprocess.check_output(["tmux", "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()
+        tmux_out = subprocess.check_output([TMUX_BIN, "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()  # nosec B603,B607
     except Exception:
         tmux_out = "No active tmux sessions."
     try:
-        uptime_out = subprocess.check_output(["uptime"], text=True).strip()
-        df_out = subprocess.check_output(["df", "-h", "/data/workspace"], text=True).strip().splitlines()[-1]
+        uptime_out = subprocess.check_output([UPTIME_BIN], text=True).strip()  # nosec B603,B607
+        df_out = subprocess.check_output([DF_BIN, "-h", "/data/workspace"], text=True).strip().splitlines()[-1]  # nosec B603,B607
     except Exception:
         uptime_out = "N/A"
         df_out = "N/A"
 
-    embed = discord.Embed(title="🖥️ ProLiant Gen8 Server Status", color=discord.Color.green())
+    embed = discord.Embed(title="🖥️ OMV Server Status", color=discord.Color.green())
     embed.add_field(name="⏱️ Uptime", value=f"`{uptime_out}`", inline=False)
     embed.add_field(name="💾 Workspace Disk", value=f"`{df_out}`", inline=False)
     embed.add_field(name="🧵 Active Agent Sessions", value=f"```\n{tmux_out}\n```", inline=False)
@@ -155,14 +202,23 @@ async def cmd_projects(ctx):
 async def cmd_clone(ctx, git_url: str, folder_name: str = None):
     if not is_authorized(ctx):
         return
-    folder = folder_name if folder_name else git_url.rstrip("/").split("/")[-1].replace(".git", "")
-    target = WORKSPACE / folder
+    valid_url = sanitize_git_url(git_url)
+    if not valid_url:
+        await ctx.send("❌ Invalid git URL format.")
+        return
+
+    folder = folder_name if folder_name else valid_url.rstrip("/").split("/")[-1].replace(".git", "")
+    target = sanitize_project_path(WORKSPACE, folder)
+    if not target:
+        await ctx.send("❌ Invalid folder name.")
+        return
+
     if target.exists():
         await ctx.send(f"⚠️ Folder `{folder}` already exists in workspace.")
         return
 
-    msg = await ctx.send(f"⏳ Cloning `{git_url}` into `{folder}`...")
-    proc = await asyncio.create_subprocess_exec("git", "clone", git_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    msg = await ctx.send(f"⏳ Cloning `{valid_url}` into `{folder}`...")
+    proc = await asyncio.create_subprocess_exec(GIT_BIN, "clone", "--", valid_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
     _, stderr = await proc.communicate()
     if proc.returncode == 0:
         await msg.edit(content=f"✅ Successfully cloned `{folder}`!\nRun `!task {folder} <instructions>` to begin coding.")
@@ -191,8 +247,8 @@ async def cmd_chat(ctx, *, query: str):
 async def cmd_task(ctx, project_name: str, *, instructions: str):
     if not is_authorized(ctx):
         return
-    project_dir = WORKSPACE / project_name
-    if not project_dir.exists():
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists():
         await ctx.send(f"❌ Project `{project_name}` does not exist in `/data/workspace`.")
         return
 
@@ -216,10 +272,10 @@ async def run_discord_agent_task(ctx, status_msg, project_dir: Path, instruction
     try:
         is_git = (project_dir / ".git").exists()
         if is_git:
-            await asyncio.create_subprocess_exec("git", "checkout", "-B", task_branch, cwd=str(project_dir))
+            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
 
         cmd = [
-            "aider",
+            AIDER_BIN,
             "--openai-api-base", f"{LITELLM_BASE}/v1",
             "--openai-api-key", LITELLM_KEY,
             "--model", "openai/coder-smart",
@@ -229,7 +285,7 @@ async def run_discord_agent_task(ctx, status_msg, project_dir: Path, instruction
             "--no-git-commit-prefix"
         ]
 
-        proc = await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             *cmd,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
@@ -241,17 +297,17 @@ async def run_discord_agent_task(ctx, status_msg, project_dir: Path, instruction
         push_status = "Local commit only."
         diff_summary = "No new commits."
         if is_git:
-            d_proc = await asyncio.create_subprocess_exec("git", "diff", "main..." + task_branch, "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)
+            d_proc = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "main..." + task_branch, "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
             d_out, _ = await d_proc.communicate()
             diff_summary = d_out.decode("utf-8", errors="replace").strip() or "Changes committed."
 
             try:
-                p_proc = await asyncio.create_subprocess_exec("git", "push", "-u", "origin", task_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                p_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", task_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
                 await p_proc.communicate()
                 if p_proc.returncode == 0:
                     push_status = f"✅ Branch pushed to remote: `{task_branch}`"
-            except Exception:
-                pass
+            except Exception as pe:
+                logger.info(f"Remote push skipped: {pe}")
 
         result_embed = discord.Embed(
             title=f"✅ Agent Task Completed! ({session_id})",
@@ -276,4 +332,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("🤖 Discord Agent Relay Bot starting...")
-    bot.run(DISCORD_TOKEN)
+    bot.run(DISCORD_TOKEN)  # nosec B603

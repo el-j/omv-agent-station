@@ -43,7 +43,7 @@ data:
       - type: textInput
         name: git_author_email
         label: _("Git Committer Email")
-        value: "agent@proliant-omv.local"
+        value: "agent@omv-box.local"
       - type: passwordInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
@@ -111,7 +111,7 @@ data:
       - type: passwordInput
         name: terminal_pass
         label: _("Web Terminal Password")
-        value: "proliantgen8"
+        value: "omvsecurepass"
     buttons:
       - template: submit
       - template: cancel
