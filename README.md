@@ -291,6 +291,21 @@ nano litellm/config.yaml
 docker compose restart litellm
 ```
 
+### 🧹 Clean Uninstallation & Reset:
+If you wish to remove the plugin, stop all containers, and purge all OMV workbench assets (while keeping your project files in `/srv/dev-data` intact):
+
+**1-Liner Shell Uninstaller:**
+```bash
+wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/uninstall-plugin.sh | sudo bash
+```
+
+**Or via CLI / APT:**
+```bash
+sudo omv-ai-orchestrator uninstall
+# or:
+sudo apt purge openmediavault-ai-orchestrator
+```
+
 ---
 
 ## 🧪 Quality Assurance, Testing & Security
