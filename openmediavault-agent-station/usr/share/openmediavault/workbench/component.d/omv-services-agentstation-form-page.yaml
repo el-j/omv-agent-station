@@ -64,10 +64,14 @@ data:
         hint: _("Choose which chat application you want to control your coding agent from")
         value: "telegram"
         options:
-          - ["telegram", "Telegram Bot (Zero phone number / Instant setup)"]
-          - ["signal", "Signal Messenger (End-to-End Encrypted Linked Device)"]
-          - ["discord", "Discord Bot (Channels & Code Embeds / Zero phone number)"]
-          - ["none", "Disabled (Web Terminal & SSH Only)"]
+          - value: "telegram"
+            text: _("Telegram Bot (Zero phone number / Instant setup)")
+          - value: "signal"
+            text: _("Signal Messenger (End-to-End Encrypted Linked Device)")
+          - value: "discord"
+            text: _("Discord Bot (Channels & Code Embeds / Zero phone number)")
+          - value: "none"
+            text: _("Disabled (Web Terminal & SSH Only)")
       - type: divider
         title: _("Telegram Bot Configuration")
       - type: passwordInput
