@@ -155,17 +155,17 @@ If your primary direct Anthropic subscription hits a rate limit (HTTP 429) or to
 
 You have 3 easy ways to run and manage this stack on your server:
 
-### 🏆 Option A: Native OpenMediaVault Plugin (`openmediavault-ai-orchestrator`)
-A full native OpenMediaVault plugin that adds **Services $\to$ AI Orchestrator** directly into the OMV WebGUI Workbench:
+### 🏆 Option A: Native OpenMediaVault Plugin (`openmediavault-agent-station`)
+A full native OpenMediaVault plugin that adds **Services $\to$ Agent Station** directly into the OMV WebGUI Workbench:
 1. Build or download the `.deb` package:
    ```bash
    ./build-deb.sh
    ```
 2. Install the package on your OMV server:
    ```bash
-   sudo dpkg -i openmediavault-ai-orchestrator_1.0.0_all.deb
+   sudo dpkg -i openmediavault-agent-station_1.0.0_all.deb
    ```
-3. Refresh your OpenMediaVault WebGUI $\to$ Click **Services $\to$ AI Orchestrator**:
+3. Refresh your OpenMediaVault WebGUI $\to$ Click **Services $\to$ Agent Station**:
    - Toggle **Enable**
    - Enter your **Google AI Pro**, **Claude Pro**, and **GitHub Copilot** keys in the WebGUI form
    - Click **Save** & **Apply**! The plugin automatically manages Docker containers and logs.
@@ -301,9 +301,9 @@ wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/
 
 **Or via CLI / APT:**
 ```bash
-sudo omv-ai-orchestrator uninstall
+sudo omv-agent-station uninstall
 # or:
-sudo apt purge openmediavault-ai-orchestrator
+sudo apt purge openmediavault-agent-station
 ```
 
 ---

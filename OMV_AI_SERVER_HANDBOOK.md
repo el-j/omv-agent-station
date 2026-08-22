@@ -71,8 +71,8 @@ This production stack turns your **HP ProLiant MicroServer Gen8 (running OpenMed
 
 ### Option 1: Native OpenMediaVault WebGUI Plugin
 1. Build package: `./build-deb.sh`
-2. Install on OMV: `sudo dpkg -i openmediavault-ai-orchestrator_1.0.0_all.deb`
-3. Go to **OMV WebGUI $\to$ Services $\to$ AI Orchestrator**: Enter your tokens and click **Save & Apply**!
+2. Install on OMV: `sudo dpkg -i openmediavault-agent-station_1.0.0_all.deb`
+3. Go to **OMV WebGUI $\to$ Services $\to$ Agent Station**: Enter your tokens and click **Save & Apply**!
 
 ### Option 2: 1-Liner Shell Quick-Start (SSH Terminal)
 ```bash

@@ -1,0 +1,9 @@
+openmediavault-agent-station (1.0.0) unstable; urgency=low
+
+  * Initial release for OpenMediaVault 6 and OpenMediaVault 7.
+  * Multi-provider AI Gateway integration via LiteLLM.
+  * Telegram, Signal and Discord remote control coding agents.
+  * Obsidian bi-directional sync with Syncthing.
+  * Web terminal remote management.
+
+ -- Fabian <dev@local>  Sat, 22 Aug 2026 12:00:00 +0200

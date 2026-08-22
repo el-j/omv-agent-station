@@ -1,7 +1,7 @@
 {
   "type": "rpc",
-  "id": "rpc.aiorchestrator.setsettings",
-  "title": "Set AI Orchestrator Settings",
+  "id": "rpc.agentstation.setsettings",
+  "title": "Set Agent Station Settings",
   "properties": {
     "enable": {
       "type": "boolean"

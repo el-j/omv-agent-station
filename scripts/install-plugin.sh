@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# OpenMediaVault AI Orchestrator Plugin & Stack Automated Installer
+# OpenMediaVault Agent Station Plugin & Stack Automated Installer
 # Repository: https://github.com/el-j/omv-agent-station
 # ==============================================================================
 set -e
 
 echo "=========================================================="
-echo "🚀 OpenMediaVault AI Orchestrator Plugin Installer"
+echo "🚀 OpenMediaVault Agent Station Plugin Installer"
 echo "=========================================================="
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -50,12 +50,14 @@ bash build-deb.sh
 
 # Remove legacy/duplicate datamodel files from past attempts to prevent registration conflicts
 rm -f /usr/share/openmediavault/datamodels/*aiorchestrator*.json \
-      /usr/share/openmediavault/datamodels/*ai_orchestrator*.json 2>/dev/null || true
+      /usr/share/openmediavault/datamodels/*ai_orchestrator*.json \
+      /usr/share/openmediavault/datamodels/*agentstation*.json 2>/dev/null || true
 
 echo "📦 Installing .deb package via apt / dpkg..."
-if ! apt-get install -y --reinstall ./openmediavault-ai-orchestrator_1.0.0_all.deb; then
+DEB_PKG=$(ls -1 openmediavault-agent-station_*.deb openmediavault-ai-orchestrator_*.deb 2>/dev/null | head -n1)
+if ! apt-get install -y --reinstall "./$DEB_PKG"; then
     echo "⚠️ Apt direct install encountered a dependency preference issue; applying with dpkg + fix-broken..."
-    dpkg -i --force-depends ./openmediavault-ai-orchestrator_1.0.0_all.deb || true
+    dpkg -i --force-depends "./$DEB_PKG" || true
     apt-get install -f -y || true
 fi
 
@@ -70,8 +72,8 @@ if command -v omv-salt >/dev/null 2>&1; then
 fi
 
 echo "=========================================================="
-echo "✅ AI Orchestrator Plugin successfully installed on your OMV Server!"
+echo "✅ Agent Station Plugin successfully installed on your OMV Server!"
 echo "👉 1. Open your OMV WebGUI in your browser"
-echo "👉 2. Navigate to: Services ➔ AI Orchestrator"
+echo "👉 2. Navigate to: Services ➔ Agent Station"
 echo "👉 3. Enter your subscription tokens and click Apply"
 echo "=========================================================="

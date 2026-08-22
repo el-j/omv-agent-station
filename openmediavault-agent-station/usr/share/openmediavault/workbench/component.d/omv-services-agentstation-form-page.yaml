@@ -1,11 +1,11 @@
 version: "1.0"
 type: component
 data:
-  name: omv-services-aiorchestrator-form-page
+  name: omv-services-agentstation-form-page
   type: formPage
   config:
     request:
-      service: AIOrchestrator
+      service: AgentStation
       get:
         method: getSettings
       post:

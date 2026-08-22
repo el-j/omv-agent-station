@@ -1,8 +1,8 @@
 {
   "type": "config",
-  "id": "conf.service.aiorchestrator",
-  "title": "AI Orchestrator",
-  "query": "//services/aiorchestrator",
+  "id": "conf.service.agentstation",
+  "title": "Agent Station",
+  "query": "//services/agentstation",
   "properties": {
     "enable": {
       "type": "boolean",

@@ -3,13 +3,13 @@
 all: lint test blackbox mutation security deb
 
 help:
-	@echo "OpenMediaVault AI Orchestrator Development Commands:"
+	@echo "OpenMediaVault Agent Station Development Commands:"
 	@echo "  make test      - Run all unit, black-box, and mutation tests"
 	@echo "  make blackbox  - Run isolated black-box security & packaging tests"
 	@echo "  make mutation  - Run AST semantic mutation & fault injection tests"
 	@echo "  make lint      - Lint Python and YAML configurations"
 	@echo "  make security  - Scan codebase for security issues & secret leaks"
-	@echo "  make deb       - Build openmediavault-ai-orchestrator .deb package"
+	@echo "  make deb       - Build openmediavault-agent-station .deb package"
 	@echo "  make clean     - Clean temporary build artifacts and caches"
 
 test:

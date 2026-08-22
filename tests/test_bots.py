@@ -36,9 +36,9 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(os.access(build_script, os.X_OK))
 
     def test_omv_plugin_files_exist(self):
-        rpc_file = ROOT_DIR / "openmediavault-ai-orchestrator" / "usr" / "share" / "openmediavault" / "engined" / "rpc" / "aiorchestrator.inc"
-        yaml_page = ROOT_DIR / "openmediavault-ai-orchestrator" / "usr" / "share" / "openmediavault" / "workbench" / "component.d" / "omv-services-ai-orchestrator-form-page.yaml"
-        cli_helper = ROOT_DIR / "openmediavault-ai-orchestrator" / "usr" / "sbin" / "omv-ai-orchestrator"
+        rpc_file = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "engined" / "rpc" / "agentstation.inc"
+        yaml_page = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "component.d" / "omv-services-agentstation-form-page.yaml"
+        cli_helper = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
         self.assertTrue(rpc_file.exists())
         self.assertTrue(yaml_page.exists())
         self.assertTrue(cli_helper.exists())

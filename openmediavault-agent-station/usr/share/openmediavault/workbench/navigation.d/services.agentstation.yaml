@@ -1,0 +1,9 @@
+version: "1.0"
+type: navigation
+data:
+  path: services.agentstation
+  text: _("Agent Station")
+  icon: "mdi:robot"
+  position: 120
+  parent: services
+  component: omv-services-agentstation-form-page

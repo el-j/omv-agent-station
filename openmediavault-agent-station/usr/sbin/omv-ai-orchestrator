@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# OpenMediaVault Agent Station CLI Helper & Service Lifecycle Manager
+# ==============================================================================
+
+set -e
+
+if [ -f "/etc/openmediavault-agent-station.json" ]; then
+    DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
+else
+    DEFAULT_CONFIG="/etc/openmediavault-ai-orchestrator.json"
+fi
+
+if [ -d "/usr/share/openmediavault/agent-station" ]; then
+    DEFAULT_STACK="/usr/share/openmediavault/agent-station"
+else
+    DEFAULT_STACK="/usr/share/openmediavault/ai-orchestrator"
+fi
+
+CONFIG_FILE="${CONFIG_FILE:-$DEFAULT_CONFIG}"
+STACK_DIR="${STACK_DIR:-$DEFAULT_STACK}"
+
+apply_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Configuration file $CONFIG_FILE does not exist."
+        exit 0
+    fi
+
+    # Read config with python
+    ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))")
+    DATA_DIR=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('data_dir', '/srv/dev-data'))")
+    GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))")
+    ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))")
+    GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))")
+    GIT_NAME=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_name', 'OMV AI Agent'))")
+    GIT_EMAIL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_email', 'agent@omv-box.local'))")
+    GITLAB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gitlab_token', ''))")
+    BITBUCKET_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_username', ''))")
+    BITBUCKET_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_app_password', ''))")
+    CHAT_SERVICE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('chat_service', 'telegram'))")
+    TELEGRAM_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_bot_token', ''))")
+    TELEGRAM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_allowed_user_id', ''))")
+    SIGNAL_PHONE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_phone_number', ''))")
+    SIGNAL_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_allowed_phone_number', ''))")
+    DISCORD_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_bot_token', ''))")
+    DISCORD_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_allowed_user_id', ''))")
+    MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-master-key'))")
+    TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))")
+    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'omvsecurepass'))")
+
+    # Create directories
+    mkdir -p "$DATA_DIR/obsidian"
+    mkdir -p "$DATA_DIR/workspace"
+    mkdir -p "$DATA_DIR/ssh"
+    mkdir -p "$STACK_DIR/credentials"
+    mkdir -p "$STACK_DIR/ssh"
+    mkdir -p "$STACK_DIR/signal-data"
+    mkdir -p "$STACK_DIR/syncthing/config"
+
+    # Write .env file
+    cat <<EOF > "$STACK_DIR/.env"
+DATA_DIR=$DATA_DIR
+TZ=$(cat /etc/timezone 2>/dev/null || echo "Europe/Berlin")
+LITELLM_MASTER_KEY=$MASTER_KEY
+GEMINI_API_KEY=$GEMINI_KEY
+ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+GITHUB_TOKEN=$GITHUB_TOKEN
+GIT_AUTHOR_NAME=$GIT_NAME
+GIT_AUTHOR_EMAIL=$GIT_EMAIL
+GITLAB_TOKEN=$GITLAB_TOKEN
+BITBUCKET_USERNAME=$BITBUCKET_USER
+BITBUCKET_APP_PASSWORD=$BITBUCKET_PASS
+CHAT_SERVICE=$CHAT_SERVICE
+TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN
+TELEGRAM_ALLOWED_USER_ID=$TELEGRAM_USER
+SIGNAL_PHONE_NUMBER=$SIGNAL_PHONE
+SIGNAL_ALLOWED_PHONE_NUMBER=$SIGNAL_USER
+DISCORD_BOT_TOKEN=$DISCORD_TOKEN
+DISCORD_ALLOWED_USER_ID=$DISCORD_USER
+TERMINAL_USER=$TERM_USER
+TERMINAL_PASSWORD=$TERM_PASS
+EOF
+    chmod 600 "$STACK_DIR/.env"
+
+    if [ "$ENABLE" = "True" ] || [ "$ENABLE" = "true" ]; then
+        echo "Starting Agent Station stack..."
+        cd "$STACK_DIR" && docker compose --env-file .env up -d
+    else
+        echo "Agent Station is disabled in settings. Stopping stack..."
+        cd "$STACK_DIR" && docker compose --env-file .env down || true
+    fi
+}
+
+get_performance() {
+    python3 - <<'PYEOF'
+import json, os, subprocess
+
+def check_cmd(cmd):
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+# Collect host metrics
+load1, load5, load15 = 0.0, 0.0, 0.0
+try:
+    load1, load5, load15 = os.getloadavg()
+except Exception:
+    pass
+
+mem_total_mb, mem_avail_mb = 0, 0
+try:
+    with open('/proc/meminfo') as f:
+        for line in f:
+            if line.startswith('MemTotal:'):
+                mem_total_mb = int(line.split()[1]) // 1024
+            elif line.startswith('MemAvailable:'):
+                mem_avail_mb = int(line.split()[1]) // 1024
+except Exception:
+    pass
+
+disk_total_gb, disk_avail_gb = 0, 0
+try:
+    st = os.statvfs('/srv/dev-data')
+    disk_total_gb = (st.f_blocks * st.f_frsize) // (1024**3)
+    disk_avail_gb = (st.f_bavail * st.f_frsize) // (1024**3)
+except Exception:
+    try:
+        st = os.statvfs('/')
+        disk_total_gb = (st.f_blocks * st.f_frsize) // (1024**3)
+        disk_avail_gb = (st.f_bavail * st.f_frsize) // (1024**3)
+    except Exception:
+        pass
+
+# Check tmux active sessions
+tmux_sessions = 0
+try:
+    res = subprocess.run(['tmux', 'list-sessions'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+    if res.returncode == 0:
+        tmux_sessions = len([l for l in res.stdout.strip().splitlines() if l])
+except Exception:
+    pass
+
+# Active container statuses
+containers = {
+    "litellm": check_cmd(["docker", "ps", "-q", "-f", "name=litellm"]),
+    "syncthing": check_cmd(["docker", "ps", "-q", "-f", "name=syncthing"]),
+    "web_terminal": check_cmd(["docker", "ps", "-q", "-f", "name=web-terminal"]),
+    "telegram_bot": check_cmd(["docker", "ps", "-q", "-f", "name=telegram-agent-bot"]),
+    "signal_bot": check_cmd(["docker", "ps", "-q", "-f", "name=signal-agent-bot"]),
+    "discord_bot": check_cmd(["docker", "ps", "-q", "-f", "name=discord-agent-bot"])
+}
+
+data = {
+    "load_average": {
+        "1m": round(load1, 2),
+        "5m": round(load5, 2),
+        "15m": round(load15, 2)
+    },
+    "memory": {
+        "total_mb": mem_total_mb,
+        "available_mb": mem_avail_mb,
+        "used_mb": max(0, mem_total_mb - mem_avail_mb)
+    },
+    "disk": {
+        "total_gb": disk_total_gb,
+        "available_gb": disk_avail_gb,
+        "used_gb": max(0, disk_total_gb - disk_avail_gb)
+    },
+    "tmux_sessions": tmux_sessions,
+    "containers": containers
+}
+
+print(json.dumps(data, indent=2))
+PYEOF
+}
+
+case "$1" in
+    apply)
+        apply_config
+        ;;
+    start)
+        cd "$STACK_DIR" && docker compose --env-file .env up -d
+        ;;
+    stop|down)
+        cd "$STACK_DIR" && docker compose --env-file .env down
+        ;;
+    restart)
+        cd "$STACK_DIR" && docker compose --env-file .env restart
+        ;;
+    status)
+        cd "$STACK_DIR" && docker compose --env-file .env ps
+        ;;
+    performance)
+        get_performance
+        ;;
+    logs)
+        SERVICE=${2:-litellm}
+        cd "$STACK_DIR" && docker compose --env-file .env logs --tail=100 "$SERVICE"
+        ;;
+    uninstall)
+        echo "🛑 Stopping Agent Station stack..."
+        cd "$STACK_DIR" 2>/dev/null && docker compose --env-file .env down 2>/dev/null || true
+        echo "🧹 Removing package and assets..."
+        apt-get purge -y openmediavault-agent-station openmediavault-ai-orchestrator 2>/dev/null || dpkg -P openmediavault-agent-station openmediavault-ai-orchestrator 2>/dev/null || true
+        systemctl restart omv-engined 2>/dev/null || true
+        omv-salt deploy run workbench 2>/dev/null || true
+        echo "✅ Uninstallation complete."
+        ;;
+    help|-h|--help)
+        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        exit 1
+        ;;
+esac

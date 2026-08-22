@@ -1,5 +1,5 @@
 """
-Black-box testing suite for OMV AI Orchestrator Stack.
+Black-box testing suite for OMV Agent Station Stack.
 Treats all scripts, packaging tools, and security barriers as black-box systems.
 """
 
@@ -108,12 +108,12 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
         res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603,B607
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
         
-        deb_file = ROOT_DIR / "openmediavault-ai-orchestrator_1.0.0_all.deb"
+        deb_file = ROOT_DIR / "openmediavault-agent-station_1.0.0_all.deb"
         self.assertTrue(deb_file.exists(), "Debian package must exist after build")
         self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
 
     def test_cli_helper_missing_config_behavior(self):
-        cli_bin = ROOT_DIR / "openmediavault-ai-orchestrator" / "usr" / "sbin" / "omv-ai-orchestrator"
+        cli_bin = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
         self.assertTrue(cli_bin.exists())
         
         # Test help command
@@ -143,7 +143,7 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
             }
             config_file.write_text(json.dumps(test_config), encoding="utf-8")
             
-            cli_bin = ROOT_DIR / "openmediavault-ai-orchestrator" / "usr" / "sbin" / "omv-ai-orchestrator"
+            cli_bin = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
             
             env = os.environ.copy()
             env["CONFIG_FILE"] = str(config_file)

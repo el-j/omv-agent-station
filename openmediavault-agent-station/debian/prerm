@@ -4,6 +4,9 @@ set -e
 case "$1" in
     remove|purge|deconfigure)
         # Stop running AI stack containers before package removal
+        if [ -x /usr/sbin/omv-agent-station ]; then
+            /usr/sbin/omv-agent-station down 2>/dev/null || true
+        fi
         if [ -x /usr/sbin/omv-ai-orchestrator ]; then
             /usr/sbin/omv-ai-orchestrator down 2>/dev/null || true
         fi

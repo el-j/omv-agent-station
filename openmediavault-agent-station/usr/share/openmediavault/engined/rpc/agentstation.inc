@@ -1,6 +1,6 @@
 <?php
 /**
- * OpenMediaVault AI Orchestrator RPC Service
+ * OpenMediaVault Agent Station RPC Service
  *
  * @author    Fabian <dev@local>
  * @copyright 2026 Fabian
@@ -13,15 +13,15 @@ use OMV\Rpc\ServiceAbstract;
 use OMV\Rpc\Exception as RpcException;
 use OMV\System\Process;
 
-class AIOrchestrator extends ServiceAbstract
+class AgentStation extends ServiceAbstract
 {
-    private const CONFIG_PATH = "/etc/openmediavault-ai-orchestrator.json";
+    private const CONFIG_PATH = "/etc/openmediavault-agent-station.json";
     private const DEFAULT_DATA_DIR = "/srv/dev-data";
-    private const STACK_DIR = "/usr/share/openmediavault/ai-orchestrator";
+    private const STACK_DIR = "/usr/share/openmediavault/agent-station";
 
     public function getName(): string
     {
-        return "AIOrchestrator";
+        return "AgentStation";
     }
 
     public function initialize(): void
@@ -40,6 +40,8 @@ class AIOrchestrator extends ServiceAbstract
 
         if (file_exists(self::CONFIG_PATH)) {
             $data = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        } elseif (file_exists("/etc/openmediavault-ai-orchestrator.json")) {
+            $data = json_decode(file_get_contents("/etc/openmediavault-ai-orchestrator.json"), true) ?: [];
         } else {
             $data = [];
         }
@@ -71,7 +73,7 @@ class AIOrchestrator extends ServiceAbstract
     public function setSettings($params, $context): array
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
-        $this->validateMethodParams($params, "rpc.aiorchestrator.setsettings");
+        $this->validateMethodParams($params, "rpc.agentstation.setsettings");
 
         $config = [
             "enable" => (bool)($params["enable"] ?? false),
@@ -98,8 +100,8 @@ class AIOrchestrator extends ServiceAbstract
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
 
-        // Call omv-ai-orchestrator CLI to sync .env and docker lifecycle
-        $cmd = new Process("omv-ai-orchestrator", ["apply"]);
+        // Call omv-agent-station CLI to sync .env and docker lifecycle
+        $cmd = new Process("omv-agent-station", ["apply"]);
         $cmd->execute();
 
         return $config;
@@ -109,7 +111,7 @@ class AIOrchestrator extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-ai-orchestrator", ["status"]);
+        $cmd = new Process("omv-agent-station", ["status"]);
         $cmd->execute($output);
 
         return [
@@ -125,7 +127,7 @@ class AIOrchestrator extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-ai-orchestrator", ["performance"]);
+        $cmd = new Process("omv-agent-station", ["performance"]);
         $cmd->execute($output);
         $json_str = implode("", $output);
         $metrics = json_decode($json_str, true) ?: [];
@@ -137,7 +139,7 @@ class AIOrchestrator extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        $cmd = new Process("omv-ai-orchestrator", ["restart"]);
+        $cmd = new Process("omv-agent-station", ["restart"]);
         $cmd->execute();
     }
 
@@ -146,7 +148,7 @@ class AIOrchestrator extends ServiceAbstract
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
         $service = $params["service"] ?? "litellm";
 
-        $cmd = new Process("omv-ai-orchestrator", ["logs", $service]);
+        $cmd = new Process("omv-agent-station", ["logs", $service]);
         $cmd->execute($output);
 
         return [

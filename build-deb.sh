@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Build Script: Packages openmediavault-ai-orchestrator into a Debian (.deb) package
+# Build Script: Packages openmediavault-agent-station into a Debian (.deb) package
 # Works on Debian/Ubuntu and macOS/BSD without requiring dpkg-deb installed.
 # ==============================================================================
 
 set -e
 
-PACKAGE_NAME="openmediavault-ai-orchestrator"
+PACKAGE_NAME="openmediavault-agent-station"
 VERSION="1.0.0"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
@@ -22,42 +22,48 @@ mkdir -p "$BUILD_DIR/usr/share/openmediavault/engined/rpc"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/datamodels"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/workbench/component.d"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/workbench/navigation.d"
-mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/litellm"
-mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/telegram-agent-bot"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/litellm"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/telegram-agent-bot"
 mkdir -p "$BUILD_DIR/usr/sbin"
 
 # Copy package control files
-cp openmediavault-ai-orchestrator/debian/control "$BUILD_DIR/DEBIAN/"
-cp openmediavault-ai-orchestrator/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
-cp openmediavault-ai-orchestrator/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
-cp openmediavault-ai-orchestrator/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+cp openmediavault-agent-station/debian/control "$BUILD_DIR/DEBIAN/"
+cp openmediavault-agent-station/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+cp openmediavault-agent-station/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+cp openmediavault-agent-station/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
 
 # Copy OMV RPC backend & WebGUI assets
-cp openmediavault-ai-orchestrator/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true
-cp openmediavault-ai-orchestrator/usr/share/openmediavault/datamodels/* "$BUILD_DIR/usr/share/openmediavault/datamodels/" 2>/dev/null || true
-cp openmediavault-ai-orchestrator/usr/share/openmediavault/workbench/component.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/component.d/" 2>/dev/null || true
-cp openmediavault-ai-orchestrator/usr/share/openmediavault/workbench/navigation.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/navigation.d/" 2>/dev/null || true
+cp openmediavault-agent-station/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true
+cp openmediavault-agent-station/usr/share/openmediavault/datamodels/* "$BUILD_DIR/usr/share/openmediavault/datamodels/" 2>/dev/null || true
+cp openmediavault-agent-station/usr/share/openmediavault/workbench/component.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/component.d/" 2>/dev/null || true
+cp openmediavault-agent-station/usr/share/openmediavault/workbench/navigation.d/* "$BUILD_DIR/usr/share/openmediavault/workbench/navigation.d/" 2>/dev/null || true
 
-# Copy executable helper
-cp openmediavault-ai-orchestrator/usr/sbin/omv-ai-orchestrator "$BUILD_DIR/usr/sbin/"
-chmod 755 "$BUILD_DIR/usr/sbin/omv-ai-orchestrator"
+# Copy executable helpers
+cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/"
+chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station"
+cp openmediavault-agent-station/usr/sbin/omv-ai-orchestrator "$BUILD_DIR/usr/sbin/" 2>/dev/null || true
+chmod 755 "$BUILD_DIR/usr/sbin/omv-ai-orchestrator" 2>/dev/null || true
 
 # Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots)
-cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/"
-cp litellm/config.yaml "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/litellm/"
-cp -r telegram-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/telegram-agent-bot/"
-mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/signal-agent-bot"
-cp -r signal-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/signal-agent-bot/"
-mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/discord-agent-bot"
-cp -r discord-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/discord-agent-bot/"
+cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/agent-station/"
+cp litellm/config.yaml "$BUILD_DIR/usr/share/openmediavault/agent-station/litellm/"
+cp -r telegram-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/telegram-agent-bot/"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot"
+cp -r signal-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot/"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/discord-agent-bot"
+cp -r discord-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/discord-agent-bot/"
+
+# Also provide backwards-compatible directory symlink /usr/share/openmediavault/ai-orchestrator
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator"
+cp -r "$BUILD_DIR/usr/share/openmediavault/agent-station/"* "$BUILD_DIR/usr/share/openmediavault/ai-orchestrator/"
 
 if command -v dpkg-deb >/dev/null 2>&1; then
     echo "🔨 Building with native dpkg-deb..."
     dpkg-deb --build --root-owner-group "$BUILD_DIR" "$DEB_FILE" 2>/dev/null || dpkg-deb --build "$BUILD_DIR" "$DEB_FILE"
 else
     echo "🔨 Building with universal Python deb packager..."
-    python3 - << 'PYEOF'
+    python3 - << PYEOF
 import os
 import tarfile
 import struct
@@ -65,7 +71,7 @@ import io
 import time
 
 build_dir = "./build-pkg"
-deb_filename = "openmediavault-ai-orchestrator_1.0.0_all.deb"
+deb_filename = "$DEB_FILE"
 
 # 1. Create control.tar.gz
 control_buf = io.BytesIO()
@@ -96,7 +102,7 @@ binary_data = b"2.0\n"
 # Helper for AR format entry
 def ar_entry(name, data):
     # name(16), timestamp(12), uid(6), gid(6), mode(8), size(10), magic(2)
-    header = f"{name:<16}{int(time.time()):<12}0     0     100644  {len(data):<10}`\n".encode("latin1")
+    header = f"{name:<16}{int(time.time()):<12}0     0     100644  {len(data):<10}\`\n".encode("latin1")
     # Pad to even boundary
     if len(data) % 2 != 0:
         data += b"\n"
@@ -119,5 +125,5 @@ echo "=========================================================="
 echo "Installation on OpenMediaVault (OMV 6 / OMV 7):"
 echo "  1. Upload $DEB_FILE to your OMV server"
 echo "  2. Run: sudo dpkg -i $DEB_FILE"
-echo "  3. Open your OMV WebGUI -> Services -> AI Orchestrator"
+echo "  3. Open your OMV WebGUI -> Services -> Agent Station"
 echo "=========================================================="

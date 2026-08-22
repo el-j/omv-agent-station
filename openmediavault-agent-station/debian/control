@@ -1,4 +1,4 @@
-Package: openmediavault-ai-orchestrator
+Package: openmediavault-agent-station
 Version: 1.0.0
 Section: net
 Priority: optional
@@ -6,7 +6,7 @@ Architecture: all
 Maintainer: Fabian <dev@local>
 Depends: openmediavault (>= 6.0), docker.io | docker-ce | docker, docker-compose-plugin | docker-compose-v2 | docker-compose, tmux
 Homepage: https://github.com/el-j/omv-agent-station
-Description: OpenMediaVault AI Orchestrator & Remote Coding Stack
+Description: OpenMediaVault Agent Station & Remote Coding Stack
  A 24/7 self-hosted AI development & remote coding stack for OpenMediaVault.
  Provides an OpenMediaVault WebGUI management interface for:
   - LiteLLM Multi-Provider AI Gateway (Gemini 3.7, Claude 3.7 Sonnet, Copilot)
