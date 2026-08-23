@@ -15,7 +15,7 @@ data:
         name: enable
         label: _("Enable Agent Station Engine")
         value: false
-        hint: _("Master switch to start/stop the AI Agent Station docker stack")
+        hint: _("Master switch to provision and run the AI Agent Station docker stack. Image downloads and container startup run in background - see 'Diagnostics & Logs' tab for real-time progress.")
       - type: textInput
         name: data_dir
         label: _("Workspace Data Directory")

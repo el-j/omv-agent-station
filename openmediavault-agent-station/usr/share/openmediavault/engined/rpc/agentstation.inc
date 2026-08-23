@@ -117,6 +117,21 @@ class AgentStation extends ServiceAbstract
         $settings = $this->getSettings([], $context);
         $masterEnabled = (bool)($settings["enable"] ?? false);
 
+        $perf = $this->getPerformance([], $context);
+        $containers = $perf["containers"] ?? [];
+        $hasRunningContainer = false;
+        foreach ($containers as $isRunning) {
+            if ($isRunning) {
+                $hasRunningContainer = true;
+                break;
+            }
+        }
+
+        $engineDetail = "Stopped";
+        if ($masterEnabled) {
+            $engineDetail = $hasRunningContainer ? "Active (Containers Running)" : "Provisioning (Pulling Images / Starting)...";
+        }
+
         $gitProviders = [];
         if (!empty($settings["enable_github"])) $gitProviders[] = "GitHub";
         if (!empty($settings["enable_gitlab"])) $gitProviders[] = "GitLab";
@@ -126,8 +141,8 @@ class AgentStation extends ServiceAbstract
         return [
             [
                 "name" => "Engine",
-                "enabled" => $masterEnabled,
-                "detail" => $masterEnabled ? "Docker stack active" : "Stopped"
+                "enabled" => $masterEnabled && $hasRunningContainer,
+                "detail" => $engineDetail
             ],
             [
                 "name" => "AI Models",
@@ -163,8 +178,17 @@ class AgentStation extends ServiceAbstract
             $statusText = implode("\n", $output);
         }
 
+        $perf = $this->getPerformance([], $context);
+        $details = $perf["container_details"] ?? [];
+        $header = "=== CONTAINER LIFECYCLE & PROVISIONING STATUS ===\n";
+        foreach ($details as $name => $info) {
+            $st = $info["status"] ?? "Unknown";
+            $header .= sprintf("• %-20s : %s\n", $name, $st);
+        }
+        $header .= "=================================================\n\n";
+
         return [
-            "log_output" => $statusText
+            "log_output" => $header . $statusText
         ];
     }
 
