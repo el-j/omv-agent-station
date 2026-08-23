@@ -5,7 +5,7 @@ FROM node:22-bookworm-slim
 # Copy pre-compiled ttyd binary
 COPY --from=ttyd-src /usr/bin/ttyd /usr/bin/ttyd
 
-# Install system utilities, python, git, github CLI, tmux
+# Install system utilities, python, git, tmux, gh (GitHub CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -19,15 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     ca-certificates \
     procps \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install GitHub CLI
-RUN mkdir -p -m 755 /etc/apt/keyrings \
-    && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && apt-get update \
-    && apt-get install -y github-cli \
+    gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI globally
