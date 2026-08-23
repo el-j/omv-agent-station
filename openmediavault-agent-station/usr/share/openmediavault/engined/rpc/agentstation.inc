@@ -97,7 +97,12 @@ class AgentStation extends ServiceAbstract
             $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
         }
 
-        $config = array_merge($existing, $params);
+        $sanitized = [];
+        foreach ($params as $k => $v) {
+            $sanitized[$k] = ($v === null) ? "" : $v;
+        }
+
+        $config = array_merge($existing, $sanitized);
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
 
