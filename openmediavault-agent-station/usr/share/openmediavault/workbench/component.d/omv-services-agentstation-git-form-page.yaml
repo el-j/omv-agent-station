@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-git-form-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>🔑 Quick Access Token Generators:</strong><br><br>• <a href='https://github.com/settings/tokens/new' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Generate GitHub Personal Access Token (PAT) ↗</a> (Recommended scopes - repo, read-user, user-email)<br>• <a href='https://gitlab.com/-/user_settings/personal_access_tokens' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Generate GitLab Access Token ↗</a> (Recommended scopes - api, read_repository, write_repository)<br>• <a href='https://bitbucket.org/account/settings/app-passwords/' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Generate Bitbucket App Password ↗</a> (Recommended permissions - Repositories Read and Write)")
     request:
       service: AgentStation
       get:
@@ -39,7 +42,7 @@ data:
       - type: passwordInput
         name: github_git_token
         label: _("GitHub Personal Access Token (PAT)")
-        hint: _("Create token with repo permissions at https://github.com/settings/tokens/new")
+        hint: _("Paste your GitHub token generated from the link above")
       - type: divider
         title: _("GitLab Integration")
       - type: checkbox
@@ -49,7 +52,7 @@ data:
       - type: passwordInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
-        hint: _("Create token with api/write permissions at https://gitlab.com/-/user_settings/personal_access_tokens")
+        hint: _("Paste your GitLab token generated from the link above")
       - type: divider
         title: _("Bitbucket Cloud Integration")
       - type: checkbox
@@ -62,7 +65,7 @@ data:
       - type: passwordInput
         name: bitbucket_app_password
         label: _("Bitbucket App Password")
-        hint: _("Create app password with repo write permissions at https://bitbucket.org/account/settings/app-passwords/")
+        hint: _("Paste your Bitbucket App Password generated from the link above")
     buttons:
       - template: submit
       - template: cancel

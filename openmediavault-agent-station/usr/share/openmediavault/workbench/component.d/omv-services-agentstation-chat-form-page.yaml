@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-chat-form-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>🤖 Quick Access Bot Creation Tools -</strong><br><br>• <a href='https://t.me/BotFather' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Telegram @BotFather ↗</a> - Create a new bot and copy your HTTP API bot token<br>• <a href='https://t.me/userinfobot' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Telegram @userinfobot ↗</a> - Send a message to get your numeric Telegram User ID<br>• <a href='https://discord.com/developers/applications' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Discord Developer Portal ↗</a> - Create an application and copy the Bot Token")
     request:
       service: AgentStation
       get:
@@ -39,11 +42,11 @@ data:
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
-        hint: _("Create your bot via BotFather at https://t.me/BotFather")
+        hint: _("Paste your BotFather HTTP API bot token")
       - type: textInput
         name: telegram_allowed_user_id
         label: _("Allowed Telegram Numeric User ID")
-        hint: _("Get your numeric user ID from userinfobot at https://t.me/userinfobot")
+        hint: _("Paste your numeric user ID from @userinfobot (Restricts bot strictly to you)")
       - type: divider
         title: _("Signal Messenger Configuration")
       - type: checkbox
@@ -67,11 +70,11 @@ data:
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")
-        hint: _("Create bot token in Developer Portal at https://discord.com/developers/applications")
+        hint: _("Paste your Discord Bot token from Developer Portal")
       - type: textInput
         name: discord_allowed_user_id
         label: _("Allowed Discord User ID")
-        hint: _("Your numeric Discord User ID (Enable Developer Mode in Discord -> Right-click profile -> Copy User ID)")
+        hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
     buttons:
       - template: submit
       - template: cancel

@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-aimodels-form-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>🔑 Quick Access API Key Portals -</strong><br><br>• <a href='https://aistudio.google.com/app/apikey' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Google AI Studio (Gemini Pro and Flash Key) ↗</a> - Free and paid API key with high rate limits<br>• <a href='https://console.anthropic.com/settings/keys' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Anthropic Console (Claude 3.7 Sonnet Key) ↗</a> - Claude API developer dashboard<br>• <a href='https://github.com/settings/tokens/new' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 GitHub Token (GPT-4o and DeepSeek via Models) ↗</a> - Personal Access Token for GitHub Models API")
     request:
       service: AgentStation
       get:
@@ -15,7 +18,7 @@ data:
         name: enable_aimodels
         label: _("Enable AI Models Provider Routing")
         value: true
-        hint: _("Master switch for LiteLLM multi-provider LLM gateway and fallbacks")
+        hint: _("Master switch for LiteLLM multi-provider LLM gateway and automated fallback routing")
       - type: divider
         title: _("Google AI Studio (Gemini 3.7 Pro & Flash)")
       - type: checkbox
@@ -25,7 +28,7 @@ data:
       - type: passwordInput
         name: gemini_api_key
         label: _("Google AI Studio API Key")
-        hint: _("Get your free/paid API key at https://aistudio.google.com/app/apikey")
+        hint: _("Paste your Gemini API key obtained from Google AI Studio")
       - type: divider
         title: _("Anthropic (Claude 3.7 Sonnet Thinking & Claude 3.5)")
       - type: checkbox
@@ -35,7 +38,7 @@ data:
       - type: passwordInput
         name: anthropic_api_key
         label: _("Anthropic API Key")
-        hint: _("Get your API key at https://console.anthropic.com/settings/keys")
+        hint: _("Paste your Anthropic API key obtained from the Anthropic Console")
       - type: divider
         title: _("GitHub Models (Copilot Pro / GPT-4o, o1, DeepSeek-R1)")
       - type: checkbox
@@ -45,7 +48,7 @@ data:
       - type: passwordInput
         name: github_token
         label: _("GitHub Personal Access Token")
-        hint: _("Create token at https://github.com/settings/tokens/new")
+        hint: _("Paste your GitHub token for GitHub Models API access")
     buttons:
       - template: submit
       - template: cancel

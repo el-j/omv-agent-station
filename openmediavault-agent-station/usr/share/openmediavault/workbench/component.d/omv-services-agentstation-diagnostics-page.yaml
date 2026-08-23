@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-diagnostics-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>📊 Real-Time Diagnostic Center:</strong><br>This console displays live Docker container states, image download progress, and background startup logs. Click <strong>Refresh Logs</strong> below to refresh the console.")
     request:
       service: AgentStation
       get:
@@ -11,8 +14,11 @@ data:
     fields:
       - type: divider
         title: _("Agent Station Engine & Docker Container Logs")
-      - type: html
-        template: "<pre style='background-color:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-family:monospace;font-size:13px;line-height:1.5;max-height:550px;overflow-y:auto;white-space:pre-wrap;border:1px solid #313244;'>{{ log_output }}</pre>"
+      - type: textarea
+        name: log_output
+        label: _("Live Startup & Execution Logs")
+        rows: 22
+        disabled: true
     buttons:
       - text: _("Refresh Logs")
         icon: "mdi:refresh"
