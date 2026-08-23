@@ -6,6 +6,8 @@ case "$1" in
     configure)
         # Ensure local deb repo archives directory exists
         mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+        # Reload OMV RPC engine daemon
+        systemctl restart openmediavault-engined 2>/dev/null || true
         ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
