@@ -6,3 +6,6 @@ data:
   position: 40
   icon: "mdi:chat-processing-outline"
   url: "/agentstation/chat"
+  permissions:
+    role:
+      - admin

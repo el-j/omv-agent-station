@@ -47,14 +47,14 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (Root + 5 submenus)
+        # Check navigation files (Root + 5 submenus + services entry)
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
-        for nav_name in ["agentstation", "agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security"]:
+        for nav_name in ["agentstation", "agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security", "services.agentstation"]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
-        # Check route files (5 routes)
+        # Check route files (6 routes)
         route_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
-        for route_name in ["agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security"]:
+        for route_name in ["agentstation", "agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security"]:
             self.assertTrue((route_dir / f"{route_name}.yaml").exists(), f"Missing route file: {route_name}.yaml")
 
         # Check component files (5 components)

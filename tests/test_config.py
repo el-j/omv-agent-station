@@ -94,10 +94,9 @@ class TestConfig(unittest.TestCase):
             nav_data = data.get("data", {})
             self.assertIn("path", nav_data, f"{nav_file.name} missing path")
             self.assertIn("text", nav_data, f"{nav_file.name} missing text")
-            if nav_file.stem == "agentstation":
-                self.assertNotIn("url", nav_data, "Root navigation item must NOT have a url field (acts as container group)")
-            else:
-                self.assertIn("url", nav_data, f"Submenu {nav_file.name} must have a url field")
+            self.assertIn("url", nav_data, f"{nav_file.name} must have a url field")
+            self.assertIn("permissions", nav_data, f"{nav_file.name} must have permissions specified")
+            self.assertIn("role", nav_data["permissions"])
 
         # 2. Routes
         route_dir = workbench_dir / "route.d"

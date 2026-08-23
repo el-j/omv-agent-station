@@ -6,3 +6,6 @@ data:
   position: 10
   icon: "mdi:view-dashboard-outline"
   url: "/agentstation/overview"
+  permissions:
+    role:
+      - admin

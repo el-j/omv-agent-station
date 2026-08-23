@@ -6,3 +6,6 @@ data:
   position: 50
   icon: "mdi:shield-lock-outline"
   url: "/agentstation/security"
+  permissions:
+    role:
+      - admin

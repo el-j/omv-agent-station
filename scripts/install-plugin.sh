@@ -85,7 +85,17 @@ fi
 
 echo "=========================================================="
 echo "✅ Agent Station Plugin successfully installed on your OMV Server!"
-echo "👉 1. Open your OMV WebGUI in your browser"
-echo "👉 2. Navigate to: Services ➔ Agent Station"
-echo "👉 3. Enter your subscription tokens and click Apply"
+echo "👉 1. Refresh your OMV WebGUI browser tab"
+echo "👉 2. Open Agent Station in the sidebar menu"
+echo "👉 3. Configure your AI models, git sync, and messenger bots"
 echo "=========================================================="
+
+# Smooth daemon reload in background so active RPC session stream completes 100% cleanly
+if command -v systemctl >/dev/null 2>&1; then
+    (
+        sleep 2
+        systemctl restart openmediavault-engined 2>/dev/null || true
+        systemctl restart 'php*-fpm' 2>/dev/null || true
+        systemctl reload nginx 2>/dev/null || true
+    ) >/dev/null 2>&1 &
+fi

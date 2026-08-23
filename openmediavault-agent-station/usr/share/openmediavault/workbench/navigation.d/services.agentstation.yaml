@@ -1,7 +1,7 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation"
+  path: "services.agentstation"
   text: _("Agent Station")
   position: 60
   icon: "mdi:robot"
