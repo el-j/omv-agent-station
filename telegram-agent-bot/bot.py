@@ -629,6 +629,76 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
         logger.error(f"Error during agent run: {e}", exc_info=True)
         await status_msg.edit_text(f"❌ Task `{session_id}` failed:\n`{str(e)}`", parse_mode="Markdown")
 
+async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Executes Claude Code CLI in non-interactive/headless mode inside the workspace."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: `/claude <your prompt or coding request>`\n\nExample: `/claude Create a FastAPI healthcheck endpoint in workspace`", parse_mode="Markdown")
+        return
+
+    prompt = " ".join(context.args)
+    msg = await update.message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in sandboxed workspace...", parse_mode="Markdown")
+
+    claude_bin = shutil.which("claude") or "/usr/local/bin/claude"
+    try:
+        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
+            claude_bin, "-p", prompt, "--print",
+            cwd=str(WORKSPACE),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        out = stdout.decode("utf-8", errors="replace").strip()
+        err = stderr.decode("utf-8", errors="replace").strip()
+
+        if proc.returncode == 0:
+            reply = f"✅ *Claude Code Finished:*\n\n{out}"
+            if len(reply) > 4000:
+                reply = reply[:4000] + "\n\n*(Truncated due to Telegram length limit)*"
+            await msg.edit_text(reply, parse_mode="Markdown")
+        else:
+            combined = (out + "\n" + err).strip()
+            if "login" in combined.lower() or "auth" in combined.lower():
+                await msg.edit_text(
+                    "🔑 *Claude.ai Authentication Required*\n\n"
+                    "Please open your Web Terminal (`:7681`) or run `/exec claude` once to complete browser OAuth login with your `claude.ai` subscription!",
+                    parse_mode="Markdown"
+                )
+            else:
+                await msg.edit_text(f"⚠️ *Claude Execution Result:*\n```\n{combined[:3000]}\n```", parse_mode="Markdown")
+    except FileNotFoundError:
+        await msg.edit_text("⚠️ Claude CLI is not installed yet. Go to OMV WebGUI -> AI Models and click 'Install / Update Claude CLI'.", parse_mode="Markdown")
+    except Exception as e:
+        await msg.edit_text(f"❌ Claude dispatch error: {e}")
+
+async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Runs a shell command strictly sandboxed in /data/workspace."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: `/exec <shell-command>`\n\nExample: `/exec ls -la`", parse_mode="Markdown")
+        return
+
+    cmd = " ".join(context.args)
+    msg = await update.message.reply_text(f"⏳ Executing: `{cmd}`...", parse_mode="Markdown")
+    try:
+        proc = await asyncio.create_subprocess_shell(  # nosec B602
+            cmd,
+            cwd=str(WORKSPACE),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        out = stdout.decode("utf-8", errors="replace")
+        err = stderr.decode("utf-8", errors="replace")
+        result = (out + "\n" + err).strip() or "(No output)"
+        if len(result) > 3500:
+            result = result[:3500] + "\n...(truncated)"
+        await msg.edit_text(f"🖥️ *Command Output:*\n```\n{result}\n```", parse_mode="Markdown")
+    except Exception as e:
+        await msg.edit_text(f"❌ Exec error: {e}")
+
 def main():
     if not BOT_TOKEN:
         print("ERROR: TELEGRAM_BOT_TOKEN environment variable not set!", file=sys.stderr)
@@ -650,6 +720,8 @@ def main():
     app.add_handler(CommandHandler("note", note_cmd))
     app.add_handler(CommandHandler("chat", chat_cmd))
     app.add_handler(CommandHandler("task", task_cmd))
+    app.add_handler(CommandHandler("claude", claude_cmd))
+    app.add_handler(CommandHandler("exec", exec_cmd))
 
     print("🤖 Telegram Agent Relay Bot starting polling...")
     app.run_polling()

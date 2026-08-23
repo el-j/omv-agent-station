@@ -1,0 +1,245 @@
+# ==============================================================================
+# LiteLLM Proxy Configuration: High-Availability Multi-Provider AI Gateway
+# Optimized for Google AI Studio (Gemini 3.7), Google Cloud Vertex AI (Claude),
+# Anthropic API (Claude 3.7 Sonnet), and Microsoft Copilot (GitHub Models)
+#
+# Official Documentation & Provider Sources:
+# - Google AI Studio (Gemini 3.7): https://ai.google.dev/gemini-api/docs
+# - Google Cloud Vertex AI Claude: https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude
+# - Anthropic Developer Docs: https://docs.anthropic.com/en/docs/about-claude/models
+# - LiteLLM Providers & Routing: https://docs.litellm.ai/docs/providers
+# ==============================================================================
+
+model_list:
+  # ----------------------------------------------------------------------------
+  # TIER 1: GOOGLE AI STUDIO (Gemini 3.7 & 2.5 Workhorse Models)
+  # Docs: https://ai.google.dev/gemini-api/docs/models/gemini
+  # ----------------------------------------------------------------------------
+  - model_name: gemini-3.7-flash
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 1000
+      tpm: 4000000
+
+  - model_name: gemini-3.7-pro
+    litellm_params:
+      model: gemini/gemini-3.7-pro
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 360
+      tpm: 2000000
+
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # TIER 2A: DIRECT ANTHROPIC API (Claude 3.7 Sonnet & 3.5 Haiku)
+  # Docs: https://docs.anthropic.com/en/docs/about-claude/models
+  # ----------------------------------------------------------------------------
+  - model_name: claude-3-7-sonnet-direct
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+      enable_prompt_caching: true
+
+  - model_name: claude-3-5-haiku
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # TIER 2B: GOOGLE CLOUD VERTEX AI (Claude via Google Cloud Subscription)
+  # Docs: https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude
+  # ----------------------------------------------------------------------------
+  - model_name: claude-3-7-sonnet-vertex
+    litellm_params:
+      model: vertex_ai/claude-3-7-sonnet@20250219
+      vertex_project: os.environ/VERTEX_PROJECT_ID
+      vertex_location: os.environ/VERTEX_LOCATION
+      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+
+  - model_name: claude-opus-vertex
+    litellm_params:
+      model: vertex_ai/claude-3-opus@20240229
+      vertex_project: os.environ/VERTEX_PROJECT_ID
+      vertex_location: os.environ/VERTEX_LOCATION
+      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+
+  # ----------------------------------------------------------------------------
+  # TIER 3: GITHUB COPILOT / GITHUB MODELS ENDPOINT (Zero-Cost Monthly Quota)
+  # Docs: https://docs.github.com/en/github-models
+  # Access GPT-4o, o1, o3-mini, DeepSeek-R1, and Llama 3.3 70B via your GITHUB_TOKEN
+  # ----------------------------------------------------------------------------
+  - model_name: github-gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-o1
+    litellm_params:
+      model: openai/o1
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-o3-mini
+    litellm_params:
+      model: openai/o3-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-deepseek-r1
+    litellm_params:
+      model: openai/DeepSeek-R1
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-llama-3.3-70b
+    litellm_params:
+      model: openai/Llama-3.3-70B-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: github-mistral-large
+    litellm_params:
+      model: openai/Mistral-Large-2411
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ----------------------------------------------------------------------------
+  # TIER 4: MISTRAL AI, DEEPSEEK & OPENROUTER / Z.AI
+  # ----------------------------------------------------------------------------
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: codestral
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: openrouter-auto
+    litellm_params:
+      model: openrouter/auto
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: custom-llm
+    litellm_params:
+      model: openai/custom-model
+      api_base: os.environ/CUSTOM_API_BASE
+      api_key: os.environ/CUSTOM_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # VIRTUAL SMART ROUTERS WITH AUTOMATIC FAILOVER & REDUNDANCY
+  # ----------------------------------------------------------------------------
+  # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)
+  - model_name: coder-fast
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
+  # Direct Anthropic -> Vertex AI Claude -> Gemini 3.7 Pro -> Gemini 3.7 Flash -> GitHub Copilot
+  - model_name: coder-smart
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+      enable_prompt_caching: true
+  - model_name: coder-smart
+    litellm_params:
+      model: vertex_ai/claude-3-7-sonnet@20250219
+      vertex_project: os.environ/VERTEX_PROJECT_ID
+      vertex_location: os.environ/VERTEX_LOCATION
+      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.7-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: vertex_ai/claude-3-7-sonnet@20250219
+      vertex_project: os.environ/VERTEX_PROJECT_ID
+      vertex_location: os.environ/VERTEX_LOCATION
+      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: gemini/gemini-3.7-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openai/o1
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openai/o3-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openai/DeepSeek-R1
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+# ==============================================================================
+# ROUTER & RATE LIMIT SHIELD SETTINGS
+# ==============================================================================
+router_settings:
+  routing_strategy: usage-based-routing
+  set_verbose: false
+  num_retries: 3
+  timeout: 120
+  retry_after: 5
+  cooldown_time: 30 # Cooldown provider for 30s when a 429 occurs
+  allowed_fails: 2
+  fallbacks:
+    - claude-3-7-sonnet-direct: ["claude-3-7-sonnet-vertex", "gemini-3.7-pro", "github-gpt-4o"]
+    - claude-3-7-sonnet-vertex: ["claude-3-7-sonnet-direct", "gemini-3.7-pro", "github-gpt-4o"]
+    - gemini-3.7-pro: ["claude-3-7-sonnet-vertex", "claude-3-7-sonnet-direct", "github-gpt-4o"]
+    - gemini-3.7-flash: ["gemini-2.5-flash", "claude-3-5-haiku"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  alerting: []
+  store_model_in_db: false

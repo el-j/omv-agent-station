@@ -98,6 +98,7 @@ write_env_file() {
     # Create directories
     mkdir -p "$DATA_DIR/obsidian" 2>/dev/null || true
     mkdir -p "$DATA_DIR/workspace" 2>/dev/null || true
+    mkdir -p "$DATA_DIR/.agent-auth" 2>/dev/null || true
     mkdir -p "$DATA_DIR/ssh" 2>/dev/null || true
     mkdir -p "$STACK_DIR/credentials" 2>/dev/null || true
     mkdir -p "$STACK_DIR/ssh" 2>/dev/null || true
