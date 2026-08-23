@@ -148,7 +148,7 @@ apply_sync() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Starting Agent Station Stack Provisioning..." >> "$LOG_FILE" 2>/dev/null || true
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing, Terminal)..." >> "$LOG_FILE" 2>/dev/null || true
         if [ -d "$STACK_DIR" ]; then
-            (cd "$STACK_DIR" && run_compose --env-file .env pull --progress=plain >> "$LOG_FILE" 2>&1 || true)
+            (cd "$STACK_DIR" && run_compose --env-file .env pull >> "$LOG_FILE" 2>&1 || true)
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
             (cd "$STACK_DIR" && run_compose --env-file .env up -d --remove-orphans >> "$LOG_FILE" 2>&1 || true)
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Agent Station stack is up and active!" >> "$LOG_FILE" 2>/dev/null || true
@@ -186,14 +186,17 @@ def check_cmd(cmd):
     except Exception:
         return False
 
-def get_container_info(name):
-    try:
-        res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
-        status = res.stdout.strip()
-        running = "Up" in status
-        return {"running": running, "status": status if status else "Not created"}
-    except Exception:
-        return {"running": False, "status": "Docker unavailable"}
+def get_container_info(filter_names):
+    for name in filter_names:
+        try:
+            res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+            status = res.stdout.strip()
+            if status:
+                running = "Up" in status
+                return {"running": running, "status": status}
+        except Exception:
+            pass
+    return {"running": False, "status": "Not created"}
 
 # Collect host metrics
 load1, load5, load15 = 0.0, 0.0, 0.0
@@ -235,22 +238,22 @@ try:
 except Exception:
     pass
 
-containers = {
-    "litellm": check_cmd(["docker", "ps", "-q", "-f", "name=litellm"]),
-    "syncthing": check_cmd(["docker", "ps", "-q", "-f", "name=syncthing"]),
-    "web_terminal": check_cmd(["docker", "ps", "-q", "-f", "name=web-terminal"]),
-    "telegram_bot": check_cmd(["docker", "ps", "-q", "-f", "name=telegram-agent-bot"]),
-    "signal_bot": check_cmd(["docker", "ps", "-q", "-f", "name=signal-agent-bot"]),
-    "discord_bot": check_cmd(["docker", "ps", "-q", "-f", "name=discord-agent-bot"])
+container_details = {
+    "LiteLLM Gateway": get_container_info(["litellm-proxy", "litellm"]),
+    "Syncthing": get_container_info(["syncthing"]),
+    "Web Terminal": get_container_info(["omv-agent-terminal", "web-terminal"]),
+    "Telegram Bot": get_container_info(["telegram-agent-bot", "telegram-bot"]),
+    "Signal Bot": get_container_info(["signal-agent-bot", "signal-bot"]),
+    "Discord Bot": get_container_info(["discord-agent-bot", "discord-bot"])
 }
 
-container_details = {
-    "LiteLLM Gateway": get_container_info("litellm"),
-    "Syncthing": get_container_info("syncthing"),
-    "Web Terminal": get_container_info("web-terminal"),
-    "Telegram Bot": get_container_info("telegram-agent-bot"),
-    "Signal Bot": get_container_info("signal-agent-bot"),
-    "Discord Bot": get_container_info("discord-agent-bot")
+containers = {
+    "litellm": container_details["LiteLLM Gateway"]["running"],
+    "syncthing": container_details["Syncthing"]["running"],
+    "web_terminal": container_details["Web Terminal"]["running"],
+    "telegram_bot": container_details["Telegram Bot"]["running"],
+    "signal_bot": container_details["Signal Bot"]["running"],
+    "discord_bot": container_details["Discord Bot"]["running"]
 }
 
 data = {
