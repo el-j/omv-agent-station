@@ -182,22 +182,17 @@ class AgentStation extends ServiceAbstract
         // 1. Container matrix
         $perf = $this->getPerformance([], $context);
         $details = $perf["container_details"] ?? [];
-        $containerLines = [];
-        $containerLines[] = sprintf("%-22s | %-12s | %-10s | %-20s", "CONTAINER", "STATUS", "MEMORY", "PORT / ROLE");
-        $containerLines[] = str_repeat("-", 72);
-
         $knownContainers = [
-            "litellm-proxy" => ["port" => "Port 4000 (AI Gateway)"],
-            "omv-agent-terminal" => ["port" => "Port 7681 (Sandboxed Agent)"],
-            "syncthing" => ["port" => "Port 8384 (File Sync)"],
-            "telegram-agent-bot" => ["port" => "Messenger Relay"]
+            "LiteLLM Gateway" => ["port" => "Port 4000 (AI Gateway)"],
+            "Web Terminal" => ["port" => "Port 7681 (Sandboxed Agent)"],
+            "Syncthing" => ["port" => "Port 8384 (File Sync)"],
+            "Telegram Bot" => ["port" => "Telegram Bot Relay"]
         ];
 
         foreach ($knownContainers as $cname => $meta) {
             $info = $details[$cname] ?? [];
             $st = $info["status"] ?? "Stopped";
-            $mem = $info["memory"] ?? "--";
-            $containerLines[] = sprintf("%-22s | %-12s | %-10s | %-20s", $cname, $st, $mem, $meta["port"]);
+            $containerLines[] = sprintf("%-22s | %-32s | %-20s", $cname, $st, $meta["port"]);
         }
         $containerStatus = implode("\n", $containerLines);
 
