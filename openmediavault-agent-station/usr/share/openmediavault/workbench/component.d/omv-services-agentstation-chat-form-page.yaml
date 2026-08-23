@@ -1,7 +1,7 @@
 version: "1.0"
 type: component
 data:
-  name: omv-agentstation-chat-form-page
+  name: omv-services-agentstation-chat-form-page
   type: formPage
   config:
     request:

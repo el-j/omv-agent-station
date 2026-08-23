@@ -1,0 +1,7 @@
+version: "1.0"
+type: route
+data:
+  url: "/services/agentstation/security"
+  title: _("Security & Web Access")
+  editing: true
+  component: omv-services-agentstation-security-form-page

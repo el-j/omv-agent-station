@@ -2,10 +2,26 @@
 # postrm for openmediavault-agent-station
 set -e
 
+clean_workbench() {
+    # Ensure cache archives dir exists and remove cached schema
+    mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+    find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
+    
+    # Recompile OMV Workbench after removing plugin assets so routes and widgets are purged from UI
+    if command -v omv-mkworkbench >/dev/null 2>&1; then
+        omv-mkworkbench all 2>/dev/null || true
+    fi
+}
+
 case "$1" in
-    remove|purge|disappear)
-        mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
-        find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
+    purge)
+        clean_workbench
+        rm -f /etc/openmediavault-agent-station.json 2>/dev/null || true
+        rm -f /etc/openmediavault-ai-orchestrator.json 2>/dev/null || true
+        ;;
+
+    remove|disappear)
+        clean_workbench
         ;;
 
     upgrade|failed-upgrade|abort-install|abort-upgrade)

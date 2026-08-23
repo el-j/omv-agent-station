@@ -1,7 +1,0 @@
-version: "1.0"
-type: route
-data:
-  url: "/agentstation/chat"
-  title: _("Chat & Messenger")
-  editing: true
-  component: omv-agentstation-chat-form-page

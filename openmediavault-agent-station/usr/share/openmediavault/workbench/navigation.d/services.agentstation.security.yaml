@@ -1,7 +1,7 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation.security"
+  path: "services.agentstation.security"
   text: _("Security & Web Access")
   position: 50
   icon: "mdi:shield-lock-outline"

@@ -1,7 +1,7 @@
 version: "1.0"
 type: component
 data:
-  name: omv-agentstation-overview-page
+  name: omv-services-agentstation-overview-page
   type: formPage
   config:
     request:

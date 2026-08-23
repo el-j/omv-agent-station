@@ -45,24 +45,44 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (Root + 5 submenus + services entry)
+        # Check navigation files (Services + Root entries)
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
-        for nav_name in ["agentstation", "agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security", "services.agentstation"]:
+        for nav_name in [
+            "services.agentstation",
+            "services.agentstation.overview",
+            "services.agentstation.aimodels",
+            "services.agentstation.git",
+            "services.agentstation.chat",
+            "services.agentstation.security",
+            "agentstation",
+            "agentstation.overview",
+            "agentstation.aimodels",
+            "agentstation.git",
+            "agentstation.chat",
+            "agentstation.security"
+        ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
-        # Check route files (6 routes)
+        # Check route files
         route_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
-        for route_name in ["agentstation", "agentstation.overview", "agentstation.aimodels", "agentstation.git", "agentstation.chat", "agentstation.security"]:
+        for route_name in [
+            "services.agentstation",
+            "services.agentstation.overview",
+            "services.agentstation.aimodels",
+            "services.agentstation.git",
+            "services.agentstation.chat",
+            "services.agentstation.security"
+        ]:
             self.assertTrue((route_dir / f"{route_name}.yaml").exists(), f"Missing route file: {route_name}.yaml")
 
-        # Check component files (5 components)
+        # Check component files
         comp_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "component.d"
         for comp_name in [
-            "omv-agentstation-overview-page",
-            "omv-agentstation-aimodels-form-page",
-            "omv-agentstation-git-form-page",
-            "omv-agentstation-chat-form-page",
-            "omv-agentstation-security-form-page"
+            "omv-services-agentstation-overview-page",
+            "omv-services-agentstation-aimodels-form-page",
+            "omv-services-agentstation-git-form-page",
+            "omv-services-agentstation-chat-form-page",
+            "omv-services-agentstation-security-form-page"
         ]:
             self.assertTrue((comp_dir / f"{comp_name}.yaml").exists(), f"Missing component file: {comp_name}.yaml")
 

@@ -1,6 +1,0 @@
-version: "1.0"
-type: route
-data:
-  url: "/agentstation/overview"
-  title: _("Overview")
-  component: omv-agentstation-overview-page

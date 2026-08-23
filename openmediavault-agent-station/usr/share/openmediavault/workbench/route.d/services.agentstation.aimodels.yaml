@@ -1,0 +1,7 @@
+version: "1.0"
+type: route
+data:
+  url: "/services/agentstation/aimodels"
+  title: _("AI Models")
+  editing: true
+  component: omv-services-agentstation-aimodels-form-page
