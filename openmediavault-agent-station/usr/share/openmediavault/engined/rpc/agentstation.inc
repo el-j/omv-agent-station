@@ -239,7 +239,17 @@ class AgentStation extends ServiceAbstract
         if (file_exists("/usr/sbin/omv-agent-station")) {
             $cmd = new Process("omv-agent-station", ["logs", "all"]);
             $cmd->execute($output);
-            $statusText = implode("\n", $output);
+            $cleanLines = [];
+            foreach ($output as $line) {
+                // Strip ANSI escape sequences
+                $clean = preg_replace('/\x1B\[[0-9;]*[a-zA-Z]/', '', $line);
+                if (trim($clean) !== "") {
+                    $cleanLines[] = $clean;
+                }
+            }
+            // Keep last 150 lines
+            $slice = array_slice($cleanLines, -150);
+            $statusText = implode("\n", $slice);
         }
 
         return [

@@ -3,5 +3,5 @@ type: route
 data:
   url: "/services/agentstation/chat"
   title: _("Chat & Messenger")
-  editing: true
+  editing: false
   component: omv-services-agentstation-chat-form-page

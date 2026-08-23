@@ -3,5 +3,5 @@ type: route
 data:
   url: "/services/agentstation/aimodels"
   title: _("AI Models")
-  editing: true
+  editing: false
   component: omv-services-agentstation-aimodels-form-page
