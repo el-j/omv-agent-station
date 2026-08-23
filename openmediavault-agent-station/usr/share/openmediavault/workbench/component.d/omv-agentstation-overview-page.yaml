@@ -22,7 +22,7 @@ data:
         hint: _("Storage path for Obsidian notes, code repositories, and workspace files (e.g. /srv/dev-data)")
         value: "/srv/dev-data"
       - type: divider
-        title: _("Integrated Web Endpoints: Web Terminal (Port 7681) | LiteLLM (Port 4000) | Web Chat (Port 3000)")
+        title: _("Integrated Web Endpoints - Web Terminal (Port 7681) | LiteLLM (Port 4000) | Web Chat (Port 3000)")
     buttons:
       - template: submit
       - template: cancel

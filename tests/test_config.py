@@ -121,6 +121,17 @@ class TestConfig(unittest.TestCase):
             self.assertIsNotNone(val_uuid)
             self.assertEqual(dash_data.get("type"), "grid")
 
+        # 4. Component Pages
+        comp_dir = workbench_dir / "component.d"
+        for comp_file in comp_dir.glob("*.yaml"):
+            with open(comp_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            self.assertEqual(data.get("type"), "component", f"{comp_file.name} must be type: component")
+            comp_data = data.get("data", {})
+            self.assertIn("name", comp_data)
+            self.assertIn("type", comp_data)
+            self.assertIn("config", comp_data)
+
 if __name__ == "__main__":
     unittest.main()
 
