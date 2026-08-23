@@ -17,13 +17,11 @@ data:
       - type: checkbox
         name: enable_chat
         label: _("Enable Remote Messenger Relay")
-        value: true
         hint: _("Master switch for interactive chat bots controlling your coding workspace")
       - type: select
         name: chat_service
         label: _("Primary Active Messenger Relay")
         hint: _("Choose which chat application acts as the primary interactive agent controller")
-        value: "telegram"
         options:
           - value: "telegram"
             text: _("Telegram Bot (Instant setup, BotFather token)")
@@ -38,7 +36,6 @@ data:
       - type: checkbox
         name: enable_telegram
         label: _("Enable Telegram Bot")
-        value: true
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
@@ -52,7 +49,6 @@ data:
       - type: checkbox
         name: enable_signal
         label: _("Enable Signal Messenger")
-        value: false
       - type: textInput
         name: signal_phone_number
         label: _("Signal Bot Phone / Linked Number")
@@ -66,7 +62,6 @@ data:
       - type: checkbox
         name: enable_discord
         label: _("Enable Discord Bot")
-        value: false
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")

@@ -3,4 +3,4 @@ type: route
 data:
   url: "/services/agentstation"
   title: _("Agent Station")
-  component: omv-services-agentstation-overview-page
+  redirectTo: "/services/agentstation/overview"

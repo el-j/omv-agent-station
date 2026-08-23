@@ -17,24 +17,20 @@ data:
       - type: checkbox
         name: enable_git
         label: _("Enable Automated Git Versioning & Sync")
-        value: true
         hint: _("Master switch for automated git commits, second-brain versioning, and remote repository sync")
       - type: divider
         title: _("Git Committer Identity")
       - type: textInput
         name: git_author_name
         label: _("Git Author Name")
-        value: "OMV AI Agent"
       - type: textInput
         name: git_author_email
         label: _("Git Author Email")
-        value: "agent@omv-box.local"
       - type: divider
         title: _("GitHub Integration (Recommended)")
       - type: checkbox
         name: enable_github
         label: _("Enable GitHub Repository Sync")
-        value: true
       - type: textInput
         name: github_git_user
         label: _("GitHub Username or Organization")
@@ -48,7 +44,6 @@ data:
       - type: checkbox
         name: enable_gitlab
         label: _("Enable GitLab Repository Sync")
-        value: false
       - type: passwordInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
@@ -58,7 +53,6 @@ data:
       - type: checkbox
         name: enable_bitbucket
         label: _("Enable Bitbucket Repository Sync")
-        value: false
       - type: textInput
         name: bitbucket_username
         label: _("Bitbucket Username")

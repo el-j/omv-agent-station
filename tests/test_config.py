@@ -106,7 +106,11 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(data.get("type"), "route", f"{route_file.name} must be type: route")
             route_data = data.get("data", {})
             self.assertIn("url", route_data)
-            self.assertIn("component", route_data)
+            # Routes can either define a component to render, or redirect to another route
+            self.assertTrue(
+                "component" in route_data or "redirectTo" in route_data,
+                f"{route_file.name} must have either a 'component' or 'redirectTo' field"
+            )
 
         # 3. Dashboard Widget
         dash_dir = workbench_dir / "dashboard.d"
