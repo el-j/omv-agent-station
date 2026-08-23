@@ -1,0 +1,18 @@
+version: "1.0"
+type: component
+data:
+  name: omv-services-agentstation-diagnostics-page
+  type: formPage
+  config:
+    request:
+      service: AgentStation
+      get:
+        method: getDiagnostics
+    fields:
+      - type: divider
+        title: _("Agent Station Engine & Docker Container Logs")
+      - type: textarea
+        name: log_output
+        label: _("Live Startup & Execution Logs")
+        value: ""
+        hint: _("Recent diagnostic output from Docker Compose, image downloads, and background container processes")

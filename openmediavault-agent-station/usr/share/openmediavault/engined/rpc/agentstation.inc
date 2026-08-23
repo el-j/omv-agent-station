@@ -29,6 +29,7 @@ class AgentStation extends ServiceAbstract
         $this->registerMethod("getSettings");
         $this->registerMethod("setSettings");
         $this->registerMethod("getStatus");
+        $this->registerMethod("getDiagnostics");
         $this->registerMethod("getPerformance");
         $this->registerMethod("restartServices");
         $this->registerMethod("getLogs");
@@ -69,10 +70,13 @@ class AgentStation extends ServiceAbstract
             "bitbucket_app_password" => (string)($data["bitbucket_app_password"] ?? ""),
             "enable_chat" => (bool)($data["enable_chat"] ?? true),
             "chat_service" => (string)($data["chat_service"] ?? "telegram"),
+            "enable_telegram" => (bool)($data["enable_telegram"] ?? true),
             "telegram_bot_token" => (string)($data["telegram_bot_token"] ?? ""),
             "telegram_allowed_user_id" => (string)($data["telegram_allowed_user_id"] ?? ""),
+            "enable_signal" => (bool)($data["enable_signal"] ?? false),
             "signal_phone_number" => (string)($data["signal_phone_number"] ?? ""),
             "signal_allowed_phone_number" => (string)($data["signal_allowed_phone_number"] ?? ""),
+            "enable_discord" => (bool)($data["enable_discord"] ?? false),
             "discord_bot_token" => (string)($data["discord_bot_token"] ?? ""),
             "discord_allowed_user_id" => (string)($data["discord_allowed_user_id"] ?? ""),
             "enable_security" => (bool)($data["enable_security"] ?? true),
@@ -97,9 +101,9 @@ class AgentStation extends ServiceAbstract
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
 
-        // Call omv-agent-station CLI to sync .env and docker lifecycle
+        // Call omv-agent-station apply-bg asynchronously so response returns immediately (<50ms)
         if (file_exists("/usr/sbin/omv-agent-station")) {
-            $cmd = new Process("omv-agent-station", ["apply"]);
+            $cmd = new Process("omv-agent-station", ["apply-bg"]);
             $cmd->execute();
         }
 
@@ -145,6 +149,22 @@ class AgentStation extends ServiceAbstract
                 "enabled" => $masterEnabled && (bool)($settings["enable_security"] ?? true),
                 "detail" => "Port 7681 protected"
             ]
+        ];
+    }
+
+    public function getDiagnostics($params, $context): array
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        $statusText = "";
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["logs", "all"]);
+            $cmd->execute($output);
+            $statusText = implode("\n", $output);
+        }
+
+        return [
+            "log_output" => $statusText
         ];
     }
 

@@ -53,7 +53,8 @@ class TestBotsAndPackaging(unittest.TestCase):
             "agentstation.aimodels",
             "agentstation.git",
             "agentstation.chat",
-            "agentstation.security"
+            "agentstation.security",
+            "agentstation.diagnostics"
         ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
@@ -65,7 +66,8 @@ class TestBotsAndPackaging(unittest.TestCase):
             "services.agentstation.aimodels",
             "services.agentstation.git",
             "services.agentstation.chat",
-            "services.agentstation.security"
+            "services.agentstation.security",
+            "services.agentstation.diagnostics"
         ]:
             self.assertTrue((route_dir / f"{route_name}.yaml").exists(), f"Missing route file: {route_name}.yaml")
 
@@ -76,7 +78,8 @@ class TestBotsAndPackaging(unittest.TestCase):
             "omv-services-agentstation-aimodels-form-page",
             "omv-services-agentstation-git-form-page",
             "omv-services-agentstation-chat-form-page",
-            "omv-services-agentstation-security-form-page"
+            "omv-services-agentstation-security-form-page",
+            "omv-services-agentstation-diagnostics-page"
         ]:
             self.assertTrue((comp_dir / f"{comp_name}.yaml").exists(), f"Missing component file: {comp_name}.yaml")
 

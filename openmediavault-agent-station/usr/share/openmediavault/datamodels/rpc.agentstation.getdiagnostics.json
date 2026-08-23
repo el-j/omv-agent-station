@@ -1,0 +1,9 @@
+{
+  "type": "rpc",
+  "id": "rpc.agentstation.getdiagnostics",
+  "title": "Get Agent Station Diagnostics",
+  "params": {
+    "type": "object",
+    "properties": {}
+  }
+}

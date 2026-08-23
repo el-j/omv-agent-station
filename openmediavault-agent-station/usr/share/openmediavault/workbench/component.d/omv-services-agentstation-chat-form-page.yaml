@@ -18,8 +18,8 @@ data:
         hint: _("Master switch for interactive chat bots controlling your coding workspace")
       - type: select
         name: chat_service
-        label: _("Active Messenger Relay")
-        hint: _("Choose which chat application controls your AI coding agent")
+        label: _("Primary Active Messenger Relay")
+        hint: _("Choose which chat application acts as the primary interactive agent controller")
         value: "telegram"
         options:
           - value: "telegram"
@@ -31,7 +31,11 @@ data:
           - value: "none"
             text: _("Disabled (Web Terminal & SSH Only)")
       - type: divider
-        title: _("Telegram Bot Credentials")
+        title: _("Telegram Bot Configuration")
+      - type: checkbox
+        name: enable_telegram
+        label: _("Enable Telegram Bot")
+        value: true
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
@@ -41,7 +45,11 @@ data:
         label: _("Allowed Telegram Numeric User ID")
         hint: _("Get your numeric user ID from userinfobot at https://t.me/userinfobot")
       - type: divider
-        title: _("Signal Messenger Credentials")
+        title: _("Signal Messenger Configuration")
+      - type: checkbox
+        name: enable_signal
+        label: _("Enable Signal Messenger")
+        value: false
       - type: textInput
         name: signal_phone_number
         label: _("Signal Bot Phone / Linked Number")
@@ -51,7 +59,11 @@ data:
         label: _("Allowed Personal Signal Number")
         hint: _("Your personal phone number (e.g. +491701234567)")
       - type: divider
-        title: _("Discord Bot Credentials")
+        title: _("Discord Bot Configuration")
+      - type: checkbox
+        name: enable_discord
+        label: _("Enable Discord Bot")
+        value: false
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")

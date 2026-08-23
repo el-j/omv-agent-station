@@ -84,17 +84,29 @@
       "type": "string",
       "default": "telegram"
     },
+    "enable_telegram": {
+      "type": "boolean",
+      "default": true
+    },
     "telegram_bot_token": {
       "type": "string"
     },
     "telegram_allowed_user_id": {
       "type": "string"
     },
+    "enable_signal": {
+      "type": "boolean",
+      "default": false
+    },
     "signal_phone_number": {
       "type": "string"
     },
     "signal_allowed_phone_number": {
       "type": "string"
+    },
+    "enable_discord": {
+      "type": "boolean",
+      "default": false
     },
     "discord_bot_token": {
       "type": "string"
