@@ -24,13 +24,13 @@ apt-get install -y -qq git python3 python3-yaml wget curl tmux || true
 
 # Try installing docker and compose if not present
 if ! command -v docker >/dev/null 2>&1; then
-    echo "📦 Installing Docker engine..."
-    apt-get install -y -qq docker.io || true
+    echo "📦 Installing Docker engine and CLI..."
+    apt-get update -qq && apt-get install -y -qq docker.io docker-cli || apt-get install -y -qq docker.io || true
 fi
 
 if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
     echo "📦 Installing Docker Compose..."
-    apt-get install -y -qq docker-compose-plugin || apt-get install -y -qq docker-compose-v2 || apt-get install -y -qq docker-compose || true
+    apt-get install -y -qq docker-compose-plugin || apt-get install -y -qq docker-compose || true
 fi
 
 BRANCH="${BRANCH:-develop}"

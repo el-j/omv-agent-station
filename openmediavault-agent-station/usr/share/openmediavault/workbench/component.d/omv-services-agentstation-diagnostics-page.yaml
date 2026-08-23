@@ -11,8 +11,10 @@ data:
     fields:
       - type: divider
         title: _("Agent Station Engine & Docker Container Logs")
-      - type: textarea
-        name: log_output
-        label: _("Live Startup & Execution Logs")
-        value: ""
-        hint: _("Recent diagnostic output from Docker Compose, image downloads, and background container processes")
+      - type: html
+        template: "<pre style='background-color:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-family:monospace;font-size:13px;line-height:1.5;max-height:550px;overflow-y:auto;white-space:pre-wrap;border:1px solid #313244;'>{{ log_output }}</pre>"
+    buttons:
+      - text: _("Refresh Logs")
+        icon: "mdi:refresh"
+        click:
+          type: reload
