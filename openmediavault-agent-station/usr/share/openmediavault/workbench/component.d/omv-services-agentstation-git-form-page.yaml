@@ -15,6 +15,7 @@ data:
         name: enable_git
         label: _("Enable Automated Git Versioning & Sync")
         value: true
+        hint: _("Master switch for automated git commits, second-brain versioning, and remote repository sync")
       - type: divider
         title: _("Git Committer Identity")
       - type: textInput
@@ -26,19 +27,42 @@ data:
         label: _("Git Author Email")
         value: "agent@omv-box.local"
       - type: divider
-        title: _("Remote Git Provider Credentials")
+        title: _("GitHub Integration (Recommended)")
+      - type: checkbox
+        name: enable_github
+        label: _("Enable GitHub Repository Sync")
+        value: true
+      - type: textInput
+        name: github_git_user
+        label: _("GitHub Username or Organization")
+        hint: _("Your GitHub account handle (e.g. el-j)")
+      - type: passwordInput
+        name: github_git_token
+        label: _("GitHub Personal Access Token (PAT)")
+        hint: _("Create token with repo permissions at https://github.com/settings/tokens/new")
+      - type: divider
+        title: _("GitLab Integration")
+      - type: checkbox
+        name: enable_gitlab
+        label: _("Enable GitLab Repository Sync")
+        value: false
       - type: passwordInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
-        hint: _("Optional - for cloning & pushing to GitLab repositories")
+        hint: _("Create token with api/write permissions at https://gitlab.com/-/user_settings/personal_access_tokens")
+      - type: divider
+        title: _("Bitbucket Cloud Integration")
+      - type: checkbox
+        name: enable_bitbucket
+        label: _("Enable Bitbucket Repository Sync")
+        value: false
       - type: textInput
         name: bitbucket_username
         label: _("Bitbucket Username")
-        hint: _("Optional - for Bitbucket Cloud repositories")
       - type: passwordInput
         name: bitbucket_app_password
         label: _("Bitbucket App Password")
-        hint: _("Optional - Bitbucket token/password with repository write permissions")
+        hint: _("Create app password with repo write permissions at https://bitbucket.org/account/settings/app-passwords/")
     buttons:
       - template: submit
       - template: cancel

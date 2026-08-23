@@ -45,15 +45,9 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (Services + Root entries)
+        # Check navigation files (Root-level sidebar menu only)
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         for nav_name in [
-            "services.agentstation",
-            "services.agentstation.overview",
-            "services.agentstation.aimodels",
-            "services.agentstation.git",
-            "services.agentstation.chat",
-            "services.agentstation.security",
             "agentstation",
             "agentstation.overview",
             "agentstation.aimodels",

@@ -2,7 +2,18 @@
 
 All notable changes to the OpenMediaVault Agent Station plugin will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+## [0.0.2-alpha] - 2026-08-23
+
+### Added
+- GitHub repository integration in Git Providers with guided token generator link.
+- Granular per-provider enable/disable switches for GitHub, GitLab, and Bitbucket.
+- Direct external token creation links for Google AI Studio, Anthropic, Telegram, and Discord.
+- Pure top-level root sidebar navigation entry for Agent Station.
+
+### Fixed
+- Resolved exit code 127 during 'omv-agent-station apply' by implementing multi-binary compose fallback.
+- Aligned route and component namespaces for seamless OpenMediaVault Workbench routing.
+
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.0.1] - 2026-08-22

@@ -33,17 +33,18 @@ if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev
     apt-get install -y -qq docker-compose-plugin || apt-get install -y -qq docker-compose-v2 || apt-get install -y -qq docker-compose || true
 fi
 
+BRANCH="${BRANCH:-develop}"
 INSTALL_DIR="/srv/dev-data/omv-agent-station"
 mkdir -p "$INSTALL_DIR"
 
 if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "🔄 Resetting and fetching latest clean code in $INSTALL_DIR..."
-    git -C "$INSTALL_DIR" fetch origin main || true
-    git -C "$INSTALL_DIR" reset --hard origin/main || true
+    echo "🔄 Resetting and fetching latest clean code ($BRANCH) in $INSTALL_DIR..."
+    git -C "$INSTALL_DIR" fetch origin "$BRANCH" 2>/dev/null || git -C "$INSTALL_DIR" fetch origin main || true
+    git -C "$INSTALL_DIR" checkout -B "$BRANCH" "origin/$BRANCH" 2>/dev/null || git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH" 2>/dev/null || git -C "$INSTALL_DIR" reset --hard origin/main || true
     git -C "$INSTALL_DIR" clean -fdx || true
 else
-    echo "📥 Cloning omv-agent-station repository to $INSTALL_DIR..."
-    git clone https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR"
+    echo "📥 Cloning omv-agent-station repository ($BRANCH) to $INSTALL_DIR..."
+    git clone -b "$BRANCH" https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR" 2>/dev/null || git clone https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"

@@ -14,11 +14,20 @@
       "enable_aimodels": {
         "type": "boolean"
       },
+      "enable_gemini": {
+        "type": "boolean"
+      },
       "gemini_api_key": {
         "type": "string"
       },
+      "enable_anthropic": {
+        "type": "boolean"
+      },
       "anthropic_api_key": {
         "type": "string"
+      },
+      "enable_github_models": {
+        "type": "boolean"
       },
       "github_token": {
         "type": "string"
@@ -32,8 +41,23 @@
       "git_author_email": {
         "type": "string"
       },
+      "enable_github": {
+        "type": "boolean"
+      },
+      "github_git_user": {
+        "type": "string"
+      },
+      "github_git_token": {
+        "type": "string"
+      },
+      "enable_gitlab": {
+        "type": "boolean"
+      },
       "gitlab_token": {
         "type": "string"
+      },
+      "enable_bitbucket": {
+        "type": "boolean"
       },
       "bitbucket_username": {
         "type": "string"

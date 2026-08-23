@@ -15,20 +15,37 @@ data:
         name: enable_aimodels
         label: _("Enable AI Models Provider Routing")
         value: true
+        hint: _("Master switch for LiteLLM multi-provider LLM gateway and fallbacks")
       - type: divider
-        title: _("AI Model Subscriptions & API Keys")
+        title: _("Google AI Studio (Gemini 3.7 Pro & Flash)")
+      - type: checkbox
+        name: enable_gemini
+        label: _("Enable Google Gemini Provider")
+        value: true
       - type: passwordInput
         name: gemini_api_key
-        label: _("Google AI Studio Key (Google AI Pro)")
-        hint: _("Powers Gemini 3.7 Flash & Pro (https://aistudio.google.com/app/apikey)")
+        label: _("Google AI Studio API Key")
+        hint: _("Get your free/paid API key at https://aistudio.google.com/app/apikey")
+      - type: divider
+        title: _("Anthropic (Claude 3.7 Sonnet Thinking & Claude 3.5)")
+      - type: checkbox
+        name: enable_anthropic
+        label: _("Enable Anthropic Claude Provider")
+        value: true
       - type: passwordInput
         name: anthropic_api_key
-        label: _("Anthropic API Key (Claude Pro)")
-        hint: _("Powers Claude 3.7 Sonnet Thinking (https://console.anthropic.com/)")
+        label: _("Anthropic API Key")
+        hint: _("Get your API key at https://console.anthropic.com/settings/keys")
+      - type: divider
+        title: _("GitHub Models (Copilot Pro / GPT-4o, o1, DeepSeek-R1)")
+      - type: checkbox
+        name: enable_github_models
+        label: _("Enable GitHub Models Provider")
+        value: true
       - type: passwordInput
         name: github_token
-        label: _("GitHub Token (Copilot Pro / GitHub Models)")
-        hint: _("Powers GPT-4o, o1, o3-mini & DeepSeek-R1 via GitHub Models")
+        label: _("GitHub Personal Access Token")
+        hint: _("Create token at https://github.com/settings/tokens/new")
     buttons:
       - template: submit
       - template: cancel

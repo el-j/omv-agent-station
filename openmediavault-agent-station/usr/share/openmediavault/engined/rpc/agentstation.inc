@@ -50,13 +50,21 @@ class AgentStation extends ServiceAbstract
             "enable" => (bool)($data["enable"] ?? false),
             "data_dir" => (string)($data["data_dir"] ?? self::DEFAULT_DATA_DIR),
             "enable_aimodels" => (bool)($data["enable_aimodels"] ?? true),
+            "enable_gemini" => (bool)($data["enable_gemini"] ?? true),
             "gemini_api_key" => (string)($data["gemini_api_key"] ?? ""),
+            "enable_anthropic" => (bool)($data["enable_anthropic"] ?? true),
             "anthropic_api_key" => (string)($data["anthropic_api_key"] ?? ""),
+            "enable_github_models" => (bool)($data["enable_github_models"] ?? true),
             "github_token" => (string)($data["github_token"] ?? ""),
             "enable_git" => (bool)($data["enable_git"] ?? true),
             "git_author_name" => (string)($data["git_author_name"] ?? "OMV AI Agent"),
             "git_author_email" => (string)($data["git_author_email"] ?? "agent@omv-box.local"),
+            "enable_github" => (bool)($data["enable_github"] ?? true),
+            "github_git_user" => (string)($data["github_git_user"] ?? ""),
+            "github_git_token" => (string)($data["github_git_token"] ?? ""),
+            "enable_gitlab" => (bool)($data["enable_gitlab"] ?? false),
             "gitlab_token" => (string)($data["gitlab_token"] ?? ""),
+            "enable_bitbucket" => (bool)($data["enable_bitbucket"] ?? false),
             "bitbucket_username" => (string)($data["bitbucket_username"] ?? ""),
             "bitbucket_app_password" => (string)($data["bitbucket_app_password"] ?? ""),
             "enable_chat" => (bool)($data["enable_chat"] ?? true),
@@ -105,6 +113,12 @@ class AgentStation extends ServiceAbstract
         $settings = $this->getSettings([], $context);
         $masterEnabled = (bool)($settings["enable"] ?? false);
 
+        $gitProviders = [];
+        if (!empty($settings["enable_github"])) $gitProviders[] = "GitHub";
+        if (!empty($settings["enable_gitlab"])) $gitProviders[] = "GitLab";
+        if (!empty($settings["enable_bitbucket"])) $gitProviders[] = "Bitbucket";
+        $gitDetail = !empty($gitProviders) ? implode(", ", $gitProviders) : "Local Only";
+
         return [
             [
                 "name" => "Engine",
@@ -119,7 +133,7 @@ class AgentStation extends ServiceAbstract
             [
                 "name" => "Git Sync",
                 "enabled" => $masterEnabled && (bool)($settings["enable_git"] ?? true),
-                "detail" => (string)($settings["git_author_name"] ?? "OMV AI Agent")
+                "detail" => $gitDetail
             ],
             [
                 "name" => "Messenger",

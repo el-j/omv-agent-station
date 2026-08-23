@@ -15,6 +15,7 @@ data:
         name: enable_chat
         label: _("Enable Remote Messenger Relay")
         value: true
+        hint: _("Master switch for interactive chat bots controlling your coding workspace")
       - type: select
         name: chat_service
         label: _("Active Messenger Relay")
@@ -34,11 +35,11 @@ data:
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
-        hint: _("From @BotFather (Leave blank if not using Telegram)")
+        hint: _("Create your bot via BotFather at https://t.me/BotFather")
       - type: textInput
         name: telegram_allowed_user_id
         label: _("Allowed Telegram Numeric User ID")
-        hint: _("From @userinfobot (Restricts bot access exclusively to you)")
+        hint: _("Get your numeric user ID from userinfobot at https://t.me/userinfobot")
       - type: divider
         title: _("Signal Messenger Credentials")
       - type: textInput
@@ -54,11 +55,11 @@ data:
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")
-        hint: _("From Discord Developer Portal -> Bot -> Token")
+        hint: _("Create bot token in Developer Portal at https://discord.com/developers/applications")
       - type: textInput
         name: discord_allowed_user_id
         label: _("Allowed Discord User ID")
-        hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
+        hint: _("Your numeric Discord User ID (Enable Developer Mode in Discord -> Right-click profile -> Copy User ID)")
     buttons:
       - template: submit
       - template: cancel
