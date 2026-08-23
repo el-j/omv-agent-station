@@ -114,6 +114,40 @@ model_list:
       api_key: os.environ/GITHUB_TOKEN
 
   # ----------------------------------------------------------------------------
+  # TIER 4: MISTRAL AI, DEEPSEEK & OPENROUTER / Z.AI
+  # ----------------------------------------------------------------------------
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: codestral
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: openrouter-auto
+    litellm_params:
+      model: openrouter/auto
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: custom-llm
+    litellm_params:
+      model: openai/custom-model
+      api_base: os.environ/CUSTOM_API_BASE
+      api_key: os.environ/CUSTOM_API_KEY
+
+  # ----------------------------------------------------------------------------
   # VIRTUAL SMART ROUTERS WITH AUTOMATIC FAILOVER & REDUNDANCY
   # ----------------------------------------------------------------------------
   # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)

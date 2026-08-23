@@ -52,10 +52,16 @@ write_env_file() {
     ENABLE_AIMODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_aimodels', True))" 2>/dev/null || echo "True")
     ENABLE_GEMINI=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_gemini', True))" 2>/dev/null || echo "True")
     GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))" 2>/dev/null || echo "")
-    ENABLE_ANTHROPIC=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_anthropic', True))" 2>/dev/null || echo "True")
+    ENABLE_ANTHROPIC=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_anthropic', False))" 2>/dev/null || echo "False")
     ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))" 2>/dev/null || echo "")
     ENABLE_GH_MODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_github_models', True))" 2>/dev/null || echo "True")
     GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))" 2>/dev/null || echo "")
+    ENABLE_MISTRAL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_mistral', False))" 2>/dev/null || echo "False")
+    MISTRAL_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('mistral_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_OPENROUTER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_openrouter', False))" 2>/dev/null || echo "False")
+    OPENROUTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('openrouter_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_DEEPSEEK=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_deepseek', False))" 2>/dev/null || echo "False")
+    DEEPSEEK_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('deepseek_api_key', ''))" 2>/dev/null || echo "")
     
     # Git
     ENABLE_GIT=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_git', True))" 2>/dev/null || echo "True")
@@ -110,6 +116,12 @@ ENABLE_ANTHROPIC=$ENABLE_ANTHROPIC
 ANTHROPIC_API_KEY=$ANTHROPIC_KEY
 ENABLE_GITHUB_MODELS=$ENABLE_GH_MODELS
 GITHUB_TOKEN=$GITHUB_TOKEN
+ENABLE_MISTRAL=$ENABLE_MISTRAL
+MISTRAL_API_KEY=$MISTRAL_KEY
+ENABLE_OPENROUTER=$ENABLE_OPENROUTER
+OPENROUTER_API_KEY=$OPENROUTER_KEY
+ENABLE_DEEPSEEK=$ENABLE_DEEPSEEK
+DEEPSEEK_API_KEY=$DEEPSEEK_KEY
 ENABLE_GIT=$ENABLE_GIT
 GIT_AUTHOR_NAME=$GIT_NAME
 GIT_AUTHOR_EMAIL=$GIT_EMAIL

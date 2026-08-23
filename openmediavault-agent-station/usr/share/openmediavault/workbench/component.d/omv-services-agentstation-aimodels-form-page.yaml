@@ -6,7 +6,7 @@ data:
   config:
     hints:
       - type: info
-        text: _("<strong>🔑 Quick Access API Key Portals -</strong><br><br>• <a href='https://aistudio.google.com/app/apikey' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Google AI Studio (Gemini Pro and Flash Key) ↗</a> - Free and paid API key with high rate limits<br>• <a href='https://console.anthropic.com/settings/keys' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Anthropic Console (Claude 3.7 Sonnet Key) ↗</a> - Claude API developer dashboard<br>• <a href='https://github.com/settings/tokens/new' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 GitHub Token (GPT-4o and DeepSeek via Models) ↗</a> - Personal Access Token for GitHub Models API")
+        text: _("<strong>🔑 Quick Access API Key Portals -</strong><br><br>• <a href='https://aistudio.google.com/app/apikey' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Google AI Studio (Gemini Pro and Flash Key) ↗</a> - Free and paid API key with high rate limits<br>• <a href='https://github.com/settings/tokens/new' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 GitHub Token (Copilot Pro / GPT-4o and DeepSeek) ↗</a> - Personal Access Token for GitHub Models API<br>• <a href='https://console.mistral.ai/' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Mistral AI Console (Codestral and Mistral Large) ↗</a> - Developer key portal<br>• <a href='https://openrouter.ai/keys' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 OpenRouter / Z.AI Keys ↗</a> - Universal aggregator for all global models<br>• <a href='https://platform.deepseek.com/' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 DeepSeek Direct API Platform ↗</a> - Low-cost reasoning API keys<br>• <a href='https://console.anthropic.com/settings/keys' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Anthropic Console (Claude 3.7 Sonnet Key) ↗</a> - Developer API dashboard")
     request:
       service: AgentStation
       get:
@@ -20,7 +20,7 @@ data:
         value: true
         hint: _("Master switch for LiteLLM multi-provider LLM gateway and automated fallback routing")
       - type: divider
-        title: _("Google AI Studio (Gemini 3.7 Pro & Flash)")
+        title: _("Google AI Studio (Gemini 3.7 Pro, 2.5 Pro & Flash - Recommended Free)")
       - type: checkbox
         name: enable_gemini
         label: _("Enable Google Gemini Provider")
@@ -30,17 +30,7 @@ data:
         label: _("Google AI Studio API Key")
         hint: _("Paste your Gemini API key obtained from Google AI Studio")
       - type: divider
-        title: _("Anthropic (Claude 3.7 Sonnet Thinking & Claude 3.5)")
-      - type: checkbox
-        name: enable_anthropic
-        label: _("Enable Anthropic Claude Provider")
-        value: true
-      - type: passwordInput
-        name: anthropic_api_key
-        label: _("Anthropic API Key")
-        hint: _("Paste your Anthropic API key obtained from the Anthropic Console")
-      - type: divider
-        title: _("GitHub Models (Copilot Pro / GPT-4o, o1, DeepSeek-R1)")
+        title: _("GitHub Models (Copilot Pro / GPT-4o, o1, DeepSeek-R1 - Included in Copilot)")
       - type: checkbox
         name: enable_github_models
         label: _("Enable GitHub Models Provider")
@@ -49,6 +39,46 @@ data:
         name: github_token
         label: _("GitHub Personal Access Token")
         hint: _("Paste your GitHub token for GitHub Models API access")
+      - type: divider
+        title: _("Mistral AI (Codestral & Mistral Large)")
+      - type: checkbox
+        name: enable_mistral
+        label: _("Enable Mistral AI Provider")
+        value: false
+      - type: passwordInput
+        name: mistral_api_key
+        label: _("Mistral API Key")
+        hint: _("Paste your Mistral API key from console.mistral.ai")
+      - type: divider
+        title: _("OpenRouter / Z.AI (Universal Model Aggregator)")
+      - type: checkbox
+        name: enable_openrouter
+        label: _("Enable OpenRouter / Z.AI Provider")
+        value: false
+      - type: passwordInput
+        name: openrouter_api_key
+        label: _("OpenRouter / Z.AI API Key")
+        hint: _("Paste your OpenRouter key from openrouter.ai/keys")
+      - type: divider
+        title: _("DeepSeek Direct API (DeepSeek-V3 & DeepSeek-R1)")
+      - type: checkbox
+        name: enable_deepseek
+        label: _("Enable DeepSeek Direct Provider")
+        value: false
+      - type: passwordInput
+        name: deepseek_api_key
+        label: _("DeepSeek API Key")
+        hint: _("Paste your DeepSeek API key from platform.deepseek.com")
+      - type: divider
+        title: _("Anthropic Direct API (Claude 3.7 Sonnet & 3.5)")
+      - type: checkbox
+        name: enable_anthropic
+        label: _("Enable Anthropic Claude Provider")
+        value: false
+      - type: passwordInput
+        name: anthropic_api_key
+        label: _("Anthropic API Key")
+        hint: _("Paste your Anthropic developer API key from console.anthropic.com")
     buttons:
       - template: submit
       - template: cancel

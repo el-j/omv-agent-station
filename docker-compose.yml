@@ -23,6 +23,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=${VERTEX_CREDENTIALS_PATH:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
       - ./credentials:/app/credentials:ro
