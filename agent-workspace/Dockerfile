@@ -25,16 +25,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create workspace and obsidian directories
-RUN mkdir -p /workspace /obsidian /home/agent/.claude /home/agent/.ssh \
-    && useradd -u 1000 -U -d /home/agent -s /bin/bash agent 2>/dev/null || true \
-    && chown -R 1000:1000 /workspace /obsidian /home/agent
+# Create workspace and obsidian directories using existing node user (UID 1000)
+RUN mkdir -p /workspace /obsidian /home/node/.claude /home/node/.ssh \
+    && chown -R node:node /workspace /obsidian /home/node
 
-USER agent
+USER node
 WORKDIR /workspace
 
-ENV HOME=/home/agent
-ENV PATH=/usr/local/bin:/usr/bin:/bin:/home/agent/.local/bin
+ENV HOME=/home/node
+ENV PATH=/usr/local/bin:/usr/bin:/bin:/home/node/.local/bin
 
 EXPOSE 7681
 

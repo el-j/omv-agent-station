@@ -106,9 +106,9 @@ services:
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/workspace
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/obsidian
-      - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/home/agent/.claude
-      - ${DATA_DIR:-/srv/dev-data}/ssh:/home/agent/.ssh:ro
-      - ./ssh:/home/agent/.ssh:ro
+      - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/home/node/.claude
+      - ${DATA_DIR:-/srv/dev-data}/ssh:/home/node/.ssh:ro
+      - ./ssh:/home/node/.ssh:ro
     ports:
       - "7681:7681"
     command: ttyd -p 7681 -c ${TERMINAL_USER:-admin}:${TERMINAL_PASS:-omvsecurepass} -W tmux new-session -A -s agent-main -c /workspace bash
