@@ -6,21 +6,46 @@ data:
   config:
     hints:
       - type: info
-        text: _("<strong>📊 Real-Time Diagnostic Center -</strong><br>This console displays live Docker container states, image download progress, and background startup logs. Click <strong>Refresh Logs</strong> below to refresh the console.")
+        text: _("<strong>📊 Real-Time Agent Station Diagnostic Center -</strong><br>This console displays live container lifecycle matrix, storage utilization, connected AI providers, and streaming provisioning logs. Click <strong>Refresh Diagnostics & Logs</strong> below for instant telemetry.")
     request:
       service: AgentStation
       get:
         method: getDiagnostics
     fields:
       - type: divider
-        title: _("Agent Station Engine & Docker Container Logs")
+        title: _("1. Sandboxed Docker Containers & Services Status")
+      - type: textarea
+        name: container_status
+        label: _("Live Container Matrix (Status, Memory & Ports)")
+        value: ""
+        rows: 6
+        readonly: true
+      - type: divider
+        title: _("2. Storage & Sandboxed Workspace Utilization")
+      - type: textarea
+        name: storage_status
+        label: _("Workspace, Obsidian Vault & Volume Capacity")
+        value: ""
+        rows: 4
+        readonly: true
+      - type: divider
+        title: _("3. Connected AI Providers & Router Gateway")
+      - type: textarea
+        name: ai_status
+        label: _("Active AI Model Endpoints & CLI Runtimes")
+        value: ""
+        rows: 8
+        readonly: true
+      - type: divider
+        title: _("4. Live Provisioning & Docker Execution Logs")
       - type: textarea
         name: log_output
-        label: _("Live Startup & Execution Logs")
-        rows: 24
+        label: _("Full Execution Stream (Image Downloads, Compose & Container Startup)")
+        value: ""
+        rows: 18
         readonly: true
     buttons:
-      - text: _("Refresh Logs")
+      - text: _("Refresh Diagnostics & Logs")
         icon: "mdi:refresh"
         click:
           type: reload

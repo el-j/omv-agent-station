@@ -4,6 +4,7 @@
   "title": "Get Agent Station Diagnostics",
   "params": {
     "type": "object",
-    "properties": {}
+    "properties": {},
+    "additionalProperties": true
   }
 }

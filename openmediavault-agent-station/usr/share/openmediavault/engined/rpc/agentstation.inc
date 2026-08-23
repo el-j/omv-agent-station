@@ -176,6 +176,70 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
+        $settings = $this->getSettings([], $context);
+        $dataDir = $settings["data_dir"] ?? "/srv/dev-data";
+
+        // 1. Container matrix
+        $perf = $this->getPerformance([], $context);
+        $details = $perf["container_details"] ?? [];
+        $containerLines = [];
+        $containerLines[] = sprintf("%-22s | %-12s | %-10s | %-20s", "CONTAINER", "STATUS", "MEMORY", "PORT / ROLE");
+        $containerLines[] = str_repeat("-", 72);
+
+        $knownContainers = [
+            "litellm-proxy" => ["port" => "Port 4000 (AI Gateway)"],
+            "omv-agent-terminal" => ["port" => "Port 7681 (Sandboxed Agent)"],
+            "syncthing" => ["port" => "Port 8384 (File Sync)"],
+            "telegram-agent-bot" => ["port" => "Messenger Relay"]
+        ];
+
+        foreach ($knownContainers as $cname => $meta) {
+            $info = $details[$cname] ?? [];
+            $st = $info["status"] ?? "Stopped";
+            $mem = $info["memory"] ?? "--";
+            $containerLines[] = sprintf("%-22s | %-12s | %-10s | %-20s", $cname, $st, $mem, $meta["port"]);
+        }
+        $containerStatus = implode("\n", $containerLines);
+
+        // 2. Storage & Workspace metrics
+        $workspaceDir = $dataDir . "/workspace";
+        $obsidianDir = $dataDir . "/obsidian";
+        $workspaceSize = "0 MB";
+        $obsidianSize = "0 MB";
+        $diskFree = "N/A";
+
+        if (is_dir($workspaceDir)) {
+            $out = [];
+            exec("du -sh " . escapeshellarg($workspaceDir) . " 2>/dev/null | awk '{print $1}'", $out);
+            $workspaceSize = $out[0] ?? "0 MB";
+        }
+        if (is_dir($obsidianDir)) {
+            $out = [];
+            exec("du -sh " . escapeshellarg($obsidianDir) . " 2>/dev/null | awk '{print $1}'", $out);
+            $obsidianSize = $out[0] ?? "0 MB";
+        }
+        $dfOut = [];
+        exec("df -h " . escapeshellarg($dataDir) . " 2>/dev/null | tail -n 1 | awk '{print $4 \" available of \" $2 \" (\" $5 \" used)\"}'", $dfOut);
+        $diskFree = $dfOut[0] ?? "N/A";
+
+        $storageLines = [];
+        $storageLines[] = sprintf("📁 Workspace Projects Directory : %s (%s)", $workspaceDir, $workspaceSize);
+        $storageLines[] = sprintf("📓 Obsidian Knowledge Vault     : %s (%s)", $obsidianDir, $obsidianSize);
+        $storageLines[] = sprintf("💾 Storage Volume Available     : %s", $diskFree);
+        $storageStatus = implode("\n", $storageLines);
+
+        // 3. AI Providers Connected
+        $aiLines = [];
+        $aiLines[] = "🤖 Active AI Provider Routing & Gateway Connections:";
+        $aiLines[] = sprintf("  • Google Gemini Studio   : %s", (!empty($settings["gemini_api_key"]) ? "✅ Connected (Gemini 2.5 / 3.7 Pro & Flash)" : "⚪ Not Configured"));
+        $aiLines[] = sprintf("  • GitHub Models / Copilot: %s", (!empty($settings["github_token"]) ? "✅ Connected (GPT-4o, DeepSeek-R1, o1)" : "⚪ Not Configured"));
+        $aiLines[] = sprintf("  • Mistral AI Direct      : %s", (!empty($settings["mistral_api_key"]) ? "✅ Connected (Codestral, Mistral Large)" : "⚪ Not Configured"));
+        $aiLines[] = sprintf("  • OpenRouter / Z.AI      : %s", (!empty($settings["openrouter_api_key"]) ? "✅ Connected (Universal Model Aggregator)" : "⚪ Not Configured"));
+        $aiLines[] = sprintf("  • DeepSeek Direct API    : %s", (!empty($settings["deepseek_api_key"]) ? "✅ Connected (DeepSeek-V3, DeepSeek-R1)" : "⚪ Not Configured"));
+        $aiLines[] = sprintf("  • Claude Code CLI        : %s", (file_exists("/usr/local/bin/claude") ? "✅ Pre-installed in Sandboxed Container" : "⚪ Installable via AI Models tab"));
+        $aiStatus = implode("\n", $aiLines);
+
+        // 4. Live execution logs
         $statusText = "";
         if (file_exists("/usr/sbin/omv-agent-station")) {
             $cmd = new Process("omv-agent-station", ["logs", "all"]);
@@ -183,17 +247,11 @@ class AgentStation extends ServiceAbstract
             $statusText = implode("\n", $output);
         }
 
-        $perf = $this->getPerformance([], $context);
-        $details = $perf["container_details"] ?? [];
-        $header = "=== CONTAINER LIFECYCLE & PROVISIONING STATUS ===\n";
-        foreach ($details as $name => $info) {
-            $st = $info["status"] ?? "Unknown";
-            $header .= sprintf("• %-20s : %s\n", $name, $st);
-        }
-        $header .= "=================================================\n\n";
-
         return [
-            "log_output" => $header . $statusText
+            "container_status" => $containerStatus,
+            "storage_status" => $storageStatus,
+            "ai_status" => $aiStatus,
+            "log_output" => $statusText ?: "No startup logs recorded yet. Enable the Agent Station in Overview to provision containers."
         ];
     }
 
