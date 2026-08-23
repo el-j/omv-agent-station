@@ -3,5 +3,4 @@ type: route
 data:
   url: "/services/agentstation/overview"
   title: _("Overview")
-  editing: false
   component: omv-services-agentstation-overview-page

@@ -3,5 +3,4 @@ type: route
 data:
   url: "/services/agentstation/diagnostics"
   title: _("Diagnostics & Logs")
-  editing: false
   component: omv-services-agentstation-diagnostics-page

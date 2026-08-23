@@ -3,5 +3,4 @@ type: route
 data:
   url: "/services/agentstation/security"
   title: _("Security & Web Access")
-  editing: false
   component: omv-services-agentstation-security-form-page

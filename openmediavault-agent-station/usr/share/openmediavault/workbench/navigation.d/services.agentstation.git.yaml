@@ -1,7 +1,7 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation.git"
+  path: "services.agentstation.git"
   text: _("Git Providers")
   position: 30
   icon: "mdi:git"

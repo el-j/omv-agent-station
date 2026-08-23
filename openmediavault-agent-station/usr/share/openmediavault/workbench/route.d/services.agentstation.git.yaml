@@ -3,5 +3,4 @@ type: route
 data:
   url: "/services/agentstation/git"
   title: _("Git Providers")
-  editing: false
   component: omv-services-agentstation-git-form-page

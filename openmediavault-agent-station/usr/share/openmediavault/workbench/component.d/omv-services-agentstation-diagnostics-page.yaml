@@ -6,7 +6,7 @@ data:
   config:
     hints:
       - type: info
-        text: _("<strong>📊 Real-Time Agent Station Diagnostic Center -</strong><br>This console displays live container lifecycle matrix, storage utilization, connected AI providers, and streaming provisioning logs. Click <strong>Refresh Diagnostics & Logs</strong> below for instant telemetry.")
+        text: _("<strong>📊 Real-Time Agent Station Diagnostic Center -</strong><br>Live container matrix, storage utilization, connected AI model gateways, and execution logs. Click <strong>Refresh Diagnostics & Logs</strong> below for instant live telemetry.")
     request:
       service: AgentStation
       get:
@@ -19,7 +19,6 @@ data:
         label: _("Live Container Matrix (Status, Memory & Ports)")
         value: ""
         rows: 6
-        readonly: true
       - type: divider
         title: _("2. Storage & Sandboxed Workspace Utilization")
       - type: textarea
@@ -27,7 +26,6 @@ data:
         label: _("Workspace, Obsidian Vault & Volume Capacity")
         value: ""
         rows: 4
-        readonly: true
       - type: divider
         title: _("3. Connected AI Providers & Router Gateway")
       - type: textarea
@@ -35,7 +33,6 @@ data:
         label: _("Active AI Model Endpoints & CLI Runtimes")
         value: ""
         rows: 8
-        readonly: true
       - type: divider
         title: _("4. Live Provisioning & Docker Execution Logs")
       - type: textarea
@@ -43,7 +40,6 @@ data:
         label: _("Full Execution Stream (Image Downloads, Compose & Container Startup)")
         value: ""
         rows: 18
-        readonly: true
     buttons:
       - text: _("Refresh Diagnostics & Logs")
         icon: "mdi:refresh"
