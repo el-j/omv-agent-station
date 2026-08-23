@@ -2,13 +2,10 @@
 # postrm for openmediavault-agent-station
 set -e
 
-. /etc/default/openmediavault
-. /usr/share/openmediavault/scripts/helper-functions
-
 case "$1" in
     remove|purge|disappear)
-        # Queue workbench recompile via trigger
-        dpkg-trigger update-workbench
+        mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+        find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
         ;;
 
     upgrade|failed-upgrade|abort-install|abort-upgrade)

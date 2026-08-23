@@ -30,12 +30,11 @@ mkdir -p "$BUILD_DIR/usr/sbin"
 
 # Copy package control files
 cp openmediavault-agent-station/debian/control "$BUILD_DIR/DEBIAN/"
-cp openmediavault-agent-station/debian/triggers "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
-chmod 644 "$BUILD_DIR/DEBIAN/control" "$BUILD_DIR/DEBIAN/triggers" 2>/dev/null || true
+chmod 644 "$BUILD_DIR/DEBIAN/control" 2>/dev/null || true
 
 # Copy OMV RPC backend & WebGUI assets
 cp openmediavault-agent-station/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true

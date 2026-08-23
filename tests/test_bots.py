@@ -38,12 +38,10 @@ class TestBotsAndPackaging(unittest.TestCase):
     def test_omv_plugin_files_exist(self):
         base_dir = ROOT_DIR / "openmediavault-agent-station"
         rpc_file = base_dir / "usr" / "share" / "openmediavault" / "engined" / "rpc" / "agentstation.inc"
-        triggers_file = base_dir / "debian" / "triggers"
         cli_helper = base_dir / "usr" / "sbin" / "omv-agent-station"
         dash_file = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "dashboard.d" / "agentstation.yaml"
 
         self.assertTrue(rpc_file.exists())
-        self.assertTrue(triggers_file.exists())
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 

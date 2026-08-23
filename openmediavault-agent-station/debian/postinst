@@ -1,24 +1,11 @@
 #!/bin/sh
 # postinst for openmediavault-agent-station
-# Based on the correct OMV plugin pattern (e.g. openmediavault-compose).
-# DO NOT call omv-mkworkbench or systemctl restart here — that kills the
-# active RPC session and causes "Connection reset by peer" 500 errors.
-# Instead, use dpkg triggers which are processed AFTER the RPC session ends.
-
 set -e
-
-. /etc/default/openmediavault
-. /usr/share/openmediavault/scripts/helper-functions
 
 case "$1" in
     configure)
         # Ensure local deb repo archives directory exists
         mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
-
-        # Queue workbench recompile and engined restart as dpkg triggers.
-        # dpkg processes these AFTER the current RPC session closes cleanly,
-        # preventing "Connection reset by peer" errors in the WebGUI.
-        dpkg-trigger update-workbench
         ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
