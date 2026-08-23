@@ -1,6 +1,11 @@
+FROM tsl0922/ttyd:latest AS ttyd-src
+
 FROM node:22-bookworm-slim
 
-# Install system utilities, python, git, github CLI, tmux, ttyd
+# Copy pre-compiled ttyd binary
+COPY --from=ttyd-src /usr/bin/ttyd /usr/bin/ttyd
+
+# Install system utilities, python, git, github CLI, tmux
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -14,7 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     ca-certificates \
     procps \
-    ttyd \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
