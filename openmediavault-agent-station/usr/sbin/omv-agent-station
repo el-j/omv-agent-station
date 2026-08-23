@@ -22,6 +22,7 @@ fi
 CONFIG_FILE="${CONFIG_FILE:-$DEFAULT_CONFIG}"
 STACK_DIR="${STACK_DIR:-$DEFAULT_STACK}"
 LOG_FILE="${LOG_FILE:-/var/log/omv-agent-station.log}"
+CLI_BIN="/usr/sbin/omv-agent-station"
 
 # Robust Docker Compose command runner with automatic binary fallback
 run_compose() {
@@ -143,22 +144,34 @@ apply_sync() {
     ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))" 2>/dev/null || echo "False")
 
     if [ "$ENABLE" = "True" ] || [ "$ENABLE" = "true" ]; then
-        echo "[$(date)] Starting Agent Station stack..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Starting Agent Station Stack Provisioning..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing, Terminal)..." >> "$LOG_FILE" 2>/dev/null || true
         if [ -d "$STACK_DIR" ]; then
-            (cd "$STACK_DIR" && run_compose --env-file .env up -d >> "$LOG_FILE" 2>&1 || true)
+            (cd "$STACK_DIR" && run_compose --env-file .env pull --progress=plain >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
+            (cd "$STACK_DIR" && run_compose --env-file .env up -d --remove-orphans >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Agent Station stack is up and active!" >> "$LOG_FILE" 2>/dev/null || true
         fi
     else
-        echo "[$(date)] Stopping Agent Station stack..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🛑 Stopping Agent Station stack..." >> "$LOG_FILE" 2>/dev/null || true
         if [ -d "$STACK_DIR" ]; then
             (cd "$STACK_DIR" && run_compose --env-file .env down >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏹️ Agent Station stack stopped." >> "$LOG_FILE" 2>/dev/null || true
         fi
     fi
 }
 
 apply_async() {
     write_env_file
+    # Locate executable binary
+    BIN="$CLI_BIN"
+    if [ ! -x "$BIN" ]; then
+        BIN="$0"
+    fi
     # Detach to background so WebGUI RPC returns immediately without 504 timeout
-    nohup "$0" apply >> "$LOG_FILE" 2>&1 &
+    nohup "$BIN" apply >> "$LOG_FILE" 2>&1 &
     echo "Configuration written. Background container synchronization dispatched."
 }
 
@@ -172,6 +185,15 @@ def check_cmd(cmd):
         return res.returncode == 0
     except Exception:
         return False
+
+def get_container_info(name):
+    try:
+        res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+        status = res.stdout.strip()
+        running = "Up" in status
+        return {"running": running, "status": status if status else "Not created"}
+    except Exception:
+        return {"running": False, "status": "Docker unavailable"}
 
 # Collect host metrics
 load1, load5, load15 = 0.0, 0.0, 0.0
@@ -213,7 +235,6 @@ try:
 except Exception:
     pass
 
-# Active container statuses
 containers = {
     "litellm": check_cmd(["docker", "ps", "-q", "-f", "name=litellm"]),
     "syncthing": check_cmd(["docker", "ps", "-q", "-f", "name=syncthing"]),
@@ -221,6 +242,15 @@ containers = {
     "telegram_bot": check_cmd(["docker", "ps", "-q", "-f", "name=telegram-agent-bot"]),
     "signal_bot": check_cmd(["docker", "ps", "-q", "-f", "name=signal-agent-bot"]),
     "discord_bot": check_cmd(["docker", "ps", "-q", "-f", "name=discord-agent-bot"])
+}
+
+container_details = {
+    "LiteLLM Gateway": get_container_info("litellm"),
+    "Syncthing": get_container_info("syncthing"),
+    "Web Terminal": get_container_info("web-terminal"),
+    "Telegram Bot": get_container_info("telegram-agent-bot"),
+    "Signal Bot": get_container_info("signal-agent-bot"),
+    "Discord Bot": get_container_info("discord-agent-bot")
 }
 
 data = {
@@ -240,7 +270,8 @@ data = {
         "used_gb": max(0, disk_total_gb - disk_avail_gb)
     },
     "tmux_sessions": tmux_sessions,
-    "containers": containers
+    "containers": containers,
+    "container_details": container_details
 }
 
 print(json.dumps(data, indent=2))
@@ -271,8 +302,13 @@ case "$1" in
         ;;
     logs)
         SERVICE=${2:-litellm}
-        if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "install" ]; then
-            tail -n 100 "$LOG_FILE" 2>/dev/null || echo "No logs available in $LOG_FILE"
+        if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "install" ] || [ "$SERVICE" = "diagnostics" ]; then
+            if [ -f "$LOG_FILE" ]; then
+                tail -n 120 "$LOG_FILE"
+            else
+                echo "Log file $LOG_FILE has not been created yet."
+                echo "Enable the Agent Station engine in the Overview tab to begin container provisioning."
+            fi
         else
             cd "$STACK_DIR" && run_compose --env-file .env logs --tail=100 "$SERVICE"
         fi
