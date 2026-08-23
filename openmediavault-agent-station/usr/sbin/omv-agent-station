@@ -328,6 +328,28 @@ case "$1" in
             cd "$STACK_DIR" && run_compose --env-file .env logs --tail=100 "$SERVICE"
         fi
         ;;
+    install-claude-cli)
+        echo "=========================================================="
+        echo "📦 Installing Claude Code CLI on OpenMediaVault..."
+        echo "=========================================================="
+        if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+            echo "📦 Installing Node.js and NPM runtime..."
+            apt-get update -qq && apt-get install -y -qq nodejs npm || true
+        fi
+        echo "📦 Installing @anthropic-ai/claude-code via npm..."
+        npm install -g @anthropic-ai/claude-code
+        echo ""
+        if command -v claude >/dev/null 2>&1 || [ -x /usr/local/bin/claude ]; then
+            echo "=========================================================="
+            echo "✅ Claude Code CLI successfully installed!"
+            echo "👉 Location: $(which claude || echo '/usr/local/bin/claude')"
+            echo "👉 Usage: Open Web Terminal (Port 7681) and run 'claude'"
+            echo "👉 Log in with your active claude.ai subscription via browser!"
+            echo "=========================================================="
+        else
+            echo "⚠️ Installation completed, binary at /usr/local/bin/claude"
+        fi
+        ;;
     uninstall)
         echo "🛑 Stopping Agent Station stack..."
         cd "$STACK_DIR" 2>/dev/null && run_compose --env-file .env down 2>/dev/null || true
@@ -339,7 +361,7 @@ case "$1" in
         echo "✅ Uninstallation complete."
         ;;
     help|-h|--help)
-        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|install-claude-cli|uninstall}"
         exit 0
         ;;
     *)

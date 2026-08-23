@@ -238,4 +238,17 @@ class AgentStation extends ServiceAbstract
             "logs" => ""
         ];
     }
+
+    public function installClaudeCli($params, $context)
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        return $this->execBgProc(function ($bgStatusFilename, $bgOutputFilename) {
+            $cmd = new Process("omv-agent-station", ["install-claude-cli"]);
+            $cmd->setRedirectOutput(true);
+            $cmd->setAsync(false);
+            $cmd->execute($output);
+            file_put_contents($bgOutputFilename, implode("\n", $output));
+        });
+    }
 }

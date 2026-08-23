@@ -82,3 +82,19 @@ data:
     buttons:
       - template: submit
       - template: cancel
+      - text: _("Install / Update Claude CLI")
+        icon: "mdi:robot"
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Install Claude Code CLI (@anthropic-ai/claude-code)")
+              width: 75%
+              startOnInit: true
+              request:
+                service: AgentStation
+                method: installClaudeCli
+                task: true
+              buttons:
+                stop:
+                  hidden: true
