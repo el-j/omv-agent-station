@@ -25,7 +25,7 @@ from telegram.ext import (
     ContextTypes,
 )
 import httpx
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(
@@ -38,24 +38,20 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ALLOWED_USER_ID = os.environ.get("TELEGRAM_ALLOWED_USER_ID")
 LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
-OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
-WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
+LITELLM_KEY = os.environ.get("LITELLM_MASTER_KEY", "sk-omv-secret-master-key")
+WORKSPACE = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT", "/workspace/ObsidianVault"))
 
-# Git Provider & Identity Configuration
-GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
-GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-server.local")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_USER = os.environ.get("GITHUB_GIT_USER", "")
+# Git Credentials Environment
+GIT_BIN = os.environ.get("GIT_BIN", "git")
+GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "Agent Station Bot")
+GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "bot@agentstation.local")
+GITHUB_USER = os.environ.get("GITHUB_USER", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_GIT_TOKEN", "") or os.environ.get("GITHUB_TOKEN", "")
+GITLAB_USER = os.environ.get("GITLAB_USER", "oauth2")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
-BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
-
-GIT_BIN = shutil.which("git") or "/usr/bin/git"
-TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
-UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
-DF_BIN = shutil.which("df") or "/bin/df"
-AIDER_BIN = shutil.which("aider") or "aider"
+BITBUCKET_TOKEN = os.environ.get("BITBUCKET_APP_PASSWORD", "")
 
 # Topic Binding & Custom Commands Storage Files
 TOPICS_FILE = WORKSPACE / ".agent_topics.json"
@@ -65,7 +61,7 @@ OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
 BUILTIN_COMMANDS = {
     "start", "help", "status", "models", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
-    "note", "chat", "task", "claude", "exec", "addcmd", "alias", "delcmd",
+    "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "addcmd", "alias", "delcmd",
     "removecmd", "customcmds", "cmds", "aliases"
 }
 
@@ -95,10 +91,10 @@ def init_git_credentials():
             logger.info("Configured automated git auth for GitLab.")
 
         # Configure automatic auth for Bitbucket
-        if BITBUCKET_USER and BITBUCKET_PASS:
+        if BITBUCKET_USER and BITBUCKET_TOKEN:
             subprocess.run([  # nosec B603,B607
                 GIT_BIN, "config", "--global",
-                f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
+                f"url.https://{BITBUCKET_USER}:{BITBUCKET_TOKEN}@bitbucket.org/.insteadOf",
                 "https://bitbucket.org/"
             ], check=True)
             logger.info("Configured automated git auth for Bitbucket.")
@@ -108,10 +104,11 @@ def init_git_credentials():
 
 init_git_credentials()
 
-# OpenAI Client pointing to local LiteLLM Proxy
-ai_client = OpenAI(
+# Non-blocking Asynchronous OpenAI Client pointing to local LiteLLM Proxy
+ai_client = AsyncOpenAI(
     api_key=LITELLM_KEY,
-    base_url=f"{LITELLM_BASE}/v1"
+    base_url=f"{LITELLM_BASE}/v1",
+    timeout=120.0
 )
 
 # ---------------------------------------------------------------------------
@@ -824,42 +821,93 @@ async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/chat <your question>`")
+        await update.effective_message.reply_text(
+            "💬 *AI Chat Usage:*\n\n"
+            "• `/chat <question>` — Ask with default smart router (`coder-smart`)\n"
+            "• `/chat -m <model> <question>` — Query a specific model\n"
+            "• `/chat @<model> <question>` — Mention a specific model\n"
+            "• `/chat gemini-3.6-flash <question>` — Direct model name\n"
+            "• `/gemini <question>` — Fast Google Gemini 3.6 Flash shortcut\n"
+            "• `/gpt4 <question>` — GitHub Models GPT-4o shortcut\n\n"
+            "Use `/models` to view all available endpoints.",
+            parse_mode="Markdown"
+        )
         return
 
-    query = " ".join(context.args)
-    status_msg = await update.effective_message.reply_text("💭 Thinking...")
+    raw_args = list(context.args)
+    target_model = "coder-smart"
+
+    # Support model flags: -m <model>, --model <model>, --model=<model>, or @<model>
+    if raw_args[0] in ("-m", "--model") and len(raw_args) > 2:
+        target_model = raw_args[1]
+        query = " ".join(raw_args[2:])
+    elif raw_args[0].startswith("--model="):
+        target_model = raw_args[0].split("=", 1)[1]
+        query = " ".join(raw_args[1:])
+    elif raw_args[0].startswith("@"):
+        target_model = raw_args[0][1:]
+        query = " ".join(raw_args[1:])
+    elif len(raw_args) > 1 and raw_args[0] in (
+        "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.7-pro", "gemini-flash-latest",
+        "gemini-2.5-flash", "gemini-2.5-pro", "coder-fast", "coder-smart", "reasoning-heavy",
+        "github-gpt-4o", "github-o1", "github-o3-mini", "github-deepseek-r1", "github-llama-3.3-70b",
+        "claude-3-7-sonnet-direct", "claude-3-5-haiku", "deepseek-chat", "deepseek-reasoner",
+        "codestral", "mistral-large", "openrouter-auto"
+    ):
+        target_model = raw_args[0]
+        query = " ".join(raw_args[1:])
+    else:
+        query = " ".join(raw_args)
+
+    status_msg = await update.effective_message.reply_text(f"💭 Thinking ({target_model})...")
 
     try:
-        response = ai_client.chat.completions.create(
-            model="coder-smart",
+        response = await ai_client.chat.completions.create(
+            model=target_model,
             messages=[
                 {"role": "system", "content": "You are an expert AI software architect and coding assistant on OpenMediaVault."},
                 {"role": "user", "content": query}
             ],
             max_tokens=2048,
         )
-        reply = response.choices[0].message.content
+        reply = response.choices[0].message.content or "*(Empty response)*"
         if len(reply) > 4000:
             reply = reply[:4000] + "\n\n*(Truncated due to Telegram length limit)*"
-        await status_msg.edit_text(reply)
+        try:
+            await status_msg.edit_text(reply, parse_mode="Markdown")
+        except Exception:
+            await status_msg.edit_text(reply)
     except Exception as e:
         err_str = str(e)
         if "Invalid model name" in err_str or "coder-smart" in err_str or "400" in err_str:
             await status_msg.edit_text(
-                "⚠️ *No Active AI Model Configured*\n\n"
-                "LiteLLM could not route your request because no active AI API keys are configured yet in OpenMediaVault.\n\n"
-                "👉 *Quick Activation:*\n"
-                "1. Open OMV WebGUI ➔ *Services ➔ Agent Station ➔ AI Models*\n"
-                "2. Enter your **Google Gemini Key**, **GitHub Token**, or **Claude Key**\n"
-                "3. Click *Save* — LiteLLM will immediately activate AI responses!\n\n"
-                "🔗 *Free API Key Portals:*\n"
-                "• [Google AI Studio (Gemini Flash & Pro)](https://aistudio.google.com/app/apikey)\n"
-                "• [GitHub Token (Copilot GPT-4o / DeepSeek)](https://github.com/settings/tokens/new)",
+                f"⚠️ *Model Unavailable: `{target_model}`*\n\n"
+                f"LiteLLM could not route to `{target_model}`.\n\n"
+                "👉 Use `/models` to view active endpoints or configure keys in OMV WebGUI ➔ **Services ➔ Agent Station ➔ AI Models**.",
                 parse_mode="Markdown"
             )
         else:
-            await status_msg.edit_text(f"❌ Error during AI generation: {e}")
+            await status_msg.edit_text(f"❌ Error during AI generation ({target_model}): {e}")
+
+async def gemini_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Direct shortcut to query Google Gemini Flash."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text("Usage: `/gemini <your prompt>`", parse_mode="Markdown")
+        return
+    context.args = ["-m", "gemini-3.6-flash"] + list(context.args)
+    await chat_cmd(update, context)
+
+async def gpt4_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Direct shortcut to query GitHub Models GPT-4o."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text("Usage: `/gpt4 <your prompt>`", parse_mode="Markdown")
+        return
+    context.args = ["-m", "github-gpt-4o"] + list(context.args)
+    await chat_cmd(update, context)
 
 async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -1297,6 +1345,8 @@ def main():
     app.add_handler(CommandHandler("vault", vault_cmd))
     app.add_handler(CommandHandler("note", note_cmd))
     app.add_handler(CommandHandler("chat", chat_cmd))
+    app.add_handler(CommandHandler("gemini", gemini_cmd))
+    app.add_handler(CommandHandler("gpt4", gpt4_cmd))
     app.add_handler(CommandHandler("task", task_cmd))
     app.add_handler(CommandHandler("claude", claude_cmd))
     app.add_handler(CommandHandler("exec", exec_cmd))

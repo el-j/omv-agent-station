@@ -25,7 +25,7 @@ from telegram.ext import (
     ContextTypes,
 )
 import httpx
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(
@@ -38,24 +38,20 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ALLOWED_USER_ID = os.environ.get("TELEGRAM_ALLOWED_USER_ID")
 LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
-OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
-WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
+LITELLM_KEY = os.environ.get("LITELLM_MASTER_KEY", "sk-omv-secret-master-key")
+WORKSPACE = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT", "/workspace/ObsidianVault"))
 
-# Git Provider & Identity Configuration
-GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
-GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-server.local")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_USER = os.environ.get("GITHUB_GIT_USER", "")
+# Git Credentials Environment
+GIT_BIN = os.environ.get("GIT_BIN", "git")
+GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "Agent Station Bot")
+GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "bot@agentstation.local")
+GITHUB_USER = os.environ.get("GITHUB_USER", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_GIT_TOKEN", "") or os.environ.get("GITHUB_TOKEN", "")
+GITLAB_USER = os.environ.get("GITLAB_USER", "oauth2")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
-BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
-
-GIT_BIN = shutil.which("git") or "/usr/bin/git"
-TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
-UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
-DF_BIN = shutil.which("df") or "/bin/df"
-AIDER_BIN = shutil.which("aider") or "aider"
+BITBUCKET_TOKEN = os.environ.get("BITBUCKET_APP_PASSWORD", "")
 
 # Topic Binding & Custom Commands Storage Files
 TOPICS_FILE = WORKSPACE / ".agent_topics.json"
@@ -65,7 +61,7 @@ OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
 BUILTIN_COMMANDS = {
     "start", "help", "status", "models", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
-    "note", "chat", "task", "claude", "exec", "addcmd", "alias", "delcmd",
+    "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "addcmd", "alias", "delcmd",
     "removecmd", "customcmds", "cmds", "aliases"
 }
 
@@ -95,10 +91,10 @@ def init_git_credentials():
             logger.info("Configured automated git auth for GitLab.")
 
         # Configure automatic auth for Bitbucket
-        if BITBUCKET_USER and BITBUCKET_PASS:
+        if BITBUCKET_USER and BITBUCKET_TOKEN:
             subprocess.run([  # nosec B603,B607
                 GIT_BIN, "config", "--global",
-                f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
+                f"url.https://{BITBUCKET_USER}:{BITBUCKET_TOKEN}@bitbucket.org/.insteadOf",
                 "https://bitbucket.org/"
             ], check=True)
             logger.info("Configured automated git auth for Bitbucket.")
@@ -108,10 +104,11 @@ def init_git_credentials():
 
 init_git_credentials()
 
-# OpenAI Client pointing to local LiteLLM Proxy
-ai_client = OpenAI(
+# Non-blocking Asynchronous OpenAI Client pointing to local LiteLLM Proxy
+ai_client = AsyncOpenAI(
     api_key=LITELLM_KEY,
-    base_url=f"{LITELLM_BASE}/v1"
+    base_url=f"{LITELLM_BASE}/v1",
+    timeout=120.0
 )
 
 # ---------------------------------------------------------------------------
@@ -713,12 +710,25 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m.get("id") for m in data.get("data", [])]
-                model_str = "\n".join([f"• `{m}`" for m in models])
-                await msg.edit_text(
-                    f"✅ *Active AI Model Endpoints:*\n\n{model_str}\n\n"
-                    f"Routing: `coder-fast` | `coder-smart` | `reasoning-heavy`",
-                    parse_mode="Markdown"
-                )
+                if models:
+                    model_str = "\n".join([f"• `{m}`" for m in models])
+                    await msg.edit_text(
+                        f"✅ *Active AI Model Endpoints:*\n\n{model_str}\n\n"
+                        f"Routing: `coder-fast` | `coder-smart` | `reasoning-heavy`",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await msg.edit_text(
+                        "📋 *AI Model Gateway Status*\n\n"
+                        "⚠️ *No AI Model Providers Configured Yet.*\n\n"
+                        "To activate AI models, enter at least one API key in OMV WebGUI:\n"
+                        "👉 *Services ➔ Agent Station ➔ AI Models*\n\n"
+                        "• *Google Gemini (Recommended Free):* [Google AI Studio](https://aistudio.google.com/app/apikey)\n"
+                        "• *GitHub Models (Free Copilot / GPT-4o):* [GitHub Tokens](https://github.com/settings/tokens/new)\n"
+                        "• *Anthropic Direct (Claude 3.7):* [Anthropic Console](https://console.anthropic.com/settings/keys)\n"
+                        "• *DeepSeek / Mistral / OpenRouter*",
+                        parse_mode="Markdown"
+                    )
             else:
                 await msg.edit_text(f"⚠️ LiteLLM returned HTTP {resp.status_code}")
     except Exception as e:
@@ -811,27 +821,93 @@ async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/chat <your question>`")
+        await update.effective_message.reply_text(
+            "💬 *AI Chat Usage:*\n\n"
+            "• `/chat <question>` — Ask with default smart router (`coder-smart`)\n"
+            "• `/chat -m <model> <question>` — Query a specific model\n"
+            "• `/chat @<model> <question>` — Mention a specific model\n"
+            "• `/chat gemini-3.6-flash <question>` — Direct model name\n"
+            "• `/gemini <question>` — Fast Google Gemini 3.6 Flash shortcut\n"
+            "• `/gpt4 <question>` — GitHub Models GPT-4o shortcut\n\n"
+            "Use `/models` to view all available endpoints.",
+            parse_mode="Markdown"
+        )
         return
 
-    query = " ".join(context.args)
-    status_msg = await update.effective_message.reply_text("💭 Thinking...")
+    raw_args = list(context.args)
+    target_model = "coder-smart"
+
+    # Support model flags: -m <model>, --model <model>, --model=<model>, or @<model>
+    if raw_args[0] in ("-m", "--model") and len(raw_args) > 2:
+        target_model = raw_args[1]
+        query = " ".join(raw_args[2:])
+    elif raw_args[0].startswith("--model="):
+        target_model = raw_args[0].split("=", 1)[1]
+        query = " ".join(raw_args[1:])
+    elif raw_args[0].startswith("@"):
+        target_model = raw_args[0][1:]
+        query = " ".join(raw_args[1:])
+    elif len(raw_args) > 1 and raw_args[0] in (
+        "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.7-pro", "gemini-flash-latest",
+        "gemini-2.5-flash", "gemini-2.5-pro", "coder-fast", "coder-smart", "reasoning-heavy",
+        "github-gpt-4o", "github-o1", "github-o3-mini", "github-deepseek-r1", "github-llama-3.3-70b",
+        "claude-3-7-sonnet-direct", "claude-3-5-haiku", "deepseek-chat", "deepseek-reasoner",
+        "codestral", "mistral-large", "openrouter-auto"
+    ):
+        target_model = raw_args[0]
+        query = " ".join(raw_args[1:])
+    else:
+        query = " ".join(raw_args)
+
+    status_msg = await update.effective_message.reply_text(f"💭 Thinking ({target_model})...")
 
     try:
-        response = ai_client.chat.completions.create(
-            model="coder-smart",
+        response = await ai_client.chat.completions.create(
+            model=target_model,
             messages=[
                 {"role": "system", "content": "You are an expert AI software architect and coding assistant on OpenMediaVault."},
                 {"role": "user", "content": query}
             ],
             max_tokens=2048,
         )
-        reply = response.choices[0].message.content
+        reply = response.choices[0].message.content or "*(Empty response)*"
         if len(reply) > 4000:
             reply = reply[:4000] + "\n\n*(Truncated due to Telegram length limit)*"
-        await status_msg.edit_text(reply)
+        try:
+            await status_msg.edit_text(reply, parse_mode="Markdown")
+        except Exception:
+            await status_msg.edit_text(reply)
     except Exception as e:
-        await status_msg.edit_text(f"❌ Error during AI generation: {e}")
+        err_str = str(e)
+        if "Invalid model name" in err_str or "coder-smart" in err_str or "400" in err_str:
+            await status_msg.edit_text(
+                f"⚠️ *Model Unavailable: `{target_model}`*\n\n"
+                f"LiteLLM could not route to `{target_model}`.\n\n"
+                "👉 Use `/models` to view active endpoints or configure keys in OMV WebGUI ➔ **Services ➔ Agent Station ➔ AI Models**.",
+                parse_mode="Markdown"
+            )
+        else:
+            await status_msg.edit_text(f"❌ Error during AI generation ({target_model}): {e}")
+
+async def gemini_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Direct shortcut to query Google Gemini Flash."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text("Usage: `/gemini <your prompt>`", parse_mode="Markdown")
+        return
+    context.args = ["-m", "gemini-3.6-flash"] + list(context.args)
+    await chat_cmd(update, context)
+
+async def gpt4_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Direct shortcut to query GitHub Models GPT-4o."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text("Usage: `/gpt4 <your prompt>`", parse_mode="Markdown")
+        return
+    context.args = ["-m", "github-gpt-4o"] + list(context.args)
+    await chat_cmd(update, context)
 
 async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -900,27 +976,24 @@ async def pull_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     project_name, _ = resolve_project_context(update, context)
     if not project_name:
-        await update.effective_message.reply_text("Usage: `/pull [project-folder-name]`", parse_mode="Markdown")
+        await update.effective_message.reply_text("Usage: `/pull [project-folder-name]`\n\n*(Tip: In a bound Telegram Topic, project name is automatically inferred!)*", parse_mode="Markdown")
         return
 
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ `{project_name}` is not a valid git repository.")
         return
 
     msg = await update.effective_message.reply_text(f"⏳ Pulling latest changes for `{project_name}`...", parse_mode="Markdown")
     try:
-        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-            GIT_BIN, "pull", "--rebase",
-            cwd=str(project_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        proc = await asyncio.create_subprocess_exec(GIT_BIN, "pull", "--rebase", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace")
-        await msg.edit_text(f"📥 *Git Pull Result for `{project_name}`:*\n```\n{out}\n```", parse_mode="Markdown")
+        err = stderr.decode("utf-8", errors="replace")
+        result = (out + "\n" + err).strip() or "Already up to date."
+        await msg.edit_text(f"📥 *Git Pull Result (`{project_name}`):*\n```\n{result}\n```", parse_mode="Markdown")
     except Exception as e:
-        await msg.edit_text(f"❌ Git pull failed: {e}")
+        await msg.edit_text(f"❌ Git pull error: {e}")
 
 async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -933,30 +1006,27 @@ async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ `{project_name}` is not a valid git repository.")
         return
 
     branch = "HEAD"
     if remaining_args:
         valid_branch = sanitize_branch_name(remaining_args[0])
         if not valid_branch:
-            await update.effective_message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            await update.effective_message.reply_text("❌ Invalid branch name format.")
             return
         branch = valid_branch
 
-    msg = await update.effective_message.reply_text(f"⏳ Pushing `{branch}` for `{project_name}` to remote...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"🚀 Pushing `{project_name}` to remote (`{branch}`)...", parse_mode="Markdown")
     try:
-        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-            GIT_BIN, "push", "origin", "--", branch,
-            cwd=str(project_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "origin", "--", branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
-        out = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
-        await msg.edit_text(f"🚀 *Git Push Result for `{project_name}`:*\n```\n{out.strip()}\n```", parse_mode="Markdown")
+        out = stdout.decode("utf-8", errors="replace")
+        err = stderr.decode("utf-8", errors="replace")
+        result = (out + "\n" + err).strip() or "Everything up-to-date"
+        await msg.edit_text(f"🚀 *Git Push Result (`{project_name}`):*\n```\n{result}\n```", parse_mode="Markdown")
     except Exception as e:
-        await msg.edit_text(f"❌ Git push failed: {e}")
+        await msg.edit_text(f"❌ Git push error: {e}")
 
 async def diff_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -969,26 +1039,26 @@ async def diff_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ `{project_name}` is not a valid git repository.")
         return
 
     try:
-        proc_status = await asyncio.create_subprocess_exec(GIT_BIN, "status", "-s", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        status_out, _ = await proc_status.communicate()
-        stat_text = status_out.decode("utf-8", errors="replace").strip() or "Clean working tree (no changes)."
+        stat_proc = await asyncio.create_subprocess_exec(GIT_BIN, "status", "-s", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
+        diff_proc = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
+        stat_out, _ = await stat_proc.communicate()
+        diff_out, _ = await diff_proc.communicate()
 
-        proc_diff = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        diff_out, _ = await proc_diff.communicate()
-        diff_text = diff_out.decode("utf-8", errors="replace").strip() or "No diff recorded."
+        s_text = stat_out.decode("utf-8", errors="replace").strip() or "Working tree clean."
+        d_text = diff_out.decode("utf-8", errors="replace").strip() or "No uncommitted diffs."
 
         await update.effective_message.reply_text(
-            f"🔍 *Git Status & Diff for `{project_name}`:*\n\n"
-            f"📋 *Working Tree:*\n```\n{stat_text}\n```\n\n"
-            f"📊 *Summary:*\n```\n{diff_text}\n```",
+            f"📊 *Git Status & Diff (`{project_name}`)*\n\n"
+            f"*Status:*\n```\n{s_text}\n```\n"
+            f"*Diff Summary:*\n```\n{d_text}\n```",
             parse_mode="Markdown"
         )
     except Exception as e:
-        await update.effective_message.reply_text(f"❌ Error inspecting git diff: {e}")
+        await update.effective_message.reply_text(f"❌ Error getting git diff: {e}")
 
 async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -1001,22 +1071,24 @@ async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ `{project_name}` is not a valid git repository.")
         return
 
     if not remaining_args:
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "branch", "-a", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        out, _ = await proc.communicate()
-        await update.effective_message.reply_text(f"🌿 *Branches in `{project_name}`:*\n```\n{out.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
+        stdout, _ = await proc.communicate()
+        branches = stdout.decode("utf-8", errors="replace").strip()
+        await update.effective_message.reply_text(f"🌿 *Branches for `{project_name}`:*\n```\n{branches}\n```", parse_mode="Markdown")
     else:
         new_branch = sanitize_branch_name(remaining_args[0])
         if not new_branch:
-            await update.effective_message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            await update.effective_message.reply_text("❌ Invalid branch name format.")
             return
+
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", new_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
-            await update.effective_message.reply_text(f"✅ Switched to branch `{new_branch}` in `{project_name}`.", parse_mode="Markdown")
+            await update.effective_message.reply_text(f"🌿 Switched to branch `{new_branch}` in project `{project_name}`.", parse_mode="Markdown")
         else:
             await update.effective_message.reply_text(f"❌ Branch switch failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
 
@@ -1181,10 +1253,17 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(reply, parse_mode="Markdown")
         else:
             combined = (out + "\n" + err).strip()
-            if "login" in combined.lower() or "auth" in combined.lower():
+            if "login" in combined.lower() or "auth" in combined.lower() or "input must be provided" in combined.lower():
                 await msg.edit_text(
-                    "🔑 *Claude.ai Authentication Required*\n\n"
-                    "Please open your Web Terminal (`:7681`) or run `/exec claude` once to complete browser OAuth login with your `claude.ai` subscription!",
+                    "🔑 *Claude Code Authentication Required*\n\n"
+                    "To link your Claude account for autonomous coding:\n\n"
+                    "👉 *Option 1: 1-Click Browser OAuth (Claude.ai Subscription / Free)*\n"
+                    "1. Open your Web Terminal: `http://<your-omv-ip>:7681`\n"
+                    "2. Login with `admin` / your password\n"
+                    "3. Type `claude` and press Enter\n"
+                    "4. Complete browser authentication (shared forever across bot and terminal!)\n\n"
+                    "👉 *Option 2: Direct API Key*\n"
+                    "Enter your `anthropic_api_key` in OMV WebGUI ➔ *Services ➔ Agent Station ➔ AI Models*.",
                     parse_mode="Markdown"
                 )
             else:
@@ -1203,6 +1282,17 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     cmd = " ".join(context.args)
+    if cmd.strip() == "claude" or cmd.strip().startswith("claude login") or cmd.strip().startswith("claude auth"):
+        await update.effective_message.reply_text(
+            "ℹ️ *Interactive Terminal Required for Claude Login*\n\n"
+            "Claude OAuth login requires an interactive browser terminal to approve the login URL.\n\n"
+            "👉 Please open your Web Terminal:\n"
+            "🔗 `http://<your-omv-ip>:7681` (Port 7681)\n\n"
+            "Type `claude` in the browser terminal to log in once. Your session will be saved permanently for Telegram `/claude` and `/task` commands!",
+            parse_mode="Markdown"
+        )
+        return
+
     msg = await update.effective_message.reply_text(f"⏳ Executing: `{cmd}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_shell(  # nosec B602
@@ -1255,6 +1345,8 @@ def main():
     app.add_handler(CommandHandler("vault", vault_cmd))
     app.add_handler(CommandHandler("note", note_cmd))
     app.add_handler(CommandHandler("chat", chat_cmd))
+    app.add_handler(CommandHandler("gemini", gemini_cmd))
+    app.add_handler(CommandHandler("gpt4", gpt4_cmd))
     app.add_handler(CommandHandler("task", task_cmd))
     app.add_handler(CommandHandler("claude", claude_cmd))
     app.add_handler(CommandHandler("exec", exec_cmd))

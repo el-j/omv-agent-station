@@ -12,15 +12,27 @@
 
 model_list:
   # ----------------------------------------------------------------------------
-  # TIER 1: GOOGLE AI STUDIO (Gemini 3.7 & 2.5 Workhorse Models)
+  # TIER 1: GOOGLE AI STUDIO (Gemini 3.6, 3.7 & 2.5 Workhorse Models)
   # Docs: https://ai.google.dev/gemini-api/docs/models/gemini
   # ----------------------------------------------------------------------------
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 1000
+      tpm: 4000000
+
   - model_name: gemini-3.7-flash
     litellm_params:
       model: gemini/gemini-3.7-flash
       api_key: os.environ/GEMINI_API_KEY
       rpm: 1000
       tpm: 4000000
+
+  - model_name: gemini-flash-latest
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GEMINI_API_KEY
 
   - model_name: gemini-3.7-pro
     litellm_params:
@@ -153,11 +165,15 @@ model_list:
   # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)
   - model_name: coder-fast
     litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-fast
+    litellm_params:
       model: gemini/gemini-3.7-flash
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-fast
     litellm_params:
-      model: gemini/gemini-2.5-flash
+      model: gemini/gemini-flash-latest
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-fast
     litellm_params:
@@ -167,11 +183,15 @@ model_list:
   # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
   - model_name: coder-smart
     litellm_params:
-      model: gemini/gemini-3.7-pro
+      model: gemini/gemini-3.6-flash
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-smart
     litellm_params:
       model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.7-pro
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-smart
     litellm_params:
@@ -191,6 +211,10 @@ model_list:
       vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
 
   # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
       model: gemini/gemini-3.7-pro
