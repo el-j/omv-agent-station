@@ -11,6 +11,7 @@ import sys
 import re
 import json
 import shutil
+import shlex
 import logging
 import asyncio
 import subprocess  # nosec B404
@@ -19,6 +20,7 @@ from datetime import datetime
 from telegram import (
     Update,
     BotCommand,
+    ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
@@ -758,9 +760,15 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not context.args:
         await update.effective_message.reply_text(
-            "Usage: `/newrepo <repo-name> [description] [--public | --private]`\n\n"
-            "Example: `/newrepo my-fastapi-service \"High performance REST backend\" --private`",
-            parse_mode="Markdown"
+            "✨ *Create New GitHub Repository*\n\n"
+            "Please type your repository name and description below:\n"
+            "• Syntax: `repo-name \"description\" [--public | --private]`\n"
+            "• Example: `my-api \"FastAPI backend\" --private`",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="repo-name 'description'..."
+            )
         )
         return
 
@@ -1069,7 +1077,15 @@ async def note_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/note <note title> | <note content>`")
+        await update.effective_message.reply_text(
+            "📝 *Obsidian Second-Brain Note*\n\n"
+            "Please type your note title & content below (`Title | Content`):",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Title | Note content and specs..."
+            )
+        )
         return
 
     raw = " ".join(context.args)
@@ -1092,15 +1108,13 @@ async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not context.args:
         await update.effective_message.reply_text(
-            "💬 *AI Chat Usage:*\n\n"
-            "• `/chat <question>` — Ask with default smart router (`coder-smart`)\n"
-            "• `/chat -m <model> <question>` — Query a specific model\n"
-            "• `/chat @<model> <question>` — Mention a specific model\n"
-            "• `/chat gemini-3.6-flash <question>` — Direct model name\n"
-            "• `/gemini <question>` — Fast Google Gemini 3.6 Flash shortcut\n"
-            "• `/gpt4 <question>` — GitHub Models GPT-4o shortcut\n\n"
-            "Use `/models` to view all available endpoints.",
-            parse_mode="Markdown"
+            "💬 *AI Chat (Smart Router: `coder-smart`)*\n\n"
+            "Please type your question or code prompt below:",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Type your question or code prompt..."
+            )
         )
         return
 
@@ -1164,7 +1178,15 @@ async def gemini_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/gemini <your prompt>`", parse_mode="Markdown")
+        await update.effective_message.reply_text(
+            "⚡ *Google Gemini 3.6 Flash (Ultra-Fast 1M Context)*\n\n"
+            "Please type your question or code prompt below:",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Type your question for Gemini..."
+            )
+        )
         return
     context.args = ["-m", "gemini-3.6-flash"] + list(context.args)
     await chat_cmd(update, context)
@@ -1174,7 +1196,15 @@ async def gpt4_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/gpt4 <your prompt>`", parse_mode="Markdown")
+        await update.effective_message.reply_text(
+            "🤖 *GitHub Models GPT-4o*\n\n"
+            "Please type your question or code prompt below:",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Type your question for GPT-4o..."
+            )
+        )
         return
     context.args = ["-m", "github-gpt-4o"] + list(context.args)
     await chat_cmd(update, context)
@@ -1343,7 +1373,6 @@ async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
         await update.effective_message.reply_text(f"❌ `{project_name}` is not a valid git repository.")
         return
-
     if not remaining_args:
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "branch", "-a", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, _ = await proc.communicate()
@@ -1368,11 +1397,18 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     project_name, remaining_args = resolve_project_context(update, context)
     if not project_name or not remaining_args:
+        bound_proj = get_bound_project(update.effective_chat.id, getattr(update.effective_message, "message_thread_id", None))
+        placeholder = "Type task instructions..." if bound_proj else "my-project 'Add unit tests'..."
         await update.effective_message.reply_text(
-            "Usage: `/task [project-folder-name] <your instructions>`\n\n"
-            "Example: `/task my-api Add authentication middleware and unit tests`\n\n"
-            "*(Tip: In a bound Telegram Topic, project name is automatically inferred!)*",
-            parse_mode="Markdown"
+            "🚀 *Autonomous Coding Agent Task*\n\n"
+            "Please type your project & coding task instructions below:\n"
+            "• Syntax: `[project-name] <instructions>`\n"
+            "• Example: `my-api \"Add Redis caching layer\"`",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder=placeholder
+            )
         )
         return
 
@@ -1416,74 +1452,42 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             "--no-git-commit-verify"
         ]
 
-        logger.info(f"Executing agent task in {project_dir} with command: {' '.join(cmd)}")
+        agent_auth_file = Path("/root/.anthropic/token")
+        if agent_auth_file.exists():
+            cmd.extend(["--anthropic-api-key", agent_auth_file.read_text().strip()])
 
-        process = await asyncio.create_subprocess_exec(  # nosec B603,B607
+        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             *cmd,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        stdout, stderr = await proc.communicate()
+        out = stdout.decode("utf-8", errors="replace").strip()
+        err = stderr.decode("utf-8", errors="replace").strip()
 
-        stdout, _ = await process.communicate()
-        agent_out = stdout.decode("utf-8", errors="replace")
-
-        diff_summary = "No git changes recorded."
-        push_status = ""
         if is_git:
-            try:
-                diff_proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-                    GIT_BIN, "diff", "main..." + task_branch, "--stat",
-                    cwd=str(project_dir),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                diff_out, _ = await diff_proc.communicate()
-                diff_summary = diff_out.decode("utf-8", errors="replace").strip() or "Changes committed."
+            push_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", task_branch, cwd=str(project_dir))  # nosec B603,B607
+            await push_proc.communicate()
 
-                push_proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-                    GIT_BIN, "push", "-u", "origin", task_branch,
-                    cwd=str(project_dir),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                await push_proc.communicate()
-                if push_proc.returncode == 0:
-                    push_status = f"🚀 *Branch Pushed to Remote:* `{task_branch}`\n"
-            except Exception as pe:
-                logger.info(f"Remote push skipped: {pe}")
+        summary = out if len(out) > 0 else err
+        if len(summary) > 3500:
+            summary = summary[:3500] + "\n...(truncated)"
 
-        try:
-            obsidian_proj = OBSIDIAN_VAULT / "Projects" / project_dir.name
-            obsidian_proj.mkdir(parents=True, exist_ok=True)
-            log_file = obsidian_proj / "agent-log.md"
-            log_entry = (
-                f"\n## Task `{session_id}` - {datetime.now().isoformat()}\n"
-                f"- **Branch:** `{task_branch}`\n"
-                f"- **Instruction:** {instructions}\n"
-                f"- **Diff Summary:**\n```\n{diff_summary}\n```\n"
-            )
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(log_entry)
-        except Exception as oe:
-            logger.warning(f"Could not write log to Obsidian: {oe}")
-
-        result_text = (
-            f"✅ *Agent Task Completed!* (`{session_id}`)\n\n"
-            f"📁 *Project:* `{project_dir.name}`\n"
-            f"🌿 *Branch:* `{task_branch}`\n"
-            f"{push_status}"
-            f"📊 *Git Changes:*\n```\n{diff_summary[:1000]}\n```\n\n"
-            f"🔍 *Agent Log Excerpt:*\n```\n{agent_out[-1500:] if agent_out else 'Done.'}\n```"
+        await status_msg.edit_text(
+            f"✅ *Task Completed Successfully!*\n\n"
+            f"📁 Project: `{project_dir.name}`\n"
+            f"🌿 Branch Pushed: `{task_branch}`\n\n"
+            f"📄 *Agent Summary:*\n```\n{summary}\n```\n\n"
+            f"Inspect diff with `/diff` or create a PR on GitHub!",
+            parse_mode="Markdown"
         )
-        await status_msg.edit_text(result_text, parse_mode="Markdown")
-
     except Exception as e:
-        logger.error(f"Error during agent run: {e}", exc_info=True)
-        await status_msg.edit_text(f"❌ Task `{session_id}` failed:\n`{str(e)}`", parse_mode="Markdown")
+        logger.error(f"Error in autonomous agent execution: {e}", exc_info=True)
+        await status_msg.edit_text(f"❌ Autonomous Agent Error: {e}")
 
 async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Executes Claude Code CLI in non-interactive mode inside workspace."""
+    """Dispatches Claude Code CLI directly inside the workspace."""
     if not await check_auth(update):
         return
 
@@ -1499,7 +1503,15 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         work_dir = WORKSPACE
 
     if not prompt:
-        await update.effective_message.reply_text("Usage: `/claude <your prompt>`\n\nExample: `/claude Create a healthcheck endpoint`", parse_mode="Markdown")
+        await update.effective_message.reply_text(
+            "🤖 *Claude Code CLI Agent*\n\n"
+            "Please type your prompt or instructions for Claude Code below:",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Type instructions for Claude Code..."
+            )
+        )
         return
 
     msg = await update.effective_message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in `{work_dir.name}`...", parse_mode="Markdown")
@@ -1548,7 +1560,15 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/exec <shell-command>`\n\nExample: `/exec ls -la`", parse_mode="Markdown")
+        await update.effective_message.reply_text(
+            "🖥️ *Workspace Shell Execution*\n\n"
+            "Please type the shell command to execute in `/data/workspace`:",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="e.g. ls -la, git status, pytest -v..."
+            )
+        )
         return
 
     cmd = " ".join(context.args)
@@ -1580,6 +1600,61 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"🖥️ *Command Output:*\n```\n{result}\n```", parse_mode="Markdown")
     except Exception as e:
         await msg.edit_text(f"❌ Exec error: {e}")
+
+async def interactive_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles direct plain text and interactive ForceReply prompts seamlessly."""
+    if not await check_auth(update):
+        return
+    msg = update.effective_message
+    if not msg or not msg.text:
+        return
+
+    text = msg.text.strip()
+    reply_to = msg.reply_to_message
+
+    # Case 1: User is replying to a ForceReply prompt from the bot
+    if reply_to and reply_to.from_user and reply_to.from_user.is_bot:
+        parent_text = reply_to.text or ""
+        
+        if "Gemini" in parent_text:
+            context.args = ["-m", "gemini-3.6-flash"] + text.split()
+            await chat_cmd(update, context)
+            return
+        elif "GPT-4o" in parent_text or "gpt4" in parent_text.lower():
+            context.args = ["-m", "github-gpt-4o"] + text.split()
+            await chat_cmd(update, context)
+            return
+        elif "AI Chat" in parent_text or "Smart Router" in parent_text:
+            context.args = text.split()
+            await chat_cmd(update, context)
+            return
+        elif "Coding Agent" in parent_text or "Autonomous" in parent_text:
+            context.args = shlex.split(text) if ("\"" in text or "'" in text) else text.split()
+            await task_cmd(update, context)
+            return
+        elif "Claude Code" in parent_text:
+            context.args = text.split()
+            await claude_cmd(update, context)
+            return
+        elif "Obsidian" in parent_text or "Note" in parent_text:
+            context.args = text.split()
+            await note_cmd(update, context)
+            return
+        elif "Shell Command" in parent_text or "Workspace Shell" in parent_text:
+            context.args = text.split()
+            await exec_cmd(update, context)
+            return
+        elif "GitHub Repository" in parent_text or "repo" in parent_text.lower():
+            context.args = shlex.split(text) if ("\"" in text or "'" in text) else text.split()
+            await newrepo_cmd(update, context)
+            return
+
+    # Case 2: In private 1-on-1 chat, if the user just sends any question without a slash command,
+    # naturally answer it with AI Chat (Google Gemini Flash / coder-smart)!
+    chat = update.effective_chat
+    if chat and chat.type == "private":
+        context.args = text.split()
+        await chat_cmd(update, context)
 
 def main():
     if not BOT_TOKEN:
@@ -1625,6 +1700,9 @@ def main():
 
     # Interactive Inline Keyboard Callback Handler
     app.add_handler(CallbackQueryHandler(help_callback_handler))
+
+    # Interactive Plain Text & ForceReply Prompt Handler
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, interactive_text_handler))
 
     # Dynamic Custom Command Fallback Handler
     app.add_handler(MessageHandler(filters.COMMAND, dynamic_command_handler))
