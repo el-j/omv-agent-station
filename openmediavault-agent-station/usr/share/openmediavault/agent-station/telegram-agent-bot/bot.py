@@ -340,8 +340,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.effective_message.reply_text(welcome_text, parse_mode="Markdown")
 
-async def sync_bot_commands(bot):
+async def sync_bot_commands(target):
     """Registers built-in and user custom commands for Telegram auto-complete menu."""
+    bot = target.bot if hasattr(target, "bot") else target
     commands = [
         BotCommand("chat", "💬 Ask AI (smart router or specific model)"),
         BotCommand("gemini", "⚡ Quick ask Google Gemini 3.6 Flash"),
