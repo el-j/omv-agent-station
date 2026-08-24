@@ -17,7 +17,7 @@ data:
         value: false
       - type: divider
         title: _("LiteLLM Proxy Security")
-      - type: textInput
+      - type: passwordInput
         name: litellm_master_key
         label: _("LiteLLM Proxy Master Key")
         value: ""
@@ -27,7 +27,7 @@ data:
         name: terminal_user
         label: _("Web Terminal Username")
         value: ""
-      - type: textInput
+      - type: passwordInput
         name: terminal_pass
         label: _("Web Terminal Password")
         value: ""

@@ -6,6 +6,7 @@ services:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-proxy
     restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
     ports:
       - "4000:4000"
     environment:

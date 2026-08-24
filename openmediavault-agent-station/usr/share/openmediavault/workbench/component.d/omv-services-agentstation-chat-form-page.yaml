@@ -39,7 +39,7 @@ data:
         name: enable_telegram
         label: _("Enable Telegram Bot")
         value: false
-      - type: textInput
+      - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
         value: ""
@@ -71,7 +71,7 @@ data:
         name: enable_discord
         label: _("Enable Discord Bot")
         value: false
-      - type: textInput
+      - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")
         value: ""

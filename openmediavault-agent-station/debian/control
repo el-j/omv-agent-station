@@ -1,5 +1,5 @@
 Package: openmediavault-agent-station
-Version: 0.0.2-alpha.26
+Version: 0.0.2-alpha.27
 Section: net
 Priority: optional
 Architecture: all
