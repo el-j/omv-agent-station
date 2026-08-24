@@ -3,4 +3,6 @@ type: route
 data:
   url: "/services/agentstation/security"
   title: _("Security & Web Access")
+  editing: true
+  notificationTitle: _("Security settings saved.")
   component: omv-services-agentstation-security-form-page

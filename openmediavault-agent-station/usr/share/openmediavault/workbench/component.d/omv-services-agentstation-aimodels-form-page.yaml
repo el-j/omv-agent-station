@@ -17,60 +17,73 @@ data:
       - type: checkbox
         name: enable_aimodels
         label: _("Enable AI Models Provider Routing")
+        value: false
         hint: _("Master switch for LiteLLM multi-provider LLM gateway and automated fallback routing")
       - type: divider
         title: _("Google AI Studio (Gemini 3.7 Pro, 2.5 Pro & Flash - Recommended Free)")
       - type: checkbox
         name: enable_gemini
         label: _("Enable Google Gemini Provider")
+        value: false
       - type: passwordInput
         name: gemini_api_key
         label: _("Google AI Studio API Key")
+        value: ""
         hint: _("Paste your Gemini API key obtained from Google AI Studio")
       - type: divider
         title: _("GitHub Models (Copilot Pro / GPT-4o, o1, DeepSeek-R1 - Included in Copilot)")
       - type: checkbox
         name: enable_github_models
         label: _("Enable GitHub Models Provider")
+        value: false
       - type: passwordInput
         name: github_token
         label: _("GitHub Personal Access Token")
+        value: ""
         hint: _("Paste your GitHub token for GitHub Models API access")
       - type: divider
         title: _("Mistral AI (Codestral & Mistral Large)")
       - type: checkbox
         name: enable_mistral
         label: _("Enable Mistral AI Provider")
+        value: false
       - type: passwordInput
         name: mistral_api_key
         label: _("Mistral API Key")
+        value: ""
         hint: _("Paste your Mistral API key from console.mistral.ai")
       - type: divider
         title: _("OpenRouter / Z.AI (Universal Model Aggregator)")
       - type: checkbox
         name: enable_openrouter
         label: _("Enable OpenRouter / Z.AI Provider")
+        value: false
       - type: passwordInput
         name: openrouter_api_key
         label: _("OpenRouter / Z.AI API Key")
+        value: ""
         hint: _("Paste your OpenRouter key from openrouter.ai/keys")
       - type: divider
         title: _("DeepSeek Direct API (DeepSeek-V3 & DeepSeek-R1)")
       - type: checkbox
         name: enable_deepseek
         label: _("Enable DeepSeek Direct Provider")
+        value: false
       - type: passwordInput
         name: deepseek_api_key
         label: _("DeepSeek API Key")
+        value: ""
         hint: _("Paste your DeepSeek API key from platform.deepseek.com")
       - type: divider
         title: _("Anthropic Direct API (Claude 3.7 Sonnet & 3.5)")
       - type: checkbox
         name: enable_anthropic
         label: _("Enable Anthropic Claude Provider")
+        value: false
       - type: passwordInput
         name: anthropic_api_key
         label: _("Anthropic API Key")
+        value: ""
         hint: _("Paste your Anthropic developer API key from console.anthropic.com")
     buttons:
       - template: submit

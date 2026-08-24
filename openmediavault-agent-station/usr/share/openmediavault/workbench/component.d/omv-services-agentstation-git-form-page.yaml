@@ -17,48 +17,59 @@ data:
       - type: checkbox
         name: enable_git
         label: _("Enable Automated Git Versioning & Sync")
+        value: false
         hint: _("Master switch for automated git commits, second-brain versioning, and remote repository sync")
       - type: divider
         title: _("Git Committer Identity")
       - type: textInput
         name: git_author_name
         label: _("Git Author Name")
+        value: ""
       - type: textInput
         name: git_author_email
         label: _("Git Author Email")
+        value: ""
       - type: divider
         title: _("GitHub Integration (Recommended)")
       - type: checkbox
         name: enable_github
         label: _("Enable GitHub Repository Sync")
+        value: false
       - type: textInput
         name: github_git_user
         label: _("GitHub Username or Organization")
+        value: ""
         hint: _("Your GitHub account handle (e.g. el-j)")
       - type: passwordInput
         name: github_git_token
         label: _("GitHub Personal Access Token (PAT)")
+        value: ""
         hint: _("Paste your GitHub token generated from the link above")
       - type: divider
         title: _("GitLab Integration")
       - type: checkbox
         name: enable_gitlab
         label: _("Enable GitLab Repository Sync")
+        value: false
       - type: passwordInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
+        value: ""
         hint: _("Paste your GitLab token generated from the link above")
       - type: divider
         title: _("Bitbucket Cloud Integration")
       - type: checkbox
         name: enable_bitbucket
         label: _("Enable Bitbucket Repository Sync")
+        value: false
       - type: textInput
         name: bitbucket_username
         label: _("Bitbucket Username")
+        value: ""
       - type: passwordInput
         name: bitbucket_app_password
         label: _("Bitbucket App Password")
+        value: ""
         hint: _("Paste your Bitbucket App Password generated from the link above")
     buttons:
       - template: submit

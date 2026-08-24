@@ -17,10 +17,12 @@ data:
       - type: checkbox
         name: enable_chat
         label: _("Enable Remote Messenger Relay")
+        value: false
         hint: _("Master switch for interactive chat bots controlling your coding workspace")
       - type: select
         name: chat_service
         label: _("Primary Active Messenger Relay")
+        value: "telegram"
         hint: _("Choose which chat application acts as the primary interactive agent controller")
         options:
           - value: "telegram"
@@ -36,39 +38,48 @@ data:
       - type: checkbox
         name: enable_telegram
         label: _("Enable Telegram Bot")
+        value: false
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
+        value: ""
         hint: _("Paste your BotFather HTTP API bot token")
       - type: textInput
         name: telegram_allowed_user_id
         label: _("Allowed Telegram Numeric User ID")
+        value: ""
         hint: _("Paste your numeric user ID from @userinfobot (Restricts bot strictly to you)")
       - type: divider
         title: _("Signal Messenger Configuration")
       - type: checkbox
         name: enable_signal
         label: _("Enable Signal Messenger")
+        value: false
       - type: textInput
         name: signal_phone_number
         label: _("Signal Bot Phone / Linked Number")
+        value: ""
         hint: _("Server Signal number or linked device number")
       - type: textInput
         name: signal_allowed_phone_number
         label: _("Allowed Personal Signal Number")
+        value: ""
         hint: _("Your personal phone number (e.g. +491701234567)")
       - type: divider
         title: _("Discord Bot Configuration")
       - type: checkbox
         name: enable_discord
         label: _("Enable Discord Bot")
+        value: false
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")
+        value: ""
         hint: _("Paste your Discord Bot token from Developer Portal")
       - type: textInput
         name: discord_allowed_user_id
         label: _("Allowed Discord User ID")
+        value: ""
         hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
     buttons:
       - template: submit

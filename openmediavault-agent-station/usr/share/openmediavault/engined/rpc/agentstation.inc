@@ -97,9 +97,23 @@ class AgentStation extends ServiceAbstract
             $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
         }
 
+        // Boolean fields that need proper type casting from Angular Formly
+        $booleanFields = [
+            "enable", "enable_aimodels", "enable_gemini", "enable_anthropic",
+            "enable_github_models", "enable_mistral", "enable_openrouter",
+            "enable_deepseek", "enable_git", "enable_github", "enable_gitlab",
+            "enable_bitbucket", "enable_chat", "enable_telegram", "enable_signal",
+            "enable_discord", "enable_security"
+        ];
+
         $sanitized = [];
         foreach ($params as $k => $v) {
-            $sanitized[$k] = ($v === null) ? "" : $v;
+            if (in_array($k, $booleanFields)) {
+                // Cast to proper boolean: true/false/"true"/"1"/1 -> true, everything else -> false
+                $sanitized[$k] = filter_var($v, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+            } else {
+                $sanitized[$k] = ($v === null) ? "" : $v;
+            }
         }
 
         $config = array_merge($existing, $sanitized);

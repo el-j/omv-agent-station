@@ -17,21 +17,15 @@ data:
       - type: checkbox
         name: enable
         label: _("Enable Agent Station Engine")
+        value: false
         hint: _("Master switch to start/stop the AI Agent Station docker stack. When enabled, core containers are provisioned in the background.")
       - type: textInput
         name: data_dir
         label: _("Workspace Data Directory")
+        value: "/srv/dev-data"
         hint: _("Storage path for Obsidian notes, code repositories, and workspace files (e.g. /srv/dev-data)")
       - type: divider
         title: _("Service Credentials and Port Overview - Web Terminal (Port 7681) | LiteLLM (Port 4000) | Syncthing (Port 8384)")
     buttons:
       - template: submit
-        execute:
-          type: request
-          request:
-            service: AgentStation
-            method: setSettings
-            params:
-              enable: "{{ _routeConfig.data.enable }}"
-          notification: _("Agent Station settings saved. Service is starting in the background.")
       - template: cancel
