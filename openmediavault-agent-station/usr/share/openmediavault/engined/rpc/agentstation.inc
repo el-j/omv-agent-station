@@ -39,12 +39,17 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
+        $data = [];
         if (file_exists(self::CONFIG_PATH)) {
             $data = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
-        } elseif (file_exists("/etc/openmediavault-ai-orchestrator.json")) {
+        }
+        // Fallback to persistent storage backup if primary config is empty/missing
+        if (empty($data) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
+            $data = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
+        }
+        // Legacy migration fallback
+        if (empty($data) && file_exists("/etc/openmediavault-ai-orchestrator.json")) {
             $data = json_decode(file_get_contents("/etc/openmediavault-ai-orchestrator.json"), true) ?: [];
-        } else {
-            $data = [];
         }
 
         return [
@@ -57,6 +62,12 @@ class AgentStation extends ServiceAbstract
             "anthropic_api_key" => (string)($data["anthropic_api_key"] ?? ""),
             "enable_github_models" => (bool)($data["enable_github_models"] ?? true),
             "github_token" => (string)($data["github_token"] ?? ""),
+            "enable_mistral" => (bool)($data["enable_mistral"] ?? false),
+            "mistral_api_key" => (string)($data["mistral_api_key"] ?? ""),
+            "enable_openrouter" => (bool)($data["enable_openrouter"] ?? false),
+            "openrouter_api_key" => (string)($data["openrouter_api_key"] ?? ""),
+            "enable_deepseek" => (bool)($data["enable_deepseek"] ?? false),
+            "deepseek_api_key" => (string)($data["deepseek_api_key"] ?? ""),
             "enable_git" => (bool)($data["enable_git"] ?? true),
             "git_author_name" => (string)($data["git_author_name"] ?? "OMV AI Agent"),
             "git_author_email" => (string)($data["git_author_email"] ?? "agent@omv-box.local"),
@@ -96,6 +107,12 @@ class AgentStation extends ServiceAbstract
         if (file_exists(self::CONFIG_PATH)) {
             $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
         }
+        if (empty($existing) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
+            $existing = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
+        }
+        if (empty($existing) && file_exists("/etc/openmediavault-ai-orchestrator.json")) {
+            $existing = json_decode(file_get_contents("/etc/openmediavault-ai-orchestrator.json"), true) ?: [];
+        }
 
         // Boolean fields that need proper type casting from Angular Formly
         $booleanFields = [
@@ -106,11 +123,25 @@ class AgentStation extends ServiceAbstract
             "enable_discord", "enable_security"
         ];
 
+        // Sensitive secret/password fields: if submitted empty and an existing non-empty value exists, preserve it!
+        $secretFields = [
+            "gemini_api_key", "anthropic_api_key", "github_token", "github_git_token",
+            "gitlab_token", "bitbucket_app_password", "mistral_api_key", "openrouter_api_key",
+            "deepseek_api_key", "telegram_bot_token", "discord_bot_token", "litellm_master_key",
+            "terminal_pass"
+        ];
+
         $sanitized = [];
         foreach ($params as $k => $v) {
             if (in_array($k, $booleanFields)) {
                 // Cast to proper boolean: true/false/"true"/"1"/1 -> true, everything else -> false
                 $sanitized[$k] = filter_var($v, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+            } elseif (in_array($k, $secretFields)) {
+                if (($v === null || $v === "") && !empty($existing[$k])) {
+                    $sanitized[$k] = (string)$existing[$k];
+                } else {
+                    $sanitized[$k] = (string)($v ?? "");
+                }
             } else {
                 $sanitized[$k] = ($v === null) ? "" : $v;
             }
@@ -119,6 +150,15 @@ class AgentStation extends ServiceAbstract
         $config = array_merge($existing, $sanitized);
 
         file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
+        @chmod(self::CONFIG_PATH, 0600);
+
+        // Persistent storage backup
+        $dataDir = (string)($config["data_dir"] ?? self::DEFAULT_DATA_DIR);
+        if (!empty($dataDir)) {
+            @mkdir($dataDir . "/config", 0755, true);
+            @file_put_contents($dataDir . "/config/agent-station.json", json_encode($config, JSON_PRETTY_PRINT));
+            @chmod($dataDir . "/config/agent-station.json", 0600);
+        }
 
         // Call omv-agent-station apply-bg asynchronously so response returns immediately (<50ms)
         if (file_exists("/usr/sbin/omv-agent-station")) {

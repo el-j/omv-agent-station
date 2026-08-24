@@ -67,12 +67,31 @@ rm -f /usr/share/openmediavault/workbench/component.d/*agentstation* \
 mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
+# Backup existing user configuration to persistent storage before upgrade
+mkdir -p /srv/dev-data/config 2>/dev/null || true
+if [ -s "/etc/openmediavault-agent-station.json" ]; then
+    cp -f "/etc/openmediavault-agent-station.json" "/srv/dev-data/config/agent-station.json" 2>/dev/null || true
+elif [ -s "/etc/openmediavault-ai-orchestrator.json" ]; then
+    cp -f "/etc/openmediavault-ai-orchestrator.json" "/srv/dev-data/config/agent-station.json" 2>/dev/null || true
+fi
+
 echo "📦 Installing .deb package via apt / dpkg..."
 DEB_PKG=$(ls -1 openmediavault-agent-station_*.deb openmediavault-ai-orchestrator_*.deb 2>/dev/null | head -n1)
 if ! apt-get install -y --reinstall "./$DEB_PKG"; then
     echo "⚠️ Apt direct install encountered a dependency preference issue; applying with dpkg + fix-broken..."
     dpkg -i --force-depends "./$DEB_PKG" || true
     apt-get install -f -y || true
+fi
+
+# Restore configuration from persistent storage if needed
+if [ ! -s "/etc/openmediavault-agent-station.json" ] && [ -s "/srv/dev-data/config/agent-station.json" ]; then
+    cp -f "/srv/dev-data/config/agent-station.json" "/etc/openmediavault-agent-station.json" 2>/dev/null || true
+    chmod 600 "/etc/openmediavault-agent-station.json" 2>/dev/null || true
+fi
+
+# Regenerate .env from restored config
+if command -v omv-agent-station >/dev/null 2>&1; then
+    omv-agent-station write-env 2>/dev/null || true
 fi
 
 # Process any pending dpkg triggers (compiles workbench and restarts engined cleanly)

@@ -40,7 +40,7 @@ data:
         label: _("GitHub Username or Organization")
         value: ""
         hint: _("Your GitHub account handle (e.g. el-j)")
-      - type: passwordInput
+      - type: textInput
         name: github_git_token
         label: _("GitHub Personal Access Token (PAT)")
         value: ""
@@ -51,7 +51,7 @@ data:
         name: enable_gitlab
         label: _("Enable GitLab Repository Sync")
         value: false
-      - type: passwordInput
+      - type: textInput
         name: gitlab_token
         label: _("GitLab Personal Access Token")
         value: ""
@@ -66,7 +66,8 @@ data:
         name: bitbucket_username
         label: _("Bitbucket Username")
         value: ""
-      - type: passwordInput
+        hint: _("Your Bitbucket username")
+      - type: textInput
         name: bitbucket_app_password
         label: _("Bitbucket App Password")
         value: ""

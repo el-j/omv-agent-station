@@ -41,6 +41,17 @@ run_compose() {
 }
 
 write_env_file() {
+    # Check if primary config is missing or empty, but persistent storage backup exists
+    if [ ! -s "$CONFIG_FILE" ] && [ -s "/srv/dev-data/config/agent-station.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/srv/dev-data/config/agent-station.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    elif [ ! -s "$CONFIG_FILE" ] && [ -s "/etc/openmediavault-ai-orchestrator.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/etc/openmediavault-ai-orchestrator.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
     if [ ! -f "$CONFIG_FILE" ]; then
         mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
         cat <<'EOF' > "$CONFIG_FILE"
