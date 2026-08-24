@@ -3,7 +3,7 @@
 Telegram Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8
 Provides remote command execution, autonomous coding agent dispatch (Hermes/Aider/Claude Code),
 Obsidian second-brain integration, LiteLLM gateway telemetry, GitHub repo creation,
-and Telegram Forum Topics (project-scoped sub-channels).
+Telegram Forum Topics (project-scoped sub-channels), and User-Defined Dynamic Custom Commands.
 """
 
 import os
@@ -20,6 +20,8 @@ from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
+    MessageHandler,
+    filters,
     ContextTypes,
 )
 import httpx
@@ -55,8 +57,17 @@ UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
 DF_BIN = shutil.which("df") or "/bin/df"
 AIDER_BIN = shutil.which("aider") or "aider"
 
-# Topic Binding Storage file
+# Topic Binding & Custom Commands Storage Files
 TOPICS_FILE = WORKSPACE / ".agent_topics.json"
+CUSTOM_CMDS_FILE = WORKSPACE / ".custom_commands.json"
+OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
+
+BUILTIN_COMMANDS = {
+    "start", "help", "status", "models", "projects", "newrepo", "create",
+    "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
+    "note", "chat", "task", "claude", "exec", "addcmd", "alias", "delcmd",
+    "removecmd", "customcmds", "cmds", "aliases"
+}
 
 def init_git_credentials():
     """Configures global git identity and provider credential helpers/URL rewrites."""
@@ -150,6 +161,51 @@ def remove_bound_project(chat_id: int, thread_id: int):
         save_topic_bindings(bindings)
 
 # ---------------------------------------------------------------------------
+# Custom User-Defined Commands Engine
+# ---------------------------------------------------------------------------
+
+def load_custom_commands() -> dict[str, str]:
+    """Loads custom commands from workspace and Obsidian mirror."""
+    if CUSTOM_CMDS_FILE.exists():
+        try:
+            with open(CUSTOM_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    if OBSIDIAN_CMDS_FILE.exists():
+        try:
+            with open(OBSIDIAN_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_custom_commands(cmds: dict[str, str]):
+    """Persists custom commands to workspace and mirrors to Obsidian Config."""
+    try:
+        WORKSPACE.mkdir(parents=True, exist_ok=True)
+        with open(CUSTOM_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not persist custom commands to workspace: {e}")
+
+    try:
+        OBSIDIAN_CMDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(OBSIDIAN_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not mirror custom commands to Obsidian: {e}")
+
+def sanitize_cmd_name(name: str) -> str | None:
+    """Validates custom command names (alphanumeric and underscores only)."""
+    if not name:
+        return None
+    name = name.strip().lstrip("/").lower()
+    if re.match(r"^[a-z0-9_]{1,32}$", name):
+        return name
+    return None
+
+# ---------------------------------------------------------------------------
 # Validation & Sanitization Helpers
 # ---------------------------------------------------------------------------
 
@@ -239,13 +295,11 @@ def resolve_project_context(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not args:
         return (bound_project, [])
 
-    # Check if first argument is an existing workspace project directory
     first_arg = args[0]
     candidate_dir = WORKSPACE / first_arg
     if candidate_dir.exists() and candidate_dir.is_dir() and not first_arg.startswith("."):
         return (first_arg, args[1:])
 
-    # If first argument is not a project, but this topic is bound, use the bound project
     if bound_project:
         return (bound_project, args)
 
@@ -266,6 +320,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/chat <message>` — Ask questions via Gemini 3.7 / Claude 3.7 router\n"
         "• `/claude <prompt>` — Execute Claude Code CLI in sandboxed container\n"
         "• `/newrepo <name> [desc]` — Create a new GitHub repository & clone locally\n"
+        "• `/addcmd <name> <template>` — Create custom shortcut command\n"
+        "• `/customcmds` — List all user-defined custom commands\n"
         "• `/projects` — List all workspace repositories\n"
         "• `/clone <url> [name]` — Clone GitHub / GitLab / Bitbucket repo\n"
         "• `/bind [project]` — Link current Telegram Forum Topic to a project\n"
@@ -293,21 +349,169 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • `/task my-api \"Add Redis caching layer with unit tests\"`\n"
         "   • Automatically branches `agent/task-<timestamp>`, runs coding agent, tests, commits & pushes!\n"
         "   • *Topic tip:* In a bound topic, simply run `/task \"Add Redis caching\"`!\n\n"
-        "3️⃣ *Telegram Forum Topics (Project Sub-Channels):*\n"
+        "3️⃣ *Custom User Commands & Shortcuts:*\n"
+        "   • `/addcmd test /exec pytest -v` ➔ Runs `/test` as a shortcut!\n"
+        "   • `/addcmd review /chat \"Review this code: {args}\"`\n"
+        "   • `/addcmd pr /task \"Create PR draft & bump version\"`\n"
+        "   • `/customcmds` — List all your custom shortcuts\n"
+        "   • `/delcmd <name>` — Delete a shortcut\n\n"
+        "4️⃣ *Telegram Forum Topics (Project Sub-Channels):*\n"
         "   • Enable **Topics** in your Telegram Supergroup settings.\n"
         "   • Inside a topic, use `/bind my-project` to bind the channel.\n"
-        "   • All `/task`, `/diff`, `/push` commands inside that topic will automatically target that project!\n\n"
-        "4️⃣ *Obsidian Second-Brain Sync:*\n"
+        "   • All `/task`, `/diff`, `/push` commands inside that topic automatically target that project!\n\n"
+        "5️⃣ *Obsidian Second-Brain Sync:*\n"
         "   • Syncthing (Port 8384) syncs notes from your laptop/phone to `/data/obsidian`.\n"
         "   • `/note Design Doc | System architecture requirements`\n"
         "   • `/vault` — Inspect recent notes & specs available to AI agents.\n\n"
-        "5️⃣ *AI Gateway & Interactive Shell:*\n"
+        "6️⃣ *AI Gateway & Interactive Shell:*\n"
         "   • `/chat <question>` — Direct query via LiteLLM model router\n"
         "   • `/claude <prompt>` — Headless Claude Code CLI execution\n"
         "   • `/models` — List active LLMs (Gemini, Claude, GPT-4o, DeepSeek)\n"
         "   • `/exec <cmd>` — Run sandboxed bash command in workspace"
     )
     await update.effective_message.reply_text(text, parse_mode="Markdown")
+
+async def addcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Adds or updates a custom user-defined shortcut command."""
+    if not await check_auth(update):
+        return
+    if not context.args or len(context.args) < 2:
+        await update.effective_message.reply_text(
+            "Usage: `/addcmd <command_name> <command_template>`\n\n"
+            "Examples:\n"
+            "• `/addcmd test /exec pytest -v`\n"
+            "• `/addcmd build /exec npm run build`\n"
+            "• `/addcmd review /chat \"Review this code: {args}\"`\n"
+            "• `/addcmd pr /task \"Create PR draft & changelog summary\"`",
+            parse_mode="Markdown"
+        )
+        return
+
+    raw_name = context.args[0]
+    cmd_name = sanitize_cmd_name(raw_name)
+    if not cmd_name:
+        await update.effective_message.reply_text("❌ Invalid command name. Use 1–32 alphanumeric characters and underscores.")
+        return
+
+    if cmd_name in BUILTIN_COMMANDS:
+        await update.effective_message.reply_text(f"❌ Cannot overwrite built-in command `/{cmd_name}`.", parse_mode="Markdown")
+        return
+
+    template = " ".join(context.args[1:]).strip()
+    cmds = load_custom_commands()
+    cmds[cmd_name] = template
+    save_custom_commands(cmds)
+
+    await update.effective_message.reply_text(
+        f"✅ *Custom Command Saved!*\n\n"
+        f"• Command: `/{cmd_name}`\n"
+        f"• Template: `{template}`\n\n"
+        f"You can now run `/{cmd_name}` directly in chat!",
+        parse_mode="Markdown"
+    )
+
+async def delcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Deletes a custom user-defined command."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text("Usage: `/delcmd <command_name>`")
+        return
+
+    cmd_name = sanitize_cmd_name(context.args[0])
+    if not cmd_name:
+        await update.effective_message.reply_text("❌ Invalid command name.")
+        return
+
+    cmds = load_custom_commands()
+    if cmd_name in cmds:
+        del cmds[cmd_name]
+        save_custom_commands(cmds)
+        await update.effective_message.reply_text(f"✅ Custom command `/{cmd_name}` deleted.", parse_mode="Markdown")
+    else:
+        await update.effective_message.reply_text(f"⚠️ Custom command `/{cmd_name}` not found.", parse_mode="Markdown")
+
+async def customcmds_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lists all user-defined custom commands."""
+    if not await check_auth(update):
+        return
+    cmds = load_custom_commands()
+    if not cmds:
+        await update.effective_message.reply_text(
+            "📋 *No Custom Commands Defined Yet.*\n\n"
+            "Create your first custom shortcut with:\n"
+            "`/addcmd test /exec pytest -v`\n"
+            "`/addcmd review /chat \"Review this code: {args}\"`",
+            parse_mode="Markdown"
+        )
+        return
+
+    lines = []
+    for name, tpl in sorted(cmds.items()):
+        lines.append(f"• `/{name}` ➔ `{tpl}`")
+    cmds_str = "\n".join(lines)
+
+    await update.effective_message.reply_text(
+        f"📋 *Your Custom Bot Commands & Shortcuts:*\n\n{cmds_str}\n\n"
+        f"To add: `/addcmd <name> <template>`\nTo delete: `/delcmd <name>`",
+        parse_mode="Markdown"
+    )
+
+async def dynamic_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Catches user-defined custom commands or provides helpful suggestions."""
+    if not await check_auth(update):
+        return
+    if not update.effective_message or not update.effective_message.text:
+        return
+
+    text = update.effective_message.text.strip()
+    if not text.startswith("/"):
+        return
+
+    parts = text.split(None, 1)
+    raw_cmd = parts[0].lstrip("/").split("@")[0].lower()
+    user_args = parts[1] if len(parts) > 1 else ""
+
+    cmds = load_custom_commands()
+    if raw_cmd in cmds:
+        template = cmds[raw_cmd]
+        thread_id = update.effective_message.message_thread_id
+        chat_id = update.effective_chat.id
+        bound_proj = get_bound_project(chat_id, thread_id) or "workspace"
+
+        # Parameter Substitution
+        expanded = template
+        if "{args}" in expanded:
+            expanded = expanded.replace("{args}", user_args)
+        elif user_args:
+            expanded = f"{expanded} {user_args}"
+        expanded = expanded.replace("{project}", bound_proj)
+
+        # Dispatch expanded action
+        if expanded.startswith("/chat "):
+            context.args = expanded[6:].split()
+            await chat_cmd(update, context)
+        elif expanded.startswith("/task "):
+            context.args = expanded[6:].split()
+            await task_cmd(update, context)
+        elif expanded.startswith("/claude "):
+            context.args = expanded[8:].split()
+            await claude_cmd(update, context)
+        elif expanded.startswith("/exec "):
+            context.args = expanded[6:].split()
+            await exec_cmd(update, context)
+        else:
+            # Direct bash command execution in bound project or workspace
+            context.args = expanded.split()
+            await exec_cmd(update, context)
+    else:
+        await update.effective_message.reply_text(
+            f"❓ Unknown command: `/{raw_cmd}`\n\n"
+            f"• Run `/help` to see built-in commands.\n"
+            f"• Run `/customcmds` to view your custom shortcuts.\n"
+            f"• Create this shortcut with `/addcmd {raw_cmd} <action>`!",
+            parse_mode="Markdown"
+        )
 
 async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Creates a new GitHub repository via GitHub API and initializes it in workspace."""
@@ -327,7 +531,6 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text("❌ Invalid repository name. Use letters, numbers, hyphens, and underscores.")
         return
 
-    # Check for flags and description
     is_private = True
     desc_words = []
     for arg in context.args[1:]:
@@ -359,7 +562,6 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.effective_message.reply_text(f"⏳ Creating GitHub repository `{repo_name}`...", parse_mode="Markdown")
 
     try:
-        # Call GitHub REST API to create repository
         async with httpx.AsyncClient(timeout=15.0) as client:
             headers = {
                 "Authorization": f"token {GITHUB_TOKEN}",
@@ -384,18 +586,15 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             html_url = repo_data.get("html_url")
             owner = repo_data.get("owner", {}).get("login", "")
 
-        # Initialize local repository on disk
         target_dir.mkdir(parents=True, exist_ok=True)
         await asyncio.create_subprocess_exec(GIT_BIN, "init", "-b", "main", cwd=str(target_dir))
 
-        # Create starter README and .gitignore
         readme_content = f"# {repo_name}\n\n{description}\n\n*Created with OMV Agent Station on {datetime.now().strftime('%Y-%m-%d')}*\n"
         (target_dir / "README.md").write_text(readme_content, encoding="utf-8")
 
         gitignore_content = "__pycache__/\n*.pyc\n.env\nnode_modules/\n.DS_Store\nvenv/\n.venv/\n"
         (target_dir / ".gitignore").write_text(gitignore_content, encoding="utf-8")
 
-        # Initial commit & remote setup
         await asyncio.create_subprocess_exec(GIT_BIN, "add", ".", cwd=str(target_dir))
         await asyncio.create_subprocess_exec(GIT_BIN, "commit", "-m", "feat: initial commit from OMV Agent Station", cwd=str(target_dir))
 
@@ -404,7 +603,6 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         push_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", "main", cwd=str(target_dir))
         await push_proc.communicate()
 
-        # If in a Forum Supergroup, create a topic for this project automatically
         topic_info = ""
         chat = update.effective_chat
         if chat and chat.type in ("supergroup", "group"):
@@ -421,7 +619,7 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         vis_str = "🔒 Private" if is_private else "🌐 Public"
         await msg.edit_text(
-            f"✅ *GitHub Repository Created & Cloned! cuadros*\n\n"
+            f"✅ *GitHub Repository Created & Cloned!*\n\n"
             f"📁 *Project:* `{repo_name}`\n"
             f"🔗 *URL:* {html_url}\n"
             f"🛡️ *Visibility:* {vis_str}\n"
@@ -671,7 +869,6 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
-            # Auto-create Forum Topic if in a group
             topic_info = ""
             chat = update.effective_chat
             if chat and chat.type in ("supergroup", "group"):
@@ -914,7 +1111,6 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             except Exception as pe:
                 logger.info(f"Remote push skipped: {pe}")
 
-        # Save log entry to Obsidian
         try:
             obsidian_proj = OBSIDIAN_VAULT / "Projects" / project_dir.name
             obsidian_proj.mkdir(parents=True, exist_ok=True)
@@ -1034,6 +1230,7 @@ def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Core Built-in Command Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("status", status_cmd))
@@ -1041,6 +1238,13 @@ def main():
     app.add_handler(CommandHandler("projects", projects_cmd))
     app.add_handler(CommandHandler("newrepo", newrepo_cmd))
     app.add_handler(CommandHandler("create", newrepo_cmd))
+    app.add_handler(CommandHandler("addcmd", addcmd_cmd))
+    app.add_handler(CommandHandler("alias", addcmd_cmd))
+    app.add_handler(CommandHandler("delcmd", delcmd_cmd))
+    app.add_handler(CommandHandler("removecmd", delcmd_cmd))
+    app.add_handler(CommandHandler("customcmds", customcmds_cmd))
+    app.add_handler(CommandHandler("cmds", customcmds_cmd))
+    app.add_handler(CommandHandler("aliases", customcmds_cmd))
     app.add_handler(CommandHandler("bind", bind_cmd))
     app.add_handler(CommandHandler("unbind", unbind_cmd))
     app.add_handler(CommandHandler("clone", clone_cmd))
@@ -1055,7 +1259,10 @@ def main():
     app.add_handler(CommandHandler("claude", claude_cmd))
     app.add_handler(CommandHandler("exec", exec_cmd))
 
-    print("🤖 Telegram Agent Relay Bot starting polling...")
+    # Dynamic Custom Command Fallback Handler
+    app.add_handler(MessageHandler(filters.COMMAND, dynamic_command_handler))
+
+    print("🤖 Telegram Agent Relay Bot starting polling with custom commands support...")
     app.run_polling()
 
 if __name__ == "__main__":

@@ -289,6 +289,116 @@ async def newrepo_cmd(ctx, name: str = None, *, description: str = None):
     except Exception as e:
         await msg.edit(content=f"❌ Repository creation error: {e}")
 
+CUSTOM_CMDS_FILE = WORKSPACE / ".custom_commands.json"
+OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
+BUILTIN_DISCORD_CMDS = {"help", "status", "models", "projects", "newrepo", "create", "clone", "pull", "push", "branch", "diff", "vault", "note", "chat", "task", "claude", "exec", "addcmd", "alias", "delcmd", "removecmd", "customcmds", "cmds", "aliases"}
+
+def load_discord_custom_commands() -> dict[str, str]:
+    if CUSTOM_CMDS_FILE.exists():
+        try:
+            with open(CUSTOM_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    if OBSIDIAN_CMDS_FILE.exists():
+        try:
+            with open(OBSIDIAN_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_discord_custom_commands(cmds: dict[str, str]):
+    try:
+        WORKSPACE.mkdir(parents=True, exist_ok=True)
+        with open(CUSTOM_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not persist custom commands: {e}")
+    try:
+        OBSIDIAN_CMDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(OBSIDIAN_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not mirror custom commands to Obsidian: {e}")
+
+@bot.command(name="addcmd", aliases=["alias"])
+async def cmd_addcmd(ctx, name: str = None, *, template: str = None):
+    if not is_authorized(ctx):
+        return
+    if not name or not template:
+        await ctx.send("Usage: `!addcmd <command_name> <command_template>`\nExample: `!addcmd test !exec pytest -v`")
+        return
+    cmd_name = name.lower().lstrip("!/")
+    if cmd_name in BUILTIN_DISCORD_CMDS:
+        await ctx.send(f"❌ Cannot overwrite built-in command `!{cmd_name}`.")
+        return
+    cmds = load_discord_custom_commands()
+    cmds[cmd_name] = template
+    save_discord_custom_commands(cmds)
+    await ctx.send(f"✅ Custom command `!{cmd_name}` saved with action: `{template}`")
+
+@bot.command(name="delcmd", aliases=["removecmd"])
+async def cmd_delcmd(ctx, name: str = None):
+    if not is_authorized(ctx):
+        return
+    if not name:
+        await ctx.send("Usage: `!delcmd <command_name>`")
+        return
+    cmd_name = name.lower().lstrip("!/")
+    cmds = load_discord_custom_commands()
+    if cmd_name in cmds:
+        del cmds[cmd_name]
+        save_discord_custom_commands(cmds)
+        await ctx.send(f"✅ Custom command `!{cmd_name}` deleted.")
+    else:
+        await ctx.send(f"⚠️ Custom command `!{cmd_name}` not found.")
+
+@bot.command(name="customcmds", aliases=["cmds", "aliases"])
+async def cmd_customcmds(ctx):
+    if not is_authorized(ctx):
+        return
+    cmds = load_discord_custom_commands()
+    if not cmds:
+        await ctx.send("📋 No custom commands defined. Add one with `!addcmd test !exec pytest -v`")
+        return
+    lines = [f"• `!{k}` ➔ `{v}`" for k, v in sorted(cmds.items())]
+    await ctx.send(f"📋 **Custom Bot Commands:**\n" + "\n".join(lines))
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        if not is_authorized(ctx):
+            return
+        invoked = ctx.invoked_with.lower() if ctx.invoked_with else ""
+        cmds = load_discord_custom_commands()
+        if invoked in cmds:
+            template = cmds[invoked]
+            raw_msg = ctx.message.content.strip()
+            parts = raw_msg.split(None, 1)
+            extra_args = parts[1] if len(parts) > 1 else ""
+            expanded = template
+            if "{args}" in expanded:
+                expanded = expanded.replace("{args}", extra_args)
+            elif extra_args:
+                expanded = f"{expanded} {extra_args}"
+            expanded = expanded.replace("{project}", "workspace")
+
+            # Execute bash or command
+            if expanded.startswith(("!exec ", "/exec ")):
+                sh_cmd = expanded.split(None, 1)[1]
+            else:
+                sh_cmd = expanded
+            msg = await ctx.send(f"⏳ Executing custom shortcut: `{sh_cmd}`...")
+            proc = await asyncio.create_subprocess_shell(sh_cmd, cwd=str(WORKSPACE), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout, stderr = await proc.communicate()
+            res = (stdout.decode('utf-8', errors='replace') + "\n" + stderr.decode('utf-8', errors='replace')).strip() or "(Done)"
+            await msg.edit(content=f"🖥️ **Output:**\n```{res[:1900]}```")
+        else:
+            await ctx.send(f"❓ Unknown command. Run `!help` for built-in commands or `!customcmds` for custom shortcuts.")
+    else:
+        logger.error(f"Discord command error: {error}")
+
 @bot.command(name="chat")
 async def cmd_chat(ctx, *, query: str):
     if not is_authorized(ctx):

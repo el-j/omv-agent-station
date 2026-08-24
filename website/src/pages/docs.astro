@@ -31,6 +31,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </div>
         <nav style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem;">
           <a href="#quickstart" class="doc-nav-link">⚡ Quick Start Guide</a>
+          <a href="#custom-commands" class="doc-nav-link">🛠️ Custom Commands & Aliases</a>
           <a href="#obsidian-sync" class="doc-nav-link">📓 Obsidian Second Brain</a>
           <a href="#telegram-topics" class="doc-nav-link">🧵 Telegram Forum Topics</a>
           <a href="#commands" class="doc-nav-link">🤖 Bot Commands Reference</a>
@@ -83,7 +84,59 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </section>
 
         <!-- ================================================================= -->
-        <!-- 2. OBSIDIAN SECOND BRAIN                                          -->
+        <!-- 2. CUSTOM BOT COMMANDS & SHORTCUT ALIASES                         -->
+        <!-- ================================================================= -->
+        <section id="custom-commands" class="glass-card" style="padding: 2.25rem;">
+          <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 0.85rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 9999px; margin-bottom: 1rem;">
+            Custom Workflows
+          </div>
+          <h2 style="font-family: 'Outfit'; font-size: 1.85rem; font-weight: 800; margin-bottom: 1rem;">
+            🛠️ Custom User-Defined Bot Commands & Aliases
+          </h2>
+          <p style="color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+            Configure and personalize your bot on the fly directly from chat. You can turn complex terminal commands, test suites, or repetitive AI prompt workflows into simple custom shortcuts.
+          </p>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #fbbf24; margin-bottom: 0.5rem;">⚡ Automated Test Runner</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Create a <code>/test</code> shortcut:</p>
+              <code style="font-size: 0.85rem; color: #818cf8; display: block; margin-bottom: 0.5rem;">/addcmd test /exec pytest -v</code>
+              <span style="font-size: 0.8rem; color: #94a3b8;">Now running <code>/test</code> instantly executes your pytest suite!</span>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #38bdf8; margin-bottom: 0.5rem;">🤖 AI Code Review Template</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Dynamic argument placeholder <code>&#123;args&#125;</code>:</p>
+              <code style="font-size: 0.85rem; color: #818cf8; display: block; margin-bottom: 0.5rem;">/addcmd review /chat "Review this code: &#123;args&#125;"</code>
+              <span style="font-size: 0.8rem; color: #94a3b8;">Running <code>/review def login()...</code> passes the snippet directly to Claude/Gemini.</span>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #34d399; margin-bottom: 0.5rem;">🚀 1-Click PR Drafts</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Automate routine Git tasks:</p>
+              <code style="font-size: 0.85rem; color: #818cf8; display: block; margin-bottom: 0.5rem;">/addcmd pr /task "Create PR draft & changelog"</code>
+              <span style="font-size: 0.8rem; color: #94a3b8;">Autonomous coding agent runs branch tasks in background.</span>
+            </div>
+          </div>
+
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; color: #e2e8f0;">Command Management:</h3>
+          <ul style="list-style-type: disc; margin-left: 1.5rem; color: var(--text-muted); line-height: 1.8; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            <li><code>/addcmd &lt;name&gt; &lt;template&gt;</code> (alias: <code>/alias</code>) — Register or update a custom shortcut.</li>
+            <li><code>/customcmds</code> (alias: <code>/cmds</code>, <code>/aliases</code>) — View all registered shortcuts and templates.</li>
+            <li><code>/delcmd &lt;name&gt;</code> (alias: <code>/removecmd</code>) — Delete a custom command.</li>
+          </ul>
+
+          <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 0.75rem; padding: 1.25rem;">
+            <div style="font-weight: 700; color: #c7d2fe; margin-bottom: 0.25rem;">📓 Synced Directly to Obsidian:</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+              All custom commands are mirrored to <code>/data/obsidian/Config/commands.json</code>. You can also view and edit your command mappings directly inside Obsidian on your Mac, PC, or mobile device!
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- 3. OBSIDIAN SECOND BRAIN                                          -->
         <!-- ================================================================= -->
         <section id="obsidian-sync" class="glass-card" style="padding: 2.25rem;">
           <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.85rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 9999px; margin-bottom: 1rem;">

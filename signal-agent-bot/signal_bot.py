@@ -47,6 +47,37 @@ TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
 UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
 DF_BIN = shutil.which("df") or "/bin/df"
 AIDER_BIN = shutil.which("aider") or "aider"
+CUSTOM_CMDS_FILE = WORKSPACE / ".custom_commands.json"
+OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
+
+def load_signal_custom_commands() -> dict[str, str]:
+    if CUSTOM_CMDS_FILE.exists():
+        try:
+            with open(CUSTOM_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    if OBSIDIAN_CMDS_FILE.exists():
+        try:
+            with open(OBSIDIAN_CMDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_signal_custom_commands(cmds: dict[str, str]):
+    try:
+        WORKSPACE.mkdir(parents=True, exist_ok=True)
+        with open(CUSTOM_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not persist custom commands: {e}")
+    try:
+        OBSIDIAN_CMDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(OBSIDIAN_CMDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cmds, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not mirror custom commands to Obsidian: {e}")
 
 def init_git_credentials():
     try:
@@ -233,6 +264,38 @@ async def handle_command(sender: str, message_text: str):
         else:
             await send_signal_message(sender, f"❌ Git clone failed:\n{stderr.decode('utf-8', errors='replace')}")
 
+    elif cmd in ("/addcmd", "/alias"):
+        if len(args) < 2:
+            await send_signal_message(sender, "Usage: /addcmd <name> <template>\nExample: /addcmd test /exec pytest -v")
+            return
+        cmd_name = args[0].lower().lstrip("/")
+        template = " ".join(args[1:])
+        cmds = load_signal_custom_commands()
+        cmds[cmd_name] = template
+        save_signal_custom_commands(cmds)
+        await send_signal_message(sender, f"✅ Custom command /{cmd_name} saved!\nAction: {template}")
+
+    elif cmd in ("/delcmd", "/removecmd"):
+        if not args:
+            await send_signal_message(sender, "Usage: /delcmd <name>")
+            return
+        cmd_name = args[0].lower().lstrip("/")
+        cmds = load_signal_custom_commands()
+        if cmd_name in cmds:
+            del cmds[cmd_name]
+            save_signal_custom_commands(cmds)
+            await send_signal_message(sender, f"✅ Custom command /{cmd_name} deleted.")
+        else:
+            await send_signal_message(sender, f"⚠️ Custom command /{cmd_name} not found.")
+
+    elif cmd in ("/customcmds", "/cmds", "/aliases"):
+        cmds = load_signal_custom_commands()
+        if not cmds:
+            await send_signal_message(sender, "📋 No custom commands defined. Add one with: /addcmd test /exec pytest -v")
+            return
+        lines = [f"• /{k} -> {v}" for k, v in sorted(cmds.items())]
+        await send_signal_message(sender, "📋 Custom Bot Commands:\n" + "\n".join(lines))
+
     elif cmd in ("/newrepo", "/create"):
         if not args:
             await send_signal_message(sender, "Usage: /newrepo <repo-name> [description] [--public | --private]")
@@ -351,6 +414,32 @@ async def handle_command(sender: str, message_text: str):
         await send_signal_message(sender, f"🚀 Launching Agent Task ({session_id})\nProject: {pname}\nBranch: {task_branch}\nInstruction: {instructions}\n\nAgent is coding in background...")
 
         asyncio.create_task(run_signal_agent_task(sender, pdir, instructions, session_id, task_branch))
+
+    else:
+        # Check user-defined custom command dictionary
+        clean_cmd = cmd.lower().lstrip("/")
+        cmds = load_signal_custom_commands()
+        if clean_cmd in cmds:
+            template = cmds[clean_cmd]
+            user_args = " ".join(args)
+            expanded = template
+            if "{args}" in expanded:
+                expanded = expanded.replace("{args}", user_args)
+            elif user_args:
+                expanded = f"{expanded} {user_args}"
+            expanded = expanded.replace("{project}", "workspace")
+
+            if expanded.startswith("/exec "):
+                sh_cmd = expanded[6:]
+            else:
+                sh_cmd = expanded
+            await send_signal_message(sender, f"⏳ Executing shortcut: {sh_cmd}...")
+            proc = await asyncio.create_subprocess_shell(sh_cmd, cwd=str(WORKSPACE), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout, stderr = await proc.communicate()
+            res = (stdout.decode('utf-8', errors='replace') + "\n" + stderr.decode('utf-8', errors='replace')).strip() or "(Done)"
+            await send_signal_message(sender, f"🖥️ Output:\n{res[:3500]}")
+        else:
+            await send_signal_message(sender, f"❓ Unknown command: {cmd}\nRun /help for built-in commands or /customcmds for your custom shortcuts.")
 
 async def run_signal_agent_task(sender: str, project_dir: Path, instructions: str, session_id: str, task_branch: str):
     """Executes coding loop and streams results to Signal."""

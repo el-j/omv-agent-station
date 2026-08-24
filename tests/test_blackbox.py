@@ -180,6 +180,60 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
 
+    def test_custom_commands_lifecycle_and_expansion_blackbox(self):
+        sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        try:
+            import bot
+            with tempfile.TemporaryDirectory() as tmpdir:
+                workspace = Path(tmpdir) / "workspace"
+                obsidian = Path(tmpdir) / "obsidian"
+                workspace.mkdir()
+                obsidian.mkdir()
+
+                bot.WORKSPACE = workspace
+                bot.OBSIDIAN_VAULT = obsidian
+                bot.CUSTOM_CMDS_FILE = workspace / ".custom_commands.json"
+                bot.OBSIDIAN_CMDS_FILE = obsidian / "Config" / "commands.json"
+
+                # 1. Validation of command names
+                self.assertEqual(bot.sanitize_cmd_name("test"), "test")
+                self.assertEqual(bot.sanitize_cmd_name("my_test_2"), "my_test_2")
+                self.assertIsNone(bot.sanitize_cmd_name("test-with-dashes!"))
+                self.assertIsNone(bot.sanitize_cmd_name("bad name with spaces"))
+                self.assertIsNone(bot.sanitize_cmd_name("../../evil"))
+
+                # 2. Saving and dual-storage persistence
+                initial_cmds = {
+                    "test": "/exec pytest -v",
+                    "review": "/chat \"Review this code: {args}\"",
+                    "build": "npm run build"
+                }
+                bot.save_custom_commands(initial_cmds)
+                self.assertTrue(bot.CUSTOM_CMDS_FILE.exists())
+                self.assertTrue(bot.OBSIDIAN_CMDS_FILE.exists())
+
+                loaded = bot.load_custom_commands()
+                self.assertEqual(loaded.get("test"), "/exec pytest -v")
+                self.assertEqual(loaded.get("review"), "/chat \"Review this code: {args}\"")
+
+                # 3. Parameter expansion logic
+                template_a = loaded["review"]
+                user_input = "def foo(): return 42"
+                expanded_a = template_a.replace("{args}", user_input)
+                self.assertEqual(expanded_a, "/chat \"Review this code: def foo(): return 42\"")
+
+                template_b = loaded["test"]
+                extra_args = "-k auth"
+                expanded_b = f"{template_b} {extra_args}"
+                self.assertEqual(expanded_b, "/exec pytest -v -k auth")
+
+                # 4. Built-in command collision defense
+                for builtin in ["start", "help", "task", "status", "exec", "newrepo", "bind"]:
+                    self.assertIn(builtin, bot.BUILTIN_COMMANDS)
+        finally:
+            if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
+                sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+
 class TestBlackboxCLIAndPackaging(unittest.TestCase):
     """Black-box testing for CLI lifecycle helper and Debian packaging."""
 
