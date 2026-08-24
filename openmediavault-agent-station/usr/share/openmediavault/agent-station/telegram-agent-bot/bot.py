@@ -602,6 +602,21 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
+    elif data == "btn_projects":
+        projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")] if WORKSPACE.exists() else []
+        if projects:
+            proj_str = "\n".join([f"• `📂 {p}`" for p in projects])
+            text = f"📁 *Registered Workspace Projects ({len(projects)}):*\n\n{proj_str}\n\nTap below to start coding on any project:"
+            keyboard = []
+            for p in projects[:6]:
+                keyboard.append([InlineKeyboardButton(f"🚀 Code: {p}", switch_inline_query_current_chat=f"/task {p} ")])
+            keyboard.append([InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")])
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            text = "📁 *No projects found in `/data/workspace`.*\n\nUse `/newrepo` to create a new GitHub repo or paste a GitHub URL to clone one!"
+            keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
 async def addcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Adds or updates a custom user-defined shortcut command."""
     if not await check_auth(update):
@@ -1213,7 +1228,17 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.effective_message.reply_text("Usage: `/clone <git-url> [custom-folder-name]`", parse_mode="Markdown")
+        await update.effective_message.reply_text(
+            "📥 *Clone Git Repository*\n\n"
+            "Please type or paste the git repository URL below:\n"
+            "• Syntax: `https://github.com/owner/repo [folder-name]`\n"
+            "• Example: `https://github.com/fastapi/fastapi my-api`",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="https://github.com/owner/repo..."
+            )
+        )
         return
 
     raw_git_url = context.args[0].strip()
@@ -1236,15 +1261,41 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(f"⚠️ Destination folder `{folder_name}` already exists in `/data/workspace`.", parse_mode="Markdown")
         return
 
-    msg = await update.effective_message.reply_text(f"⏳ Cloning `{git_url}` into `{folder_name}`...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"⏳ Cloning `{git_url}` into `/data/workspace/{folder_name}`...", parse_mode="Markdown")
     try:
+        clone_target_url = git_url
+        if GITHUB_TOKEN and "github.com" in git_url and not git_url.startswith("git@"):
+            clean_http = git_url.replace("https://", "").replace("http://", "")
+            clone_target_url = f"https://x-access-token:{GITHUB_TOKEN}@{clean_http}"
+
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-            GIT_BIN, "clone", "--", git_url, str(target_dir),
+            GIT_BIN, "clone", "--", clone_target_url, str(target_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
+            await asyncio.create_subprocess_exec(GIT_BIN, "config", "user.name", GIT_AUTHOR_NAME, cwd=str(target_dir))
+            await asyncio.create_subprocess_exec(GIT_BIN, "config", "user.email", GIT_AUTHOR_EMAIL, cwd=str(target_dir))
+
+            try:
+                obsidian_proj = OBSIDIAN_VAULT / "Projects" / folder_name
+                obsidian_proj.mkdir(parents=True, exist_ok=True)
+                spec_file = obsidian_proj / "project-spec.md"
+                if not spec_file.exists():
+                    spec_content = (
+                        f"# Project: {folder_name}\n\n"
+                        f"- **Git Remote:** `{git_url}`\n"
+                        f"- **Cloned On:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                        f"- **Workspace Path:** `/data/workspace/{folder_name}`\n\n"
+                        f"## 📋 Active Tasks & Notes\n"
+                        f"- [ ] Initial codebase review & test suite execution\n\n"
+                        f"## 🤖 Agent Execution History\n"
+                    )
+                    spec_file.write_text(spec_content, encoding="utf-8")
+            except Exception as oe:
+                logger.warning(f"Could not initialize Obsidian project note: {oe}")
+
             topic_info = ""
             chat = update.effective_chat
             if chat and chat.type in ("supergroup", "group"):
@@ -1255,14 +1306,29 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                     if forum_topic and forum_topic.message_thread_id:
                         set_bound_project(chat.id, forum_topic.message_thread_id, folder_name)
-                        topic_info = f"\n🧵 *Created Forum Topic:* `📂 {folder_name}`"
+                        topic_info = f"\n🧵 *Created Forum Topic:* `📂 {folder_name}` (automatically bound!)"
                 except Exception as te:
                     logger.info(f"Could not create forum topic: {te}")
 
+            keyboard = [
+                [
+                    InlineKeyboardButton("🚀 Start Coding Task", switch_inline_query_current_chat=f"/task {folder_name} "),
+                    InlineKeyboardButton("🌿 Branches", switch_inline_query_current_chat=f"/branch {folder_name} "),
+                ],
+                [
+                    InlineKeyboardButton("📁 List All Projects", callback_data="btn_projects"),
+                ]
+            ]
+
             await msg.edit_text(
-                f"✅ Successfully cloned `{folder_name}`!{topic_info}\n\n"
-                f"You can now run:\n`/task {folder_name} \"your instructions\"`",
-                parse_mode="Markdown"
+                f"✅ *Repository Cloned & Registered as Active Project!*\n\n"
+                f"📁 *Project:* `{folder_name}`\n"
+                f"🔗 *Remote:* `{git_url}`\n"
+                f"💾 *Path:* `/data/workspace/{folder_name}`\n"
+                f"📓 *Obsidian Spec:* `/data/obsidian/Projects/{folder_name}/`{topic_info}\n\n"
+                f"You can now run tasks on this project with:\n`/task {folder_name} \"your coding prompt\"`",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
             err = stderr.decode("utf-8", errors="replace")
@@ -1648,8 +1714,18 @@ async def interactive_text_handler(update: Update, context: ContextTypes.DEFAULT
             context.args = shlex.split(text) if ("\"" in text or "'" in text) else text.split()
             await newrepo_cmd(update, context)
             return
+        elif "Clone Git Repository" in parent_text or "clone" in parent_text.lower() or "git" in parent_text.lower():
+            context.args = text.split()
+            await clone_cmd(update, context)
+            return
 
-    # Case 2: In private 1-on-1 chat, if the user just sends any question without a slash command,
+    # Case 2: Direct GitHub / Git URL paste in private chat automatically triggers project clone
+    if text.startswith("https://github.com/") or text.startswith("http://github.com/") or text.startswith("git@github.com:"):
+        context.args = text.split()
+        await clone_cmd(update, context)
+        return
+
+    # Case 3: In private 1-on-1 chat, if the user sends any text question without a slash command,
     # naturally answer it with AI Chat (Google Gemini Flash / coder-smart)!
     chat = update.effective_chat
     if chat and chat.type == "private":
