@@ -2,12 +2,14 @@
 """
 Telegram Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8
 Provides remote command execution, autonomous coding agent dispatch (Hermes/Aider/Claude Code),
-Obsidian second-brain integration, and LiteLLM gateway telemetry.
+Obsidian second-brain integration, LiteLLM gateway telemetry, GitHub repo creation,
+and Telegram Forum Topics (project-scoped sub-channels).
 """
 
 import os
 import sys
 import re
+import json
 import shutil
 import logging
 import asyncio
@@ -42,6 +44,7 @@ WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
 GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
 GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-server.local")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_USER = os.environ.get("GITHUB_GIT_USER", "")
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
 BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
@@ -51,6 +54,9 @@ TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
 UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
 DF_BIN = shutil.which("df") or "/bin/df"
 AIDER_BIN = shutil.which("aider") or "aider"
+
+# Topic Binding Storage file
+TOPICS_FILE = WORKSPACE / ".agent_topics.json"
 
 def init_git_credentials():
     """Configures global git identity and provider credential helpers/URL rewrites."""
@@ -97,6 +103,56 @@ ai_client = OpenAI(
     base_url=f"{LITELLM_BASE}/v1"
 )
 
+# ---------------------------------------------------------------------------
+# Topic & Sub-Channel Project Binding Helpers
+# ---------------------------------------------------------------------------
+
+def load_topic_bindings() -> dict:
+    """Loads thread-to-project bindings from disk."""
+    if TOPICS_FILE.exists():
+        try:
+            with open(TOPICS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_topic_bindings(bindings: dict):
+    """Saves thread-to-project bindings to disk."""
+    try:
+        WORKSPACE.mkdir(parents=True, exist_ok=True)
+        with open(TOPICS_FILE, "w", encoding="utf-8") as f:
+            json.dump(bindings, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not persist topic bindings: {e}")
+
+def get_bound_project(chat_id: int, thread_id: int | None) -> str | None:
+    """Returns the project name bound to a specific chat and thread/topic."""
+    if thread_id is None:
+        return None
+    bindings = load_topic_bindings()
+    key = f"{chat_id}:{thread_id}"
+    return bindings.get(key)
+
+def set_bound_project(chat_id: int, thread_id: int, project_name: str):
+    """Binds a Telegram forum topic (thread_id) to a workspace project."""
+    bindings = load_topic_bindings()
+    key = f"{chat_id}:{thread_id}"
+    bindings[key] = project_name
+    save_topic_bindings(bindings)
+
+def remove_bound_project(chat_id: int, thread_id: int):
+    """Unbinds a Telegram forum topic."""
+    bindings = load_topic_bindings()
+    key = f"{chat_id}:{thread_id}"
+    if key in bindings:
+        del bindings[key]
+        save_topic_bindings(bindings)
+
+# ---------------------------------------------------------------------------
+# Validation & Sanitization Helpers
+# ---------------------------------------------------------------------------
+
 def sanitize_git_url(url: str) -> str | None:
     """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
     if not url:
@@ -107,6 +163,17 @@ def sanitize_git_url(url: str) -> str | None:
     pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
     if re.match(pattern, url):
         return url
+    return None
+
+def sanitize_repo_name(name: str) -> str | None:
+    """Validates repository name for alphanumeric and safe separator chars."""
+    if not name:
+        return None
+    name = name.strip()
+    if name.startswith(("-", ".")) or ".." in name or "/" in name or "\\" in name:
+        return None
+    if re.match(r"^[a-zA-Z0-9_.-]+$", name):
+        return name
     return None
 
 def sanitize_branch_name(branch: str) -> str | None:
@@ -147,65 +214,298 @@ def authorized(update: Update) -> bool:
 
 async def check_auth(update: Update) -> bool:
     if not authorized(update):
+        if update.effective_user:
+            logger.warning(f"Unauthorized access attempt from user_id: {update.effective_user.id} (@{update.effective_user.username})")
         if update.effective_message:
-            await update.effective_message.reply_text("⛔ Unauthorized access.")
+            await update.effective_message.reply_text(
+                "⛔ Unauthorized access.\n\n"
+                "Please configure your personal numeric Telegram User ID in OMV Services -> Agent Station -> Chat & Messenger."
+            )
         return False
     return True
 
+def resolve_project_context(update: Update, context: ContextTypes.DEFAULT_TYPE) -> tuple[str | None, list[str]]:
+    """
+    Intelligently resolves the target project and remaining args based on:
+    1. Explicit project argument in command (if matches a workspace folder).
+    2. Forum topic / sub-channel binding.
+    """
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    bound_project = get_bound_project(chat_id, thread_id)
+
+    args = list(context.args) if context.args else []
+
+    if not args:
+        return (bound_project, [])
+
+    # Check if first argument is an existing workspace project directory
+    first_arg = args[0]
+    candidate_dir = WORKSPACE / first_arg
+    if candidate_dir.exists() and candidate_dir.is_dir() and not first_arg.startswith("."):
+        return (first_arg, args[1:])
+
+    # If first argument is not a project, but this topic is bound, use the bound project
+    if bound_project:
+        return (bound_project, args)
+
+    return (first_arg, args[1:])
+
 # ---------------------------------------------------------------------------
-# Telegram Handlers
+# Telegram Command Handlers
 # ---------------------------------------------------------------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     welcome_text = (
-        "🤖 *OMV AI Orchestrator & Remote Coding Bot*\n\n"
+        "🤖 *OMV AI Agent Station — Remote Dev & Orchestrator*\n\n"
         "Your 24/7 AI-powered development server is online.\n\n"
         "⚡ *Core Commands:*\n"
-        "• `/task <project> <prompt>` - Run autonomous coding agent on git branch\n"
-        "• `/chat <message>` - Ask questions using Gemini 3.7 / Claude 3.7\n"
-        "• `/projects` - List all workspace repositories\n"
-        "• `/clone <url> [name]` - Clone GitHub / GitLab / Bitbucket repo\n"
-        "• `/pull <project>` - Pull latest changes from remote\n"
-        "• `/push <project> [branch]` - Push commits to remote\n"
-        "• `/branch <project> [name]` - List or switch git branch\n"
-        "• `/diff <project>` - View git diff & status summary\n"
-        "• `/vault` - Inspect Obsidian notes\n"
-        "• `/note <Title> | <Content>` - Quick note to Obsidian\n"
-        "• `/models` - Check available models & health\n"
-        "• `/status` - Server CPU/RAM & active tmux sessions\n"
-        "• `/help` - Show detailed documentation"
+        "• `/task [project] <prompt>` — Run autonomous coding agent on branch\n"
+        "• `/chat <message>` — Ask questions via Gemini 3.7 / Claude 3.7 router\n"
+        "• `/claude <prompt>` — Execute Claude Code CLI in sandboxed container\n"
+        "• `/newrepo <name> [desc]` — Create a new GitHub repository & clone locally\n"
+        "• `/projects` — List all workspace repositories\n"
+        "• `/clone <url> [name]` — Clone GitHub / GitLab / Bitbucket repo\n"
+        "• `/bind [project]` — Link current Telegram Forum Topic to a project\n"
+        "• `/pull [project]` — Pull latest commits from remote\n"
+        "• `/push [project] [branch]` — Push commits to remote\n"
+        "• `/branch [project] [name]` — Switch or list git branches\n"
+        "• `/diff [project]` — View git diff & status summary\n"
+        "• `/vault` — Inspect Obsidian Second Brain notes\n"
+        "• `/note <Title> | <Content>` — Quick note into Obsidian vault\n"
+        "• `/models` — Check LiteLLM AI Gateway provider status\n"
+        "• `/status` — Server CPU/RAM, disk & tmux sessions\n"
+        "• `/help` — Full handbook & Telegram Forum Topics guide"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await update.effective_message.reply_text(welcome_text, parse_mode="Markdown")
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     text = (
-        "📖 *Git & Agent Remote Control Handbook:*\n\n"
-        "1️⃣ *Clone Repo:* `/clone https://github.com/user/my-repo`\n"
-        "   - Works with GitHub, GitLab, Bitbucket (HTTPS or SSH)\n"
-        "   - Automatically authenticates using your configured tokens\n\n"
-        "2️⃣ *Autonomous Task:* `/task my-repo \"Add authentication middleware\"`\n"
-        "   - Automatically cuts branch `agent/task-<timestamp>`\n"
-        "   - Reads context & project specs from Obsidian vault\n"
-        "   - Runs coding agent, runs tests & commits\n"
-        "   - Automatically pushes branch to remote repository!\n\n"
-        "3️⃣ *Git Management:*\n"
-        "   - `/pull my-repo` - Rebase latest commits\n"
-        "   - `/push my-repo` - Push local commits\n"
-        "   - `/branch my-repo feature-x` - Switch/create branch\n"
-        "   - `/diff my-repo` - Inspect current modifications\n\n"
-        "4️⃣ *Direct Chat:* `/chat How do I optimize SQLite WAL in Go?`\n"
-        "5️⃣ *Obsidian Memo:* `/note Topic | Content`"
+        "📖 *Agent Station Remote Control & Handbook*\n\n"
+        "1️⃣ *Create / Clone Repositories:*\n"
+        "   • `/newrepo my-api \"FastAPI backend service\"` — Creates remote GitHub repo, initializes local workspace & creates Topic!\n"
+        "   • `/clone https://github.com/user/repo` — Clones any repo with PAT auth\n\n"
+        "2️⃣ *Autonomous Coding Agent:*\n"
+        "   • `/task my-api \"Add Redis caching layer with unit tests\"`\n"
+        "   • Automatically branches `agent/task-<timestamp>`, runs coding agent, tests, commits & pushes!\n"
+        "   • *Topic tip:* In a bound topic, simply run `/task \"Add Redis caching\"`!\n\n"
+        "3️⃣ *Telegram Forum Topics (Project Sub-Channels):*\n"
+        "   • Enable **Topics** in your Telegram Supergroup settings.\n"
+        "   • Inside a topic, use `/bind my-project` to bind the channel.\n"
+        "   • All `/task`, `/diff`, `/push` commands inside that topic will automatically target that project!\n\n"
+        "4️⃣ *Obsidian Second-Brain Sync:*\n"
+        "   • Syncthing (Port 8384) syncs notes from your laptop/phone to `/data/obsidian`.\n"
+        "   • `/note Design Doc | System architecture requirements`\n"
+        "   • `/vault` — Inspect recent notes & specs available to AI agents.\n\n"
+        "5️⃣ *AI Gateway & Interactive Shell:*\n"
+        "   • `/chat <question>` — Direct query via LiteLLM model router\n"
+        "   • `/claude <prompt>` — Headless Claude Code CLI execution\n"
+        "   • `/models` — List active LLMs (Gemini, Claude, GPT-4o, DeepSeek)\n"
+        "   • `/exec <cmd>` — Run sandboxed bash command in workspace"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    await update.effective_message.reply_text(text, parse_mode="Markdown")
+
+async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Creates a new GitHub repository via GitHub API and initializes it in workspace."""
+    if not await check_auth(update):
+        return
+    if not context.args:
+        await update.effective_message.reply_text(
+            "Usage: `/newrepo <repo-name> [description] [--public | --private]`\n\n"
+            "Example: `/newrepo my-fastapi-service \"High performance REST backend\" --private`",
+            parse_mode="Markdown"
+        )
+        return
+
+    raw_name = context.args[0]
+    repo_name = sanitize_repo_name(raw_name)
+    if not repo_name:
+        await update.effective_message.reply_text("❌ Invalid repository name. Use letters, numbers, hyphens, and underscores.")
+        return
+
+    # Check for flags and description
+    is_private = True
+    desc_words = []
+    for arg in context.args[1:]:
+        if arg == "--public":
+            is_private = False
+        elif arg == "--private":
+            is_private = True
+        else:
+            desc_words.append(arg)
+    description = " ".join(desc_words) or f"Repository {repo_name} created via OMV Agent Station"
+
+    if not GITHUB_TOKEN:
+        await update.effective_message.reply_text(
+            "⚠️ GitHub Token not configured.\n\n"
+            "Please go to OMV WebGUI -> Services -> Agent Station -> Git Providers and enter your GitHub PAT token.",
+            parse_mode="Markdown"
+        )
+        return
+
+    target_dir = sanitize_project_path(WORKSPACE, repo_name)
+    if not target_dir:
+        await update.effective_message.reply_text("❌ Invalid folder path.")
+        return
+
+    if target_dir.exists():
+        await update.effective_message.reply_text(f"⚠️ A folder named `{repo_name}` already exists in workspace.", parse_mode="Markdown")
+        return
+
+    msg = await update.effective_message.reply_text(f"⏳ Creating GitHub repository `{repo_name}`...", parse_mode="Markdown")
+
+    try:
+        # Call GitHub REST API to create repository
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            headers = {
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "OMV-Agent-Station"
+            }
+            payload = {
+                "name": repo_name,
+                "description": description,
+                "private": is_private,
+                "auto_init": False
+            }
+            resp = await client.post("https://api.github.com/user/repos", json=payload, headers=headers)
+
+            if resp.status_code not in (200, 201):
+                err_body = resp.text
+                await msg.edit_text(f"❌ GitHub API error ({resp.status_code}):\n```\n{err_body[:500]}\n```", parse_mode="Markdown")
+                return
+
+            repo_data = resp.json()
+            clone_url = repo_data.get("clone_url")
+            html_url = repo_data.get("html_url")
+            owner = repo_data.get("owner", {}).get("login", "")
+
+        # Initialize local repository on disk
+        target_dir.mkdir(parents=True, exist_ok=True)
+        await asyncio.create_subprocess_exec(GIT_BIN, "init", "-b", "main", cwd=str(target_dir))
+
+        # Create starter README and .gitignore
+        readme_content = f"# {repo_name}\n\n{description}\n\n*Created with OMV Agent Station on {datetime.now().strftime('%Y-%m-%d')}*\n"
+        (target_dir / "README.md").write_text(readme_content, encoding="utf-8")
+
+        gitignore_content = "__pycache__/\n*.pyc\n.env\nnode_modules/\n.DS_Store\nvenv/\n.venv/\n"
+        (target_dir / ".gitignore").write_text(gitignore_content, encoding="utf-8")
+
+        # Initial commit & remote setup
+        await asyncio.create_subprocess_exec(GIT_BIN, "add", ".", cwd=str(target_dir))
+        await asyncio.create_subprocess_exec(GIT_BIN, "commit", "-m", "feat: initial commit from OMV Agent Station", cwd=str(target_dir))
+
+        remote_url = f"https://x-access-token:{GITHUB_TOKEN}@github.com/{owner}/{repo_name}.git" if GITHUB_TOKEN else clone_url
+        await asyncio.create_subprocess_exec(GIT_BIN, "remote", "add", "origin", remote_url, cwd=str(target_dir))
+        push_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", "main", cwd=str(target_dir))
+        await push_proc.communicate()
+
+        # If in a Forum Supergroup, create a topic for this project automatically
+        topic_info = ""
+        chat = update.effective_chat
+        if chat and chat.type in ("supergroup", "group"):
+            try:
+                forum_topic = await context.bot.create_forum_topic(
+                    chat_id=chat.id,
+                    name=f"📂 {repo_name}"
+                )
+                if forum_topic and forum_topic.message_thread_id:
+                    set_bound_project(chat.id, forum_topic.message_thread_id, repo_name)
+                    topic_info = f"\n🧵 *Created Forum Topic:* `📂 {repo_name}` (automatically bound!)"
+            except Exception as te:
+                logger.info(f"Could not auto-create forum topic: {te}")
+
+        vis_str = "🔒 Private" if is_private else "🌐 Public"
+        await msg.edit_text(
+            f"✅ *GitHub Repository Created & Cloned! cuadros*\n\n"
+            f"📁 *Project:* `{repo_name}`\n"
+            f"🔗 *URL:* {html_url}\n"
+            f"🛡️ *Visibility:* {vis_str}\n"
+            f"💾 *Path:* `/data/workspace/{repo_name}`{topic_info}\n\n"
+            f"Ready to code! Run:\n`/task {repo_name} \"Initial setup instructions\"`",
+            parse_mode="Markdown"
+        )
+
+    except Exception as e:
+        logger.error(f"Error creating GitHub repository: {e}", exc_info=True)
+        await msg.edit_text(f"❌ Failed to create repository: {e}")
+
+async def bind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Binds the current Telegram topic/sub-channel to a workspace project."""
+    if not await check_auth(update):
+        return
+
+    chat = update.effective_chat
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
+
+    if not thread_id:
+        await update.effective_message.reply_text(
+            "ℹ️ This command binds a **Telegram Forum Topic** (sub-channel) to a project repository.\n\n"
+            "To use it:\n"
+            "1. Enable **Topics** in your Telegram Group Settings.\n"
+            "2. Open a dedicated Project Topic (e.g. `#my-app`).\n"
+            "3. Send `/bind <project-folder-name>` inside that topic.",
+            parse_mode="Markdown"
+        )
+        return
+
+    if not context.args:
+        current_bound = get_bound_project(chat.id, thread_id)
+        status = f"Currently bound to: `{current_bound}`" if current_bound else "Not bound to any project."
+        projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")] if WORKSPACE.exists() else []
+        proj_str = ", ".join([f"`{p}`" for p in projects]) or "None"
+        await update.effective_message.reply_text(
+            f"🧵 *Topic Binding Status*\n\n"
+            f"• {status}\n"
+            f"• Available projects: {proj_str}\n\n"
+            f"To bind: `/bind <project-name>`\nTo unbind: `/unbind`",
+            parse_mode="Markdown"
+        )
+        return
+
+    project_name = context.args[0].strip()
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+
+    if not project_dir or not project_dir.exists():
+        await update.effective_message.reply_text(f"❌ Project directory `{project_name}` not found in `/data/workspace`.")
+        return
+
+    set_bound_project(chat.id, thread_id, project_name)
+    await update.effective_message.reply_text(
+        f"✅ *Topic Successfully Bound!*\n\n"
+        f"This sub-channel is now linked to project: `{project_name}`.\n\n"
+        f"Commands in this topic now automatically target `{project_name}`:\n"
+        f"• `/task \"your instructions\"`\n"
+        f"• `/diff`\n"
+        f"• `/pull`\n"
+        f"• `/push`\n"
+        f"• `/branch <name>`",
+        parse_mode="Markdown"
+    )
+
+async def unbind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unbinds the current Telegram topic/sub-channel."""
+    if not await check_auth(update):
+        return
+
+    chat = update.effective_chat
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
+
+    if not thread_id:
+        await update.effective_message.reply_text("ℹ️ Run `/unbind` inside a Telegram Forum Topic.")
+        return
+
+    remove_bound_project(chat.id, thread_id)
+    await update.effective_message.reply_text("✅ Topic unlinked from project context.")
 
 async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    msg = await update.message.reply_text("🔍 Querying LiteLLM Gateway...")
+    msg = await update.effective_message.reply_text("🔍 Querying LiteLLM Gateway...")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
@@ -229,7 +529,6 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    # Check tmux sessions
     try:
         tmux_out = subprocess.check_output(  # nosec B603,B607
             [TMUX_BIN, "list-sessions"],
@@ -239,7 +538,6 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         tmux_out = "No active tmux sessions."
 
-    # Check uptime & memory
     try:
         uptime_out = subprocess.check_output([UPTIME_BIN], text=True).strip()  # nosec B603,B607
         df_out = subprocess.check_output([DF_BIN, "-h", "/data/workspace"], text=True).strip().splitlines()[-1]  # nosec B603,B607
@@ -253,38 +551,39 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💾 *Disk Space:* `{df_out}`\n\n"
         f"🧵 *Active Agent Sessions:*\n```\n{tmux_out}\n```"
     )
-    await update.message.reply_text(report, parse_mode="Markdown")
+    await update.effective_message.reply_text(report, parse_mode="Markdown")
 
 async def projects_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not WORKSPACE.exists():
-        await update.message.reply_text("📁 Workspace folder is empty or not mounted.")
+        await update.effective_message.reply_text("📁 Workspace folder is empty or not mounted.")
         return
-    
+
     projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")]
     if not projects:
-        await update.message.reply_text("📁 No projects found in `/data/workspace`.")
+        await update.effective_message.reply_text("📁 No projects found in `/data/workspace`.")
         return
-    
+
     proj_list = "\n".join([f"📂 `{p}`" for p in projects])
-    await update.message.reply_text(f"📁 *Available Workspace Projects:*\n\n{proj_list}", parse_mode="Markdown")
+    await update.effective_message.reply_text(f"📁 *Available Workspace Projects:*\n\n{proj_list}", parse_mode="Markdown")
 
 async def vault_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not OBSIDIAN_VAULT.exists():
-        await update.message.reply_text("📓 Obsidian vault not mounted.")
+        await update.effective_message.reply_text("📓 Obsidian vault not mounted.")
         return
 
     md_files = list(OBSIDIAN_VAULT.glob("**/*.md"))
-    recent = sorted(md_files, key=lambda f: f.stat().st_mtime, reverse=True)[:5]
-    
+    recent = sorted(md_files, key=lambda f: f.stat().st_mtime, reverse=True)[:6]
+
     recent_str = "\n".join([f"• `{f.relative_to(OBSIDIAN_VAULT)}`" for f in recent]) if recent else "No notes found."
-    await update.message.reply_text(
-        f"📓 *Obsidian Vault Status:*\n\n"
+    await update.effective_message.reply_text(
+        f"📓 *Obsidian Second Brain Vault:*\n\n"
         f"📊 Total notes: `{len(md_files)}`\n"
-        f"🕒 *Recently modified:*\n{recent_str}",
+        f"🔄 Sync: Syncthing (Port 8384)\n\n"
+        f"🕒 *Recently Modified Notes:*\n{recent_str}",
         parse_mode="Markdown"
     )
 
@@ -292,7 +591,7 @@ async def note_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.message.reply_text("Usage: `/note <note title> | <note content>`")
+        await update.effective_message.reply_text("Usage: `/note <note title> | <note content>`")
         return
 
     raw = " ".join(context.args)
@@ -308,24 +607,23 @@ async def note_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     content = f"# {title}\n\n*Created via Telegram on {datetime.now().isoformat()}*\n\n{body}\n"
     note_path.write_text(content, encoding="utf-8")
 
-    await update.message.reply_text(f"📝 Note saved to Obsidian: `{note_path.relative_to(OBSIDIAN_VAULT)}`", parse_mode="Markdown")
+    await update.effective_message.reply_text(f"📝 Note saved to Obsidian: `{note_path.relative_to(OBSIDIAN_VAULT)}`", parse_mode="Markdown")
 
 async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.message.reply_text("Usage: `/chat <your question>`")
+        await update.effective_message.reply_text("Usage: `/chat <your question>`")
         return
 
     query = " ".join(context.args)
-    status_msg = await update.message.reply_text("💭 Thinking...")
+    status_msg = await update.effective_message.reply_text("💭 Thinking...")
 
     try:
-        # Calls LiteLLM virtual router 'coder-smart' (Claude 3.7 Sonnet / Vertex AI / Gemini 3.7 Pro)
         response = ai_client.chat.completions.create(
             model="coder-smart",
             messages=[
-                {"role": "system", "content": "You are an expert AI software architect and assistant."},
+                {"role": "system", "content": "You are an expert AI software architect and coding assistant on OpenMediaVault."},
                 {"role": "user", "content": query}
             ],
             max_tokens=2048,
@@ -341,13 +639,13 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.message.reply_text("Usage: `/clone <git-url> [custom-folder-name]`", parse_mode="Markdown")
+        await update.effective_message.reply_text("Usage: `/clone <git-url> [custom-folder-name]`", parse_mode="Markdown")
         return
 
     raw_git_url = context.args[0].strip()
     git_url = sanitize_git_url(raw_git_url)
     if not git_url:
-        await update.message.reply_text("❌ Invalid git URL format.", parse_mode="Markdown")
+        await update.effective_message.reply_text("❌ Invalid git URL format.", parse_mode="Markdown")
         return
 
     if len(context.args) > 1:
@@ -357,14 +655,14 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_dir = sanitize_project_path(WORKSPACE, folder_name)
     if not target_dir:
-        await update.message.reply_text("❌ Invalid folder name.", parse_mode="Markdown")
+        await update.effective_message.reply_text("❌ Invalid folder name.", parse_mode="Markdown")
         return
 
     if target_dir.exists():
-        await update.message.reply_text(f"⚠️ Destination folder `{folder_name}` already exists in `/data/workspace`.", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"⚠️ Destination folder `{folder_name}` already exists in `/data/workspace`.", parse_mode="Markdown")
         return
 
-    msg = await update.message.reply_text(f"⏳ Cloning `{git_url}` into `{folder_name}`...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"⏳ Cloning `{git_url}` into `{folder_name}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             GIT_BIN, "clone", "--", git_url, str(target_dir),
@@ -373,7 +671,26 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
-            await msg.edit_text(f"✅ Successfully cloned `{folder_name}`!\n\nYou can now run:\n`/task {folder_name} \"your prompt\"`", parse_mode="Markdown")
+            # Auto-create Forum Topic if in a group
+            topic_info = ""
+            chat = update.effective_chat
+            if chat and chat.type in ("supergroup", "group"):
+                try:
+                    forum_topic = await context.bot.create_forum_topic(
+                        chat_id=chat.id,
+                        name=f"📂 {folder_name}"
+                    )
+                    if forum_topic and forum_topic.message_thread_id:
+                        set_bound_project(chat.id, forum_topic.message_thread_id, folder_name)
+                        topic_info = f"\n🧵 *Created Forum Topic:* `📂 {folder_name}`"
+                except Exception as te:
+                    logger.info(f"Could not create forum topic: {te}")
+
+            await msg.edit_text(
+                f"✅ Successfully cloned `{folder_name}`!{topic_info}\n\n"
+                f"You can now run:\n`/task {folder_name} \"your instructions\"`",
+                parse_mode="Markdown"
+            )
         else:
             err = stderr.decode("utf-8", errors="replace")
             await msg.edit_text(f"❌ Git clone failed:\n```\n{err}\n```", parse_mode="Markdown")
@@ -383,17 +700,18 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def pull_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if not context.args:
-        await update.message.reply_text("Usage: `/pull <project-folder-name>`", parse_mode="Markdown")
+
+    project_name, _ = resolve_project_context(update, context)
+    if not project_name:
+        await update.effective_message.reply_text("Usage: `/pull [project-folder-name]`", parse_mode="Markdown")
         return
 
-    project_name = context.args[0]
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
-    msg = await update.message.reply_text(f"⏳ Pulling latest changes for `{project_name}`...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"⏳ Pulling latest changes for `{project_name}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             GIT_BIN, "pull", "--rebase",
@@ -410,32 +728,33 @@ async def pull_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if not context.args:
-        await update.message.reply_text("Usage: `/push <project-folder-name> [branch]`", parse_mode="Markdown")
+
+    project_name, remaining_args = resolve_project_context(update, context)
+    if not project_name:
+        await update.effective_message.reply_text("Usage: `/push [project-folder-name] [branch]`", parse_mode="Markdown")
         return
 
-    project_name = context.args[0]
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
     branch = "HEAD"
-    if len(context.args) > 1:
-        valid_branch = sanitize_branch_name(context.args[1])
+    if remaining_args:
+        valid_branch = sanitize_branch_name(remaining_args[0])
         if not valid_branch:
-            await update.message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            await update.effective_message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
             return
         branch = valid_branch
 
-    msg = await update.message.reply_text(f"⏳ Pushing `{branch}` for `{project_name}` to remote...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"⏳ Pushing `{branch}` for `{project_name}` to remote...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             GIT_BIN, "push", "origin", "--", branch,
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
-        )  # nosec B603,B607
+        )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
         await msg.edit_text(f"🚀 *Git Push Result for `{project_name}`:*\n```\n{out.strip()}\n```", parse_mode="Markdown")
@@ -445,91 +764,91 @@ async def push_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def diff_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if not context.args:
-        await update.message.reply_text("Usage: `/diff <project-folder-name>`", parse_mode="Markdown")
+
+    project_name, _ = resolve_project_context(update, context)
+    if not project_name:
+        await update.effective_message.reply_text("Usage: `/diff [project-folder-name]`", parse_mode="Markdown")
         return
 
-    project_name = context.args[0]
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
     try:
-        # Get status and diff
         proc_status = await asyncio.create_subprocess_exec(GIT_BIN, "status", "-s", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
+        status_out, _ = await proc_status.communicate()
+        stat_text = status_out.decode("utf-8", errors="replace").strip() or "Clean working tree (no changes)."
+
         proc_diff = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        out_status, _ = await proc_status.communicate()
-        out_diff, _ = await proc_diff.communicate()
+        diff_out, _ = await proc_diff.communicate()
+        diff_text = diff_out.decode("utf-8", errors="replace").strip() or "No diff recorded."
 
-        status_text = out_status.decode("utf-8", errors="replace").strip() or "Working tree clean."
-        diff_text = out_diff.decode("utf-8", errors="replace").strip() or "No uncommitted modifications."
-
-        report = (
-            f"📊 *Git Status & Diff for `{project_name}`:*\n\n"
-            f"*Modified Files:*\n```\n{status_text}\n```\n\n"
-            f"*Diff Summary:*\n```\n{diff_text}\n```"
+        await update.effective_message.reply_text(
+            f"🔍 *Git Status & Diff for `{project_name}`:*\n\n"
+            f"📋 *Working Tree:*\n```\n{stat_text}\n```\n\n"
+            f"📊 *Summary:*\n```\n{diff_text}\n```",
+            parse_mode="Markdown"
         )
-        await update.message.reply_text(report, parse_mode="Markdown")
     except Exception as e:
-        await update.message.reply_text(f"❌ Failed to get git diff: {e}")
+        await update.effective_message.reply_text(f"❌ Error inspecting git diff: {e}")
 
 async def branch_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if not context.args:
-        await update.message.reply_text("Usage: `/branch <project-name> [new-branch-to-create-or-checkout]`", parse_mode="Markdown")
+
+    project_name, remaining_args = resolve_project_context(update, context)
+    if not project_name:
+        await update.effective_message.reply_text("Usage: `/branch [project-folder-name] [new-branch-name]`", parse_mode="Markdown")
         return
 
-    project_name = context.args[0]
     project_dir = sanitize_project_path(WORKSPACE, project_name)
     if not project_dir or not project_dir.exists() or not (project_dir / ".git").exists():
-        await update.message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ Not a valid git repository: `{project_name}`", parse_mode="Markdown")
         return
 
-    if len(context.args) == 1:
-        # List branches
+    if not remaining_args:
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "branch", "-a", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
         out, _ = await proc.communicate()
-        await update.message.reply_text(f"🌿 *Branches for `{project_name}`:*\n```\n{out.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"🌿 *Branches in `{project_name}`:*\n```\n{out.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
     else:
-        # Checkout / create branch
-        raw_branch = context.args[1].strip()
-        new_branch = sanitize_branch_name(raw_branch)
+        new_branch = sanitize_branch_name(remaining_args[0])
         if not new_branch:
-            await update.message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
+            await update.effective_message.reply_text("❌ Invalid branch name format.", parse_mode="Markdown")
             return
         proc = await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", new_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
-            await update.message.reply_text(f"✅ Switched to branch `{new_branch}` in `{project_name}`.", parse_mode="Markdown")
+            await update.effective_message.reply_text(f"✅ Switched to branch `{new_branch}` in `{project_name}`.", parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"❌ Branch switch failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
+            await update.effective_message.reply_text(f"❌ Branch switch failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```", parse_mode="Markdown")
 
 async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
-    if not context.args or len(context.args) < 2:
-        await update.message.reply_text(
-            "Usage: `/task <project-folder-name> <your instructions>`\n\n"
-            "Example: `/task my-web-app Add dark mode toggle and unit tests`",
+
+    project_name, remaining_args = resolve_project_context(update, context)
+    if not project_name or not remaining_args:
+        await update.effective_message.reply_text(
+            "Usage: `/task [project-folder-name] <your instructions>`\n\n"
+            "Example: `/task my-api Add authentication middleware and unit tests`\n\n"
+            "*(Tip: In a bound Telegram Topic, project name is automatically inferred!)*",
             parse_mode="Markdown"
         )
         return
 
-    project_name = context.args[0]
-    instructions = " ".join(context.args[1:])
+    instructions = " ".join(remaining_args)
     project_dir = sanitize_project_path(WORKSPACE, project_name)
 
     if not project_dir or not project_dir.exists():
-        await update.message.reply_text(f"❌ Project directory `{project_name}` does not exist in `/data/workspace`.", parse_mode="Markdown")
+        await update.effective_message.reply_text(f"❌ Project directory `{project_name}` does not exist in `/data/workspace`.", parse_mode="Markdown")
         return
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_id = f"task_{timestamp}"
     task_branch = f"agent/{session_id}"
 
-    msg = await update.message.reply_text(
+    msg = await update.effective_message.reply_text(
         f"🚀 *Launching Autonomous Agent Task*\n\n"
         f"📁 Project: `{project_name}`\n"
         f"🌿 Branch: `{task_branch}`\n"
@@ -539,13 +858,11 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    # Spawn Aider / Hermes agent in background asyncio task
     asyncio.create_task(run_agent_task(update, msg, project_dir, instructions, session_id, task_branch))
 
 async def run_agent_task(update: Update, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str):
     """Executes the autonomous agent (Aider with LiteLLM proxy), commits, and pushes branch."""
     try:
-        # If git repo, checkout dedicated task branch
         is_git = (project_dir / ".git").exists()
         if is_git:
             await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
@@ -572,7 +889,6 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
         stdout, _ = await process.communicate()
         agent_out = stdout.decode("utf-8", errors="replace")
 
-        # Capture git diff after execution
         diff_summary = "No git changes recorded."
         push_status = ""
         if is_git:
@@ -586,7 +902,6 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
                 diff_out, _ = await diff_proc.communicate()
                 diff_summary = diff_out.decode("utf-8", errors="replace").strip() or "Changes committed."
 
-                # Automatically push task branch to remote origin
                 push_proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
                     GIT_BIN, "push", "-u", "origin", task_branch,
                     cwd=str(project_dir),
@@ -630,21 +945,32 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
         await status_msg.edit_text(f"❌ Task `{session_id}` failed:\n`{str(e)}`", parse_mode="Markdown")
 
 async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Executes Claude Code CLI in non-interactive/headless mode inside the workspace."""
+    """Executes Claude Code CLI in non-interactive mode inside workspace."""
     if not await check_auth(update):
         return
-    if not context.args:
-        await update.message.reply_text("Usage: `/claude <your prompt or coding request>`\n\nExample: `/claude Create a FastAPI healthcheck endpoint in workspace`", parse_mode="Markdown")
+
+    project_name, remaining_args = resolve_project_context(update, context)
+    prompt = " ".join(remaining_args) if remaining_args else ""
+
+    if not prompt and project_name:
+        prompt = project_name
+        work_dir = WORKSPACE
+    elif project_name and (WORKSPACE / project_name).is_dir():
+        work_dir = WORKSPACE / project_name
+    else:
+        work_dir = WORKSPACE
+
+    if not prompt:
+        await update.effective_message.reply_text("Usage: `/claude <your prompt>`\n\nExample: `/claude Create a healthcheck endpoint`", parse_mode="Markdown")
         return
 
-    prompt = " ".join(context.args)
-    msg = await update.message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in sandboxed workspace...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in `{work_dir.name}`...", parse_mode="Markdown")
 
     claude_bin = shutil.which("claude") or "/usr/local/bin/claude"
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             claude_bin, "-p", prompt, "--print",
-            cwd=str(WORKSPACE),
+            cwd=str(work_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -677,11 +1003,11 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     if not context.args:
-        await update.message.reply_text("Usage: `/exec <shell-command>`\n\nExample: `/exec ls -la`", parse_mode="Markdown")
+        await update.effective_message.reply_text("Usage: `/exec <shell-command>`\n\nExample: `/exec ls -la`", parse_mode="Markdown")
         return
 
     cmd = " ".join(context.args)
-    msg = await update.message.reply_text(f"⏳ Executing: `{cmd}`...", parse_mode="Markdown")
+    msg = await update.effective_message.reply_text(f"⏳ Executing: `{cmd}`...", parse_mode="Markdown")
     try:
         proc = await asyncio.create_subprocess_shell(  # nosec B602
             cmd,
@@ -713,6 +1039,10 @@ def main():
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("models", models_cmd))
     app.add_handler(CommandHandler("projects", projects_cmd))
+    app.add_handler(CommandHandler("newrepo", newrepo_cmd))
+    app.add_handler(CommandHandler("create", newrepo_cmd))
+    app.add_handler(CommandHandler("bind", bind_cmd))
+    app.add_handler(CommandHandler("unbind", unbind_cmd))
     app.add_handler(CommandHandler("clone", clone_cmd))
     app.add_handler(CommandHandler("pull", pull_cmd))
     app.add_handler(CommandHandler("push", push_cmd))

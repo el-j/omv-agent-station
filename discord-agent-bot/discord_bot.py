@@ -225,6 +225,70 @@ async def cmd_clone(ctx, git_url: str, folder_name: str = None):
     else:
         await msg.edit(content=f"❌ Git clone failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```")
 
+@bot.command(name="newrepo", aliases=["create"])
+async def newrepo_cmd(ctx, name: str = None, *, description: str = None):
+    if not is_authorized(ctx):
+        await ctx.send("⛔ Unauthorized access.")
+        return
+    if not name:
+        await ctx.send("Usage: `!newrepo <repo-name> [description] [--public | --private]`")
+        return
+
+    is_private = True
+    desc_clean = description or f"Repository {name} created via OMV Agent Station"
+    if "--public" in desc_clean:
+        is_private = False
+        desc_clean = desc_clean.replace("--public", "").strip()
+    elif "--private" in desc_clean:
+        is_private = True
+        desc_clean = desc_clean.replace("--private", "").strip()
+
+    if not GITHUB_TOKEN:
+        await ctx.send("⚠️ GitHub Token not configured in OMV Services -> Agent Station -> Git Providers.")
+        return
+
+    target = sanitize_project_path(WORKSPACE, name)
+    if not target or target.exists():
+        await ctx.send(f"❌ Invalid or existing repository folder: `{name}`")
+        return
+
+    msg = await ctx.send(f"⏳ Creating GitHub repository `{name}`...")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            headers = {
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "OMV-Agent-Station"
+            }
+            payload = {"name": name, "description": desc_clean, "private": is_private, "auto_init": False}
+            resp = await client.post("https://api.github.com/user/repos", json=payload, headers=headers)
+            if resp.status_code not in (200, 201):
+                await msg.edit(content=f"❌ GitHub API Error ({resp.status_code}):\n```{resp.text[:500]}```")
+                return
+
+            repo_data = resp.json()
+            html_url = repo_data.get("html_url")
+            owner = repo_data.get("owner", {}).get("login", "")
+
+        target.mkdir(parents=True, exist_ok=True)
+        await asyncio.create_subprocess_exec(GIT_BIN, "init", "-b", "main", cwd=str(target))
+        (target / "README.md").write_text(f"# {name}\n\n{desc_clean}\n", encoding="utf-8")
+        (target / ".gitignore").write_text("__pycache__/\n*.pyc\n.env\nnode_modules/\n", encoding="utf-8")
+        await asyncio.create_subprocess_exec(GIT_BIN, "add", ".", cwd=str(target))
+        await asyncio.create_subprocess_exec(GIT_BIN, "commit", "-m", "feat: initial commit", cwd=str(target))
+        remote_url = f"https://x-access-token:{GITHUB_TOKEN}@github.com/{owner}/{name}.git"
+        await asyncio.create_subprocess_exec(GIT_BIN, "remote", "add", "origin", remote_url, cwd=str(target))
+        p_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", "main", cwd=str(target))
+        await p_proc.communicate()
+
+        embed = discord.Embed(title=f"✅ Repository Created: {name}", color=discord.Color.green())
+        embed.add_field(name="GitHub URL", value=html_url, inline=False)
+        embed.add_field(name="Local Path", value=f"`/data/workspace/{name}`", inline=False)
+        embed.add_field(name="Visibility", value="🔒 Private" if is_private else "🌐 Public", inline=True)
+        await msg.edit(content=None, embed=embed)
+    except Exception as e:
+        await msg.edit(content=f"❌ Repository creation error: {e}")
+
 @bot.command(name="chat")
 async def cmd_chat(ctx, *, query: str):
     if not is_authorized(ctx):

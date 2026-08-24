@@ -233,6 +233,46 @@ async def handle_command(sender: str, message_text: str):
         else:
             await send_signal_message(sender, f"❌ Git clone failed:\n{stderr.decode('utf-8', errors='replace')}")
 
+    elif cmd in ("/newrepo", "/create"):
+        if not args:
+            await send_signal_message(sender, "Usage: /newrepo <repo-name> [description] [--public | --private]")
+            return
+        repo_name = args[0]
+        if not GITHUB_TOKEN:
+            await send_signal_message(sender, "⚠️ GitHub Token not configured in OMV Services -> Agent Station -> Git Providers.")
+            return
+        target = sanitize_project_path(WORKSPACE, repo_name)
+        if not target or target.exists():
+            await send_signal_message(sender, f"❌ Invalid or existing repository: {repo_name}")
+            return
+        is_priv = "--public" not in args
+        desc = " ".join([a for a in args[1:] if not a.startswith("--")]) or f"Repository {repo_name}"
+        await send_signal_message(sender, f"⏳ Creating GitHub repository {repo_name}...")
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json", "User-Agent": "OMV-Agent-Station"}
+                payload = {"name": repo_name, "description": desc, "private": is_priv, "auto_init": False}
+                resp = await client.post("https://api.github.com/user/repos", json=payload, headers=headers)
+                if resp.status_code not in (200, 201):
+                    await send_signal_message(sender, f"❌ GitHub API Error: {resp.text[:300]}")
+                    return
+                repo_data = resp.json()
+                html_url = repo_data.get("html_url")
+                owner = repo_data.get("owner", {}).get("login", "")
+
+            target.mkdir(parents=True, exist_ok=True)
+            await asyncio.create_subprocess_exec(GIT_BIN, "init", "-b", "main", cwd=str(target))
+            (target / "README.md").write_text(f"# {repo_name}\n\n{desc}\n", encoding="utf-8")
+            await asyncio.create_subprocess_exec(GIT_BIN, "add", ".", cwd=str(target))
+            await asyncio.create_subprocess_exec(GIT_BIN, "commit", "-m", "feat: initial commit", cwd=str(target))
+            remote_url = f"https://x-access-token:{GITHUB_TOKEN}@github.com/{owner}/{repo_name}.git"
+            await asyncio.create_subprocess_exec(GIT_BIN, "remote", "add", "origin", remote_url, cwd=str(target))
+            p_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", "main", cwd=str(target))
+            await p_proc.communicate()
+            await send_signal_message(sender, f"✅ Repository Created & Initialized!\n🔗 URL: {html_url}\n💾 Path: /data/workspace/{repo_name}\nRun: /task {repo_name} \"instructions\"")
+        except Exception as e:
+            await send_signal_message(sender, f"❌ Failed to create repo: {e}")
+
     elif cmd == "/pull":
         if not args:
             await send_signal_message(sender, "Usage: /pull <project-name>")

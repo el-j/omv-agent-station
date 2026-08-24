@@ -97,6 +97,89 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
                 sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
 
 
+    def test_repo_name_sanitization_blackbox(self):
+        sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        try:
+            import bot
+            valid_names = ["my-cool-app", "backend_api", "service.v2", "omv-agent-123"]
+            for name in valid_names:
+                self.assertEqual(bot.sanitize_repo_name(name), name)
+
+            invalid_names = [
+                "../../evil-app",
+                "-bad-start",
+                ".hidden",
+                "repo/with/slashes",
+                "repo\\with\\backslashes",
+                "repo with spaces",
+                "repo;rm -rf /",
+                "",
+                None
+            ]
+            for name in invalid_names:
+                self.assertIsNone(bot.sanitize_repo_name(name), f"Unsafe repo name '{name}' was not blocked!")
+        finally:
+            if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
+                sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+
+    def test_telegram_topic_binding_and_context_resolution(self):
+        sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        try:
+            import bot
+            with tempfile.TemporaryDirectory() as tmpdir:
+                workspace = Path(tmpdir) / "workspace"
+                workspace.mkdir()
+                bot.WORKSPACE = workspace
+                bot.TOPICS_FILE = workspace / ".agent_topics.json"
+
+                # Create sample projects
+                (workspace / "project-alpha").mkdir()
+                (workspace / "project-beta").mkdir()
+
+                # Bind thread 42 in chat 100 to project-alpha
+                bot.set_bound_project(100, 42, "project-alpha")
+                self.assertEqual(bot.get_bound_project(100, 42), "project-alpha")
+                self.assertIsNone(bot.get_bound_project(100, 99))
+
+                # Test resolve_project_context
+                class DummyMessage:
+                    def __init__(self, thread_id):
+                        self.message_thread_id = thread_id
+
+                class DummyChat:
+                    def __init__(self, cid):
+                        self.id = cid
+
+                class DummyContext:
+                    def __init__(self, args):
+                        self.args = args
+
+                class DummyUpdate:
+                    def __init__(self, cid, thread_id):
+                        self.effective_chat = DummyChat(cid)
+                        self.effective_message = DummyMessage(thread_id)
+
+                # Case A: Inside topic 42 with implicit project args
+                upA = DummyUpdate(100, 42)
+                ctxA = DummyContext(["Add", "new", "feature"])
+                proj, rem = bot.resolve_project_context(upA, ctxA)
+                self.assertEqual(proj, "project-alpha")
+                self.assertEqual(rem, ["Add", "new", "feature"])
+
+                # Case B: Inside topic 42 with explicit override project
+                upB = DummyUpdate(100, 42)
+                ctxB = DummyContext(["project-beta", "Add", "feature"])
+                projB, remB = bot.resolve_project_context(upB, ctxB)
+                self.assertEqual(projB, "project-beta")
+                self.assertEqual(remB, ["Add", "feature"])
+
+                # Unbind
+                bot.remove_bound_project(100, 42)
+                self.assertIsNone(bot.get_bound_project(100, 42))
+        finally:
+            if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
+                sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+
 class TestBlackboxCLIAndPackaging(unittest.TestCase):
     """Black-box testing for CLI lifecycle helper and Debian packaging."""
 
