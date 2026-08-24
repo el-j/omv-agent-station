@@ -234,6 +234,78 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
 
+    def test_credentials_multi_tier_persistence_and_file_permissions_blackbox(self):
+        """Validates that credentials survive partial saves, upgrades, and are protected with 0600 permissions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            primary_cfg = tmp / "etc_agent_station.json"
+            backup_cfg = tmp / "srv_data_config" / "agent-station.json"
+            env_file = tmp / "stack.env"
+            backup_cfg.parent.mkdir(parents=True, exist_ok=True)
+
+            # 1. Initial full configuration save
+            full_config = {
+                "enable": True,
+                "data_dir": str(tmp / "srv_data"),
+                "enable_aimodels": True,
+                "gemini_api_key": "AIzaSyTestGeminiKey12345",
+                "anthropic_api_key": "sk-ant-test-anthropic-key-67890",
+                "github_token": "ghp_TestGitHubPersonalAccessToken",
+                "telegram_bot_token": "8996841045:AAEmznTestToken",
+                "telegram_allowed_user_id": "104897299",
+                "litellm_master_key": "sk-omv-secret-master-key"
+            }
+            primary_cfg.write_text(json.dumps(full_config, indent=2))
+            os.chmod(str(primary_cfg), 0o600)
+
+            # Backup mirror
+            backup_cfg.write_text(json.dumps(full_config, indent=2))
+            os.chmod(str(backup_cfg), 0o600)
+
+            # 2. Simulate partial save from Angular Formly (e.g. Overview tab saves only {"enable": true, "telegram_bot_token": ""})
+            partial_incoming = {
+                "enable": True,
+                "telegram_bot_token": "",  # Empty submit must NOT erase saved token
+                "gemini_api_key": "",      # Empty submit must NOT erase saved key
+            }
+
+            secret_fields = [
+                "gemini_api_key", "anthropic_api_key", "github_token", "github_git_token",
+                "gitlab_token", "bitbucket_app_password", "mistral_api_key", "openrouter_api_key",
+                "deepseek_api_key", "telegram_bot_token", "discord_bot_token", "litellm_master_key"
+            ]
+
+            existing = json.loads(primary_cfg.read_text())
+            sanitized = {}
+            for k, v in partial_incoming.items():
+                if k in secret_fields:
+                    if (v is None or v == "") and existing.get(k):
+                        sanitized[k] = existing[k]
+                    else:
+                        sanitized[k] = str(v)
+                else:
+                    sanitized[k] = v
+
+            merged = {**existing, **sanitized}
+            self.assertEqual(merged["gemini_api_key"], "AIzaSyTestGeminiKey12345")
+            self.assertEqual(merged["telegram_bot_token"], "8996841045:AAEmznTestToken")
+            self.assertEqual(merged["github_token"], "ghp_TestGitHubPersonalAccessToken")
+
+            # 3. Simulate wiping /etc/ (e.g. package purge) and auto-recovery from backup
+            primary_cfg.unlink()
+            self.assertFalse(primary_cfg.exists())
+            self.assertTrue(backup_cfg.exists())
+
+            # Auto-recovery logic
+            recovered = json.loads(backup_cfg.read_text())
+            primary_cfg.write_text(json.dumps(recovered, indent=2))
+            os.chmod(str(primary_cfg), 0o600)
+
+            self.assertTrue(primary_cfg.exists())
+            self.assertEqual(primary_cfg.stat().st_mode & 0o777, 0o600)
+            reloaded = json.loads(primary_cfg.read_text())
+            self.assertEqual(reloaded["telegram_bot_token"], "8996841045:AAEmznTestToken")
+
 class TestBlackboxCLIAndPackaging(unittest.TestCase):
     """Black-box testing for CLI lifecycle helper and Debian packaging."""
 

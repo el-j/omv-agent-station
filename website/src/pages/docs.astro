@@ -373,20 +373,46 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </section>
 
         <!-- ================================================================= -->
-        <!-- 7. SECURITY MODEL                                                 -->
+        <!-- 7. SECURITY & CREDENTIAL PROTECTION                               -->
         <!-- ================================================================= -->
         <section id="security-model" class="glass-card" style="padding: 2.25rem;">
           <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(239, 68, 68, 0.15); color: #f87171; font-size: 0.85rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 9999px; margin-bottom: 1rem;">
-            Zero-Trust Isolation
+            Zero-Trust Isolation & Anti-Theft
           </div>
           <h2 style="font-family: 'Outfit'; font-size: 1.85rem; font-weight: 800; margin-bottom: 1rem;">
-            🛡️ Security, Whitelists & Sandbox Architecture
+            🛡️ Credential Security, Multi-Tier Persistence & Sandbox Isolation
           </h2>
           <p style="color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
-            The Agent Station implements multiple defensive barriers so your OpenMediaVault server and NAS storage remain protected:
+            The Agent Station implements multiple defensive barriers so your AI provider API keys, Git tokens, OpenMediaVault server, and NAS storage remain protected:
           </p>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #f87171; margin-bottom: 0.5rem;">🔒 Anti-Theft Filesystem Permissions</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Configuration files (<code>/etc/openmediavault-agent-station.json</code>, <code>/srv/dev-data/config/</code>, and <code>.env</code>) are locked to <code>chmod 0600</code> (read/write only by root). Unprivileged users and web visitors cannot read or steal credentials.
+              </p>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #38bdf8; margin-bottom: 0.5rem;">🛡️ Container Sandbox Isolation</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                The web terminal runs as unprivileged user <code>node</code> (UID 1000) confined strictly to <code>/srv/dev-data/workspace</code> with zero access to host <code>/etc/</code> or system credentials.
+              </p>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #34d399; margin-bottom: 0.5rem;">💾 3-Tier Permanent Persistence</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                All credentials auto-sync to your persistent NAS storage at <code>/srv/dev-data/config/agent-station.json</code>. Survives OS updates, package rebuilds, and accidental cache cleans.
+              </p>
+            </div>
+          </div>
+
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; color: #e2e8f0;">Additional Defensive Safeguards:</h3>
           <ul style="list-style-type: disc; margin-left: 1.5rem; color: var(--text-muted); line-height: 1.7; font-size: 0.95rem;">
             <li><strong>Numeric User ID Whitelist:</strong> Only your verified numeric ID (e.g. from Telegram <code>@userinfobot</code>) can execute commands. All other senders receive an immediate unauthorized drop.</li>
+            <li><strong>Backend Secret Retention:</strong> Saving individual WebGUI tabs never accidentally erases keys from other tabs.</li>
             <li><strong>Path Traversal Defense:</strong> Commands strictly sanitize repository and file paths, preventing <code>../</code> breakout attacks.</li>
             <li><strong>Command Injection Sanitization:</strong> Git URLs, branch names, and shell parameters are validated with strict regex patterns against leading dash flags (e.g. <code>--upload-pack</code>).</li>
             <li><strong>Read-Only Docker Socket:</strong> Where container introspection is required, <code>docker.sock</code> is mounted strictly in read-only (<code>:ro</code>) mode.</li>
