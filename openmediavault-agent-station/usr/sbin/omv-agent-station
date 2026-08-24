@@ -9,8 +9,10 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 if [ -f "/etc/openmediavault-agent-station.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
-else
+elif [ -f "/etc/openmediavault-ai-orchestrator.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-ai-orchestrator.json"
+else
+    DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
 fi
 
 if [ -d "/usr/share/openmediavault/agent-station" ]; then
@@ -40,8 +42,22 @@ run_compose() {
 
 write_env_file() {
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "Configuration file $CONFIG_FILE does not exist."
-        return 0
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cat <<'EOF' > "$CONFIG_FILE"
+{
+  "enable": false,
+  "data_dir": "/srv/dev-data",
+  "enable_aimodels": true,
+  "enable_gemini": true,
+  "enable_anthropic": true,
+  "enable_github_models": true,
+  "enable_git": true,
+  "enable_chat": true,
+  "enable_telegram": true,
+  "enable_security": true
+}
+EOF
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
     fi
 
     # Read config with python
