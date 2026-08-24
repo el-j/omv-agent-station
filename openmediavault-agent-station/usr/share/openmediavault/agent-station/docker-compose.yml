@@ -83,6 +83,8 @@ services:
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
+      - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/root/.claude
+      - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/root/.anthropic
       - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
       - ./ssh:/root/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -103,10 +105,13 @@ services:
       - LITELLM_API_BASE=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       - ${DATA_DIR:-/srv/dev-data}/workspace:/workspace
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/obsidian
       - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/home/node/.claude
+      - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/home/node/.anthropic
       - ${DATA_DIR:-/srv/dev-data}/ssh:/home/node/.ssh:ro
       - ./ssh:/home/node/.ssh:ro
     ports:

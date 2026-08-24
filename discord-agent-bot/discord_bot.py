@@ -179,9 +179,17 @@ async def cmd_models(ctx):
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m.get("id") for m in data.get("data", [])]
-                model_str = "\n".join([f"• `{m}`" for m in models])
-                embed = discord.Embed(title="✅ Active AI Model Endpoints", description=f"{model_str}\n\n**Virtual Routers:** `coder-fast` | `coder-smart` | `reasoning-heavy`", color=discord.Color.purple())
-                await ctx.send(embed=embed)
+                if models:
+                    model_str = "\n".join([f"• `{m}`" for m in models])
+                    embed = discord.Embed(title="✅ Active AI Model Endpoints", description=f"{model_str}\n\n**Virtual Routers:** `coder-fast` | `coder-smart` | `reasoning-heavy`", color=discord.Color.purple())
+                    await ctx.send(embed=embed)
+                else:
+                    embed = discord.Embed(
+                        title="📋 AI Model Gateway Status",
+                        description="⚠️ **No AI Model Providers Configured Yet.**\n\nTo activate AI models, enter at least one API key in OMV WebGUI:\n👉 **Services ➔ Agent Station ➔ AI Models**\n\n• **Google Gemini (Free):** [Google AI Studio](https://aistudio.google.com/app/apikey)\n• **GitHub Models (Free Copilot):** [GitHub Tokens](https://github.com/settings/tokens/new)\n• **Anthropic Direct (Claude 3.7):** [Anthropic Console](https://console.anthropic.com/settings/keys)",
+                        color=discord.Color.gold()
+                    )
+                    await ctx.send(embed=embed)
             else:
                 await ctx.send(f"⚠️ LiteLLM HTTP {resp.status_code}")
     except Exception as e:
@@ -415,7 +423,16 @@ async def cmd_chat(ctx, *, query: str):
                 reply = reply[:1950] + "\n\n*(Truncated for Discord)*"
             await ctx.send(reply)
         except Exception as e:
-            await ctx.send(f"❌ Error during AI generation: {e}")
+            err_str = str(e)
+            if "Invalid model name" in err_str or "coder-smart" in err_str or "400" in err_str:
+                embed = discord.Embed(
+                    title="⚠️ No AI Model Providers Configured",
+                    description="LiteLLM could not route your query because no API keys have been entered yet.\n\n👉 Open OMV WebGUI ➔ **Services ➔ Agent Station ➔ AI Models** and enter your Google Gemini, GitHub Token, or Claude Key!",
+                    color=discord.Color.orange()
+                )
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send(f"❌ Error during AI generation: {e}")
 
 @bot.command(name="task")
 async def cmd_task(ctx, project_name: str, *, instructions: str):

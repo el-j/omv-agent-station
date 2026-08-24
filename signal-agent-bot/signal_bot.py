@@ -222,8 +222,20 @@ async def handle_command(sender: str, message_text: str):
                 if resp.status_code == 200:
                     data = resp.json()
                     models = [m.get("id") for m in data.get("data", [])]
-                    model_str = "\n".join([f"• {m}" for m in models])
-                    await send_signal_message(sender, f"✅ Active AI Endpoints:\n\n{model_str}\n\nRouters: coder-fast | coder-smart | reasoning-heavy")
+                    if models:
+                        model_str = "\n".join([f"• {m}" for m in models])
+                        await send_signal_message(sender, f"✅ Active AI Endpoints:\n\n{model_str}\n\nRouters: coder-fast | coder-smart | reasoning-heavy")
+                    else:
+                        await send_signal_message(
+                            sender,
+                            "📋 AI Model Gateway Status\n\n"
+                            "⚠️ No AI Model Providers Configured Yet.\n\n"
+                            "To activate models, enter an API key in OMV WebGUI:\n"
+                            "👉 Services ➔ Agent Station ➔ AI Models\n\n"
+                            "• Google Gemini (Free): https://aistudio.google.com/app/apikey\n"
+                            "• GitHub Models: https://github.com/settings/tokens/new\n"
+                            "• Anthropic Claude: https://console.anthropic.com/settings/keys"
+                        )
                 else:
                     await send_signal_message(sender, f"⚠️ LiteLLM HTTP {resp.status_code}")
         except Exception as e:
@@ -396,7 +408,16 @@ async def handle_command(sender: str, message_text: str):
             )
             await send_signal_message(sender, res.choices[0].message.content[:4000])
         except Exception as e:
-            await send_signal_message(sender, f"❌ AI Generation Error: {e}")
+            err_str = str(e)
+            if "Invalid model name" in err_str or "coder-smart" in err_str or "400" in err_str:
+                await send_signal_message(
+                    sender,
+                    "⚠️ No Active AI Model Providers Configured\n\n"
+                    "LiteLLM could not route your request because no API keys have been entered yet.\n\n"
+                    "👉 Open OMV WebGUI ➔ Services ➔ Agent Station ➔ AI Models and enter your Google Gemini, GitHub Token, or Claude Key!"
+                )
+            else:
+                await send_signal_message(sender, f"❌ AI Generation Error: {e}")
 
     elif cmd == "/task":
         if len(args) < 2:
