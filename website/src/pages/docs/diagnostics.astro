@@ -1,0 +1,76 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="System Diagnostics, Health & Telemetry" 
+  description="Native OMV diagnostics page, CLI telemetry subcommands, live tmux session monitor, and service log streaming."
+  category="Security & Ops"
+  prevPage={{ title: "Security & Credential Vault", href: `${baseUrl}/docs/security` }}
+  nextPage={{ title: "Architecture & Overview", href: `${baseUrl}/docs` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>📊 Built-In Observability:</strong><br />
+    The Agent Station provides real-time health checks, memory benchmarking, and service logs directly within the OpenMediaVault WebGUI as well as via the <code>omv-agent-station</code> CLI utility.
+  </div>
+
+  <h2>🖥️ OpenMediaVault WebGUI Diagnostics Page</h2>
+  <p>
+    Inside the OMV WebGUI, navigate to <strong>Diagnostics ➔ Agent Station</strong>:
+  </p>
+  <ul>
+    <li><strong>Services Status Table:</strong> Real-time container state, uptime, port mappings, and memory consumption for <code>litellm-proxy</code>, <code>telegram-agent-bot</code>, <code>syncthing</code>, and <code>ttyd</code>.</li>
+    <li><strong>Tmux Sessions Monitor:</strong> Lists all background autonomous agent sessions with CPU usage and running processes.</li>
+    <li><strong>Service Logs Streamer:</strong> Choose any service from the dropdown (LiteLLM, Telegram Bot, Signal, Discord, System) to inspect the last 100 log lines with one click.</li>
+  </ul>
+
+  <h2>⚡ CLI Subcommands (<code>omv-agent-station</code>)</h2>
+  <p>
+    Manage and inspect the stack from any terminal:
+  </p>
+
+  <pre><code># 1. Full system status summary
+sudo omv-agent-station status
+
+# 2. Memory & CPU resource benchmark
+sudo omv-agent-station performance
+
+# 3. Stream live logs from specific container
+sudo omv-agent-station logs telegram-bot
+sudo omv-agent-station logs litellm-proxy
+
+# 4. Re-apply WebGUI configuration to .env and restart containers
+sudo omv-agent-station apply
+
+# 5. Full stack restart
+sudo omv-agent-station restart</code></pre>
+
+  <h2>🩺 Troubleshooting Common Issues</h2>
+  <table class="docs-table">
+    <thead>
+      <tr>
+        <th>Symptom</th>
+        <th>Likely Cause</th>
+        <th>Recommended Solution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Unauthorized access</code> in Telegram</td>
+        <td><code>TELEGRAM_ALLOWED_USER_ID</code> does not match your numeric ID</td>
+        <td>Send <code>/start</code> to <code>@userinfobot</code> in Telegram, copy your ID, and update it in OMV WebGUI ➔ Agent Station ➔ Chat.</td>
+      </tr>
+      <tr>
+        <td><code>The chat is not a forum</code> error</td>
+        <td>Group does not have Topics enabled</td>
+        <td>In Telegram Group Settings ➔ <strong>Edit</strong> ➔ Turn ON <strong>Topics</strong> and promote bot to Admin.</td>
+      </tr>
+      <tr>
+        <td>LiteLLM <code>No active route configured</code></td>
+        <td>AI provider keys missing in <code>.env</code></td>
+        <td>Add your Gemini API Key or GitHub Token in OMV WebGUI ➔ Agent Station ➔ AI Providers and click Apply.</td>
+      </tr>
+    </tbody>
+  </table>
+</DocsLayout>

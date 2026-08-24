@@ -1,0 +1,51 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Obsidian Second-Brain & Syncthing Sync" 
+  description="Bi-directional continuous synchronization of markdown notes, project specs, and agent execution logs between your devices and OMV."
+  category="Workspace & Notes"
+  prevPage={{ title: "Git Workspaces & Auto-Cloning", href: `${baseUrl}/docs/git-workspaces` }}
+  nextPage={{ title: "Security & Credential Vault", href: `${baseUrl}/docs/security` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>📓 Connected Second Brain:</strong><br />
+    The Agent Station connects your mobile and desktop Obsidian vaults directly to your OMV development server via private, encrypted <strong>Syncthing</strong> replication on ports <code>8384</code> (Web GUI) and <code>22000</code> (Sync Protocol).
+  </div>
+
+  <h2>📝 Creating Notes on the Fly (<code>/note</code>)</h2>
+  <p>
+    You can capture project ideas, architecture specs, or quick scratchpads anytime from your phone:
+  </p>
+
+  <pre><code>/note Database Architecture | Use PostgreSQL with pgvector for embedding search and Redis for task queues.</code></pre>
+
+  <p>
+    The bot formats the note with timestamp frontmatter and writes it to <code>/data/obsidian/Inbox/Database Architecture.md</code>, which syncs immediately to your Obsidian app on iOS/Android/Mac/PC.
+  </p>
+
+  <h2>📓 Inspecting Vault Status (<code>/vault</code>)</h2>
+  <pre><code>/vault</code></pre>
+  <p>
+    Displays total notes in your vault, Syncthing port status, and a list of the 6 most recently modified markdown files across your knowledge base.
+  </p>
+
+  <h2>📂 Automated Project Specs</h2>
+  <p>
+    Whenever a project is cloned or created, the bot automatically provisions:
+  </p>
+  <pre><code>/data/obsidian/Projects/&lt;project_name&gt;/project-spec.md</code></pre>
+  <p>
+    This note contains repository origin links, creation timestamps, active task checklists, and an ongoing execution log updated by autonomous coding agents.
+  </p>
+
+  <h2>🔄 Syncthing Setup on Your Phone / Laptop</h2>
+  <ol>
+    <li>Open the Syncthing WebGUI at <code>http://&lt;your-omv-ip&gt;:8384</code>.</li>
+    <li>Install the Syncthing app on your laptop, phone, or tablet (or use Mobius Sync for iOS).</li>
+    <li>Scan the QR code to pair your device.</li>
+    <li>Select your local <strong>Obsidian Vault folder</strong> as the sync destination.</li>
+  </ol>
+</DocsLayout>

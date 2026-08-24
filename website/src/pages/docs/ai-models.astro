@@ -1,0 +1,112 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="AI Models, Gateway & Smart Routing" 
+  description="Multi-tier model redundancy, automated fallback cascades, LiteLLM gateway configuration, and model selection syntax."
+  category="AI Intelligence"
+  prevPage={{ title: "Quickstart & Installation", href: `${baseUrl}/docs/quickstart` }}
+  nextPage={{ title: "Telegram Bot Handbook", href: `${baseUrl}/docs/telegram` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>🧠 Resilient AI Gateway Architecture:</strong><br />
+    The Agent Station routes all AI queries through a local <code>litellm-proxy</code> container on port <code>4000</code>. If an upstream provider suffers rate limiting (HTTP 429) or server outages (HTTP 500/503), the gateway seamlessly cascades to the next healthy model in milliseconds with zero dropped messages.
+  </div>
+
+  <h2>📋 Active Model Endpoints & Aliases</h2>
+  <table class="docs-table">
+    <thead>
+      <tr>
+        <th>Alias / Model Name</th>
+        <th>Upstream Model</th>
+        <th>Context Window</th>
+        <th>Speed / Tier</th>
+        <th>Best Used For</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>gemini-3.6-flash</code></td>
+        <td><code>gemini/gemini-2.0-flash</code></td>
+        <td>1,048,576 tokens</td>
+        <td>⚡ Ultra-Fast (~80 tps)</td>
+        <td>Default conversational chat, quick code snippets, refactoring, and large repo scans.</td>
+      </tr>
+      <tr>
+        <td><code>coder-smart</code> (Router)</td>
+        <td><code>gemini-2.0-flash</code> ➔ <code>claude-3-7-sonnet</code> ➔ <code>deepseek-r1</code></td>
+        <td>Up to 1M tokens</td>
+        <td>🚀 Smart Multi-Tier</td>
+        <td>Multi-tier autonomous coding agent loop with automatic fallback.</td>
+      </tr>
+      <tr>
+        <td><code>reasoning-heavy</code> (Router)</td>
+        <td><code>deepseek/deepseek-r1</code> ➔ <code>gemini-2.5-pro</code></td>
+        <td>128,000 tokens</td>
+        <td>🧠 Deep Chain-of-Thought</td>
+        <td>Complex algorithmic logic, schema architecture, and intricate debugging.</td>
+      </tr>
+      <tr>
+        <td><code>github-gpt-4o</code></td>
+        <td><code>github/gpt-4o</code></td>
+        <td>128,000 tokens</td>
+        <td>⚡ High Quality</td>
+        <td>Querying OpenAI GPT-4o via free GitHub Marketplace personal access tokens.</td>
+      </tr>
+      <tr>
+        <td><code>claude</code></td>
+        <td>Anthropic Claude Code CLI</td>
+        <td>200,000 tokens</td>
+        <td>🛠️ Workspace Agent</td>
+        <td>Full repository multi-file edits, git commit automation, and test runner execution.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>💬 How to Select Models via Chat</h2>
+  <p>
+    You can query any specific model or use intelligent shortcut commands:
+  </p>
+
+  <pre><code># 1. Quick Shortcut for Google Gemini Flash:
+/gemini Explain how systemd timers compare to crond
+
+# 2. Quick Shortcut for GitHub GPT-4o:
+/gpt4 Write a TypeScript interface for this JSON schema
+
+# 3. Model Flag Selection via /chat:
+/chat -m reasoning-heavy Optimize this SQL join query for 10M rows
+/chat -m coder-smart Find and fix the memory leak in worker.py
+
+# 4. Interactive Dashboard:
+/models     # Displays active models with tap-to-ask inline action buttons!
+/modelhelp  # Displays in-depth model documentation inside chat</code></pre>
+
+  <h2>🔄 Redundancy & Failover Configuration</h2>
+  <p>
+    The LiteLLM gateway configuration is defined in <code>/usr/share/openmediavault/agent-station/litellm_config.yaml</code>:
+  </p>
+
+  <pre><code>model_list:
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+router_settings:
+  routing_strategy: latency-based-routing
+  num_retries: 3
+  timeout: 45
+  fallbacks:
+    - coder-smart: ["github-gpt-4o", "gemini-3.6-flash"]</code></pre>
+</DocsLayout>

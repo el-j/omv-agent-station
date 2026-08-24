@@ -82,7 +82,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
-      - ./telegram-agent-bot/bot.py:/app/bot.py:ro
+      - ./telegram-agent-bot:/app:ro
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
       - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/root/.claude

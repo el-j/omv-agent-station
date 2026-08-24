@@ -1,0 +1,54 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Security, Credentials & Access Control" 
+  description="Multi-tier credential persistence, strict 0600 file masks, WebGUI password input masking, numeric ID authorization, and path traversal guards."
+  category="Security & Ops"
+  prevPage={{ title: "Obsidian & Syncthing Sync", href: `${baseUrl}/docs/obsidian-sync` }}
+  nextPage={{ title: "Diagnostics & Telemetry", href: `${baseUrl}/docs/diagnostics` }}
+>
+  <div class="docs-callout docs-callout-warning">
+    <strong>🛡️ Production-Grade Hardening:</strong><br />
+    Self-hosted development servers hold sensitive tokens (OpenAI, Gemini, Anthropic, GitHub). The Agent Station implements a zero-trust multi-tier security model to prevent secret leaks, credential clobbering, and path traversal attacks.
+  </div>
+
+  <h2>🔑 Multi-Tier Credential Persistence & Protection</h2>
+  <p>
+    When you configure API keys in the OMV WebGUI, the system writes secrets into:
+  </p>
+  <pre><code>/etc/agent-station/credentials.json</code></pre>
+  
+  <ul>
+    <li><strong>Permission Mask <code>0600</code> (<code>rw-------</code>):</strong> Readable and writable strictly by <code>root</code>. Regular users or other unprivileged daemons cannot read this file.</li>
+    <li><strong>Survives Plugin Updates & Partial Saves:</strong> If you only update Telegram settings, the CLI helper merges your input with existing AI provider keys so existing credentials are never erased.</li>
+    <li><strong>Non-Clobbering Fallback:</strong> If WebGUI submission fields are submitted empty during partial saves, the backend preserves existing valid tokens.</li>
+  </ul>
+
+  <h2>🔒 Password Input Masking in OMV WebGUI</h2>
+  <p>
+    All sensitive token fields in the OMV Angular Workbench interface (Gemini API Key, GitHub Token, Telegram Bot Token, Anthropic API Key, Discord Token, OpenAI Token) use <code>type: password</code> inputs. Tokens are never displayed in cleartext on the screen after pasting.
+  </p>
+
+  <h2>👤 Strict Numeric User ID Authorization</h2>
+  <p>
+    Messenger bots (Telegram, Discord, Signal) enforce strict whitelisting:
+  </p>
+  <ul>
+    <li>Every incoming message verifies <code>update.effective_user.id == ALLOWED_USER_ID</code>.</li>
+    <li>Unauthorized users attempting to send commands receive a strict <code>403 Unauthorized</code> response and are immediately dropped from execution.</li>
+  </ul>
+
+  <h2>🛡️ Path Traversal & Command Injection Sanitization</h2>
+  <p>
+    Commands that accept folder or project names (such as <code>/clone</code>, <code>/task</code>, <code>/branch</code>, <code>/diff</code>) pass through strict path traversal validation:
+  </p>
+  <pre><code>def sanitize_project_path(base_dir: Path, user_input: str) -> Path | None:
+    # Resolves canonical real path and verifies it is strictly inside WORKSPACE
+    target = (base_dir / user_input).resolve()
+    if not str(target).startswith(str(base_dir.resolve())):
+        return None
+    return target</code></pre>
+</DocsLayout>
