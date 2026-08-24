@@ -165,18 +165,6 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 
   # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
-  # Direct Anthropic -> Vertex AI Claude -> Gemini 3.7 Pro -> Gemini 3.7 Flash -> GitHub Copilot
-  - model_name: coder-smart
-    litellm_params:
-      model: anthropic/claude-3-7-sonnet-20250219
-      api_key: os.environ/ANTHROPIC_API_KEY
-      enable_prompt_caching: true
-  - model_name: coder-smart
-    litellm_params:
-      model: vertex_ai/claude-3-7-sonnet@20250219
-      vertex_project: os.environ/VERTEX_PROJECT_ID
-      vertex_location: os.environ/VERTEX_LOCATION
-      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
   - model_name: coder-smart
     litellm_params:
       model: gemini/gemini-3.7-pro
@@ -190,25 +178,26 @@ model_list:
       model: openai/gpt-4o
       api_base: https://models.inference.ai.azure.com
       api_key: os.environ/GITHUB_TOKEN
-
-  # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
-  - model_name: reasoning-heavy
+  - model_name: coder-smart
     litellm_params:
       model: anthropic/claude-3-7-sonnet-20250219
       api_key: os.environ/ANTHROPIC_API_KEY
-  - model_name: reasoning-heavy
+      enable_prompt_caching: true
+  - model_name: coder-smart
     litellm_params:
       model: vertex_ai/claude-3-7-sonnet@20250219
       vertex_project: os.environ/VERTEX_PROJECT_ID
       vertex_location: os.environ/VERTEX_LOCATION
       vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+
+  # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
   - model_name: reasoning-heavy
     litellm_params:
       model: gemini/gemini-3.7-pro
       api_key: os.environ/GEMINI_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
-      model: openai/o1
+      model: openai/DeepSeek-R1
       api_base: https://models.inference.ai.azure.com
       api_key: os.environ/GITHUB_TOKEN
   - model_name: reasoning-heavy
@@ -218,9 +207,13 @@ model_list:
       api_key: os.environ/GITHUB_TOKEN
   - model_name: reasoning-heavy
     litellm_params:
-      model: openai/DeepSeek-R1
+      model: openai/o1
       api_base: https://models.inference.ai.azure.com
       api_key: os.environ/GITHUB_TOKEN
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
 
 # ==============================================================================
 # ROUTER & RATE LIMIT SHIELD SETTINGS
@@ -234,10 +227,13 @@ router_settings:
   cooldown_time: 30 # Cooldown provider for 30s when a 429 occurs
   allowed_fails: 2
   fallbacks:
-    - claude-3-7-sonnet-direct: ["claude-3-7-sonnet-vertex", "gemini-3.7-pro", "github-gpt-4o"]
-    - claude-3-7-sonnet-vertex: ["claude-3-7-sonnet-direct", "gemini-3.7-pro", "github-gpt-4o"]
-    - gemini-3.7-pro: ["claude-3-7-sonnet-vertex", "claude-3-7-sonnet-direct", "github-gpt-4o"]
-    - gemini-3.7-flash: ["gemini-2.5-flash", "claude-3-5-haiku"]
+    - coder-smart: ["gemini-3.7-pro", "gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - coder-fast: ["gemini-3.7-flash", "gemini-2.5-flash", "github-gpt-4o"]
+    - reasoning-heavy: ["gemini-3.7-pro", "github-deepseek-r1", "github-o3-mini", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-direct: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-vertex: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - gemini-3.7-pro: ["gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - gemini-3.7-flash: ["gemini-2.5-flash", "github-gpt-4o"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
