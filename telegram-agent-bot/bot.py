@@ -16,11 +16,17 @@ import asyncio
 import subprocess  # nosec B404
 from pathlib import Path
 from datetime import datetime
-from telegram import Update
+from telegram import (
+    Update,
+    BotCommand,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
     ContextTypes,
 )
@@ -59,7 +65,7 @@ CUSTOM_CMDS_FILE = WORKSPACE / ".custom_commands.json"
 OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
 
 BUILTIN_COMMANDS = {
-    "start", "help", "status", "models", "projects", "newrepo", "create",
+    "start", "help", "status", "models", "modelhelp", "aihelp", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
     "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "addcmd", "alias", "delcmd",
     "removecmd", "customcmds", "cmds", "aliases"
@@ -334,39 +340,264 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.effective_message.reply_text(welcome_text, parse_mode="Markdown")
 
+async def sync_bot_commands(bot):
+    """Registers built-in and user custom commands for Telegram auto-complete menu."""
+    commands = [
+        BotCommand("chat", "💬 Ask AI (smart router or specific model)"),
+        BotCommand("gemini", "⚡ Quick ask Google Gemini 3.6 Flash"),
+        BotCommand("gpt4", "🤖 Quick ask GitHub Models GPT-4o"),
+        BotCommand("models", "📋 List active AI models & action dashboard"),
+        BotCommand("modelhelp", "📖 Detailed model guide & recommendations"),
+        BotCommand("task", "🚀 Dispatch autonomous coding agent loop"),
+        BotCommand("claude", "🧠 Run Claude Code CLI on workspace"),
+        BotCommand("exec", "🖥️ Execute shell command in workspace"),
+        BotCommand("projects", "📁 List workspaces & git repos"),
+        BotCommand("newrepo", "✨ Create a new GitHub repo"),
+        BotCommand("clone", "📥 Clone a git repository"),
+        BotCommand("pull", "⬇️ Git pull changes"),
+        BotCommand("push", "⬆️ Git push changes"),
+        BotCommand("branch", "🌿 List / switch git branches"),
+        BotCommand("diff", "🔍 View uncommitted git diff"),
+        BotCommand("status", "📊 View server & agent health metrics"),
+        BotCommand("note", "📝 Quick note to Obsidian second-brain"),
+        BotCommand("vault", "📓 List Obsidian notes & specs"),
+        BotCommand("addcmd", "➕ Add custom shortcut command"),
+        BotCommand("delcmd", "➖ Delete a custom shortcut"),
+        BotCommand("cmds", "📋 View all custom shortcuts"),
+        BotCommand("help", "❓ Open interactive help & handbook"),
+    ]
+
+    try:
+        custom_cmds = load_custom_commands()
+        for name, tpl in sorted(custom_cmds.items())[:20]:
+            desc = f"⚡ Shortcut: {tpl}"
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+            commands.append(BotCommand(name, desc))
+    except Exception as e:
+        logger.warning(f"Could not load custom commands for autocomplete: {e}")
+
+    try:
+        await bot.set_my_commands(commands)
+        logger.info(f"Synchronized {len(commands)} commands to Telegram autocomplete menu.")
+    except Exception as e:
+        logger.warning(f"Failed to set Telegram bot commands: {e}")
+
+async def modelhelp_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Provides an in-depth guide on available AI models, strengths, speed, and usage tips."""
+    if not await check_auth(update):
+        return
+    
+    guide_text = (
+        "📖 *Agent Station — AI Model Guide & Recommendations*\n\n"
+        "⚡ *1. Google Gemini (Fast & Massive Context)*\n"
+        "• `gemini-3.6-flash` / `gemini-3.7-flash`\n"
+        "• *Context:* 1,000,000+ tokens | *Speed:* Ultra-Fast (< 1s)\n"
+        "• *Best for:* Quick questions, documentation lookup, code translation, single-file edits.\n"
+        "• *Usage:* `/gemini <prompt>` or `/chat -m gemini-3.6-flash <prompt>`\n\n"
+        "🧠 *2. Coder-Smart Virtual Router (High Intelligence)*\n"
+        "• `coder-smart` (Default Router)\n"
+        "• *Engines:* Gemini 3.6 Flash ➔ Gemini 3.7 Pro ➔ GitHub GPT-4o ➔ Claude 3.7\n"
+        "• *Best for:* Autonomous agentic coding loops, deep refactoring, architecture design.\n"
+        "• *Usage:* `/chat <prompt>` or `/task <project> <prompt>`\n\n"
+        "🚀 *3. Reasoning-Heavy Router (Extended Thinking)*\n"
+        "• `reasoning-heavy`\n"
+        "• *Engines:* Gemini Pro ➔ DeepSeek-R1 ➔ OpenAI o3-mini\n"
+        "• *Best for:* Complex math, concurrency bugs, algorithmic puzzles, security audits.\n"
+        "• *Usage:* `/chat -m reasoning-heavy <prompt>`\n\n"
+        "🐙 *4. GitHub Models (Copilot Zero-Cost Quota)*\n"
+        "• `github-gpt-4o` | `github-o3-mini` | `github-deepseek-r1`\n"
+        "• *Best for:* High-quality GPT-4o intelligence included in your GitHub subscription.\n"
+        "• *Usage:* `/gpt4 <prompt>` or `/chat -m github-gpt-4o <prompt>`\n\n"
+        "🤖 *5. Claude Code CLI (Autonomous Agent)*\n"
+        "• `claude`\n"
+        "• *Capabilities:* Reads entire directories, creates/edits files, runs git commands, executes tests.\n"
+        "• *Usage:* `/claude <prompt>` (Requires 1-time Web Terminal login: `http://192.168.1.200:7681`)"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("⚡ Ask Gemini", switch_inline_query_current_chat="/gemini "),
+            InlineKeyboardButton("🧠 Ask Coder-Smart", switch_inline_query_current_chat="/chat "),
+        ],
+        [
+            InlineKeyboardButton("📋 View Active Models", callback_data="btn_models"),
+            InlineKeyboardButton("❓ Full Help Menu", callback_data="help_menu:main"),
+        ]
+    ]
+
+    await update.effective_message.reply_text(
+        guide_text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
     text = (
         "📖 *Agent Station Remote Control & Handbook*\n\n"
-        "1️⃣ *Create / Clone Repositories:*\n"
-        "   • `/newrepo my-api \"FastAPI backend service\"` — Creates remote GitHub repo, initializes local workspace & creates Topic!\n"
-        "   • `/clone https://github.com/user/repo` — Clones any repo with PAT auth\n\n"
+        "1️⃣ *AI Models & Chat:*\n"
+        "   • `/chat <question>` — Direct query via default `coder-smart` router\n"
+        "   • `/chat -m <model> <question>` — Query a specific model\n"
+        "   • `/gemini <prompt>` — Instant Google Gemini 3.6 Flash shortcut\n"
+        "   • `/gpt4 <prompt>` — Instant GitHub Models GPT-4o shortcut\n"
+        "   • `/models` — Active AI model endpoints & action dashboard\n"
+        "   • `/modelhelp` — Detailed AI model comparison & tips\n\n"
         "2️⃣ *Autonomous Coding Agent:*\n"
         "   • `/task my-api \"Add Redis caching layer with unit tests\"`\n"
-        "   • Automatically branches `agent/task-<timestamp>`, runs coding agent, tests, commits & pushes!\n"
-        "   • *Topic tip:* In a bound topic, simply run `/task \"Add Redis caching\"`!\n\n"
-        "3️⃣ *Custom User Commands & Shortcuts:*\n"
+        "   • `/claude <prompt>` — Headless Claude Code CLI execution\n"
+        "   • `/exec <cmd>` — Run sandboxed bash command in workspace\n\n"
+        "3️⃣ *Create / Clone Repositories:*\n"
+        "   • `/newrepo my-api \"FastAPI backend service\"` — Creates remote GitHub repo + local workspace + Topic!\n"
+        "   • `/clone https://github.com/user/repo` — Clones any repo with PAT auth\n\n"
+        "4️⃣ *Custom User Commands & Shortcuts:*\n"
         "   • `/addcmd test /exec pytest -v` ➔ Runs `/test` as a shortcut!\n"
         "   • `/addcmd review /chat \"Review this code: {args}\"`\n"
-        "   • `/addcmd pr /task \"Create PR draft & bump version\"`\n"
         "   • `/customcmds` — List all your custom shortcuts\n"
         "   • `/delcmd <name>` — Delete a shortcut\n\n"
-        "4️⃣ *Telegram Forum Topics (Project Sub-Channels):*\n"
-        "   • Enable **Topics** in your Telegram Supergroup settings.\n"
+        "5️⃣ *Telegram Forum Topics (Project Sub-Channels):*\n"
         "   • Inside a topic, use `/bind my-project` to bind the channel.\n"
-        "   • All `/task`, `/diff`, `/push` commands inside that topic automatically target that project!\n\n"
-        "5️⃣ *Obsidian Second-Brain Sync:*\n"
+        "   • All `/task`, `/diff`, `/push` commands automatically target that project!\n\n"
+        "6️⃣ *Obsidian Second-Brain Sync:*\n"
         "   • Syncthing (Port 8384) syncs notes from your laptop/phone to `/data/obsidian`.\n"
         "   • `/note Design Doc | System architecture requirements`\n"
-        "   • `/vault` — Inspect recent notes & specs available to AI agents.\n\n"
-        "6️⃣ *AI Gateway & Interactive Shell:*\n"
-        "   • `/chat <question>` — Direct query via LiteLLM model router\n"
-        "   • `/claude <prompt>` — Headless Claude Code CLI execution\n"
-        "   • `/models` — List active LLMs (Gemini, Claude, GPT-4o, DeepSeek)\n"
-        "   • `/exec <cmd>` — Run sandboxed bash command in workspace"
+        "   • `/vault` — Inspect recent notes & specs available to AI agents."
     )
-    await update.effective_message.reply_text(text, parse_mode="Markdown")
+    keyboard = [
+        [
+            InlineKeyboardButton("🧠 AI Models", callback_data="help_menu:models"),
+            InlineKeyboardButton("🚀 Coding Agent", callback_data="help_menu:agent"),
+        ],
+        [
+            InlineKeyboardButton("📁 Git & Repos", callback_data="help_menu:git"),
+            InlineKeyboardButton("📓 Obsidian Vault", callback_data="help_menu:obsidian"),
+        ],
+        [
+            InlineKeyboardButton("⚡ Custom Commands", callback_data="help_menu:customcmds"),
+            InlineKeyboardButton("📋 Active Models", callback_data="btn_models"),
+        ]
+    ]
+    await update.effective_message.reply_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles inline keyboard navigation for /help and /models dashboard."""
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+
+    data = query.data or ""
+    if data == "btn_models":
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"{LITELLM_BASE}/models", headers={"Authorization": f"Bearer {LITELLM_KEY}"})
+                if resp.status_code == 200:
+                    models = [m.get("id") for m in resp.json().get("data", [])]
+                    model_str = "\n".join([f"• `{m}`" for m in models]) if models else "No active models configured."
+                    text = f"✅ *Active AI Model Endpoints ({len(models)}):*\n\n{model_str}\n\n*Routers:* `coder-fast` | `coder-smart` | `reasoning-heavy`"
+                    keyboard = [
+                        [
+                            InlineKeyboardButton("⚡ Ask Gemini", switch_inline_query_current_chat="/gemini "),
+                            InlineKeyboardButton("🧠 Ask Coder-Smart", switch_inline_query_current_chat="/chat "),
+                        ],
+                        [
+                            InlineKeyboardButton("📖 Model Guide", callback_data="btn_modelhelp"),
+                            InlineKeyboardButton("🔄 Refresh", callback_data="btn_models"),
+                        ]
+                    ]
+                    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            await query.edit_message_text(f"❌ Error refreshing models: {e}")
+
+    elif data == "btn_modelhelp" or data == "help_menu:models":
+        text = (
+            "📖 *AI Models Guide & Tips:*\n\n"
+            "• `gemini-3.6-flash` — Ultra fast (1M context), best for quick queries.\n"
+            "• `coder-smart` — Smart multi-tier router for deep bug fixing & coding.\n"
+            "• `reasoning-heavy` — Deep reasoning for math & architectural design.\n"
+            "• `github-gpt-4o` — High quality GPT-4o via GitHub token.\n"
+            "• `claude` — Claude Code autonomous CLI agent on workspace.\n\n"
+            "Syntax: `/chat -m <model> <question>` or `/gemini <prompt>`"
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton("⚡ Ask Gemini", switch_inline_query_current_chat="/gemini "),
+                InlineKeyboardButton("📋 Active Models", callback_data="btn_models"),
+            ],
+            [
+                InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")
+            ]
+        ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help_menu:main":
+        text = (
+            "📖 *Agent Station Interactive Handbook*\n\n"
+            "Select a topic below to explore capabilities and commands:"
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton("🧠 AI Models & Chat", callback_data="help_menu:models"),
+                InlineKeyboardButton("🚀 Coding Agent", callback_data="help_menu:agent"),
+            ],
+            [
+                InlineKeyboardButton("📁 Git & Repos", callback_data="help_menu:git"),
+                InlineKeyboardButton("📓 Obsidian Vault", callback_data="help_menu:obsidian"),
+            ],
+            [
+                InlineKeyboardButton("⚡ Custom Commands", callback_data="help_menu:customcmds"),
+                InlineKeyboardButton("📋 Active Endpoints", callback_data="btn_models"),
+            ]
+        ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help_menu:agent":
+        text = (
+            "🚀 *Autonomous Coding Agent & Claude Code:*\n\n"
+            "• `/task <project> <prompt>` — Dispatches autonomous coding agent on the project.\n"
+            "• `/claude <prompt>` — Executes Claude Code CLI on the sandboxed workspace.\n"
+            "• `/exec <cmd>` — Runs any shell command in the project directory."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help_menu:git":
+        text = (
+            "📁 *Git & Workspace Management:*\n\n"
+            "• `/newrepo <name> <desc>` — Creates remote GitHub repo + local folder + Telegram topic.\n"
+            "• `/clone <url>` — Clones any repo with configured PAT credentials.\n"
+            "• `/pull` | `/push` | `/branch` | `/diff` — Instant git actions on current project."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help_menu:obsidian":
+        text = (
+            "📓 *Obsidian Second-Brain Integration:*\n\n"
+            "• Syncthing (Port 8384) bi-directionally syncs notes between your devices & OMV.\n"
+            "• `/note <Title> | <Content>` — Writes a structured Markdown note to the vault.\n"
+            "• `/vault` — Lists recent notes and specs available to AI agents."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help_menu:customcmds":
+        text = (
+            "⚡ *User-Defined Custom Commands:*\n\n"
+            "• `/addcmd <name> <template>` — Create custom shortcuts that autocomplete in Telegram.\n"
+            "  Examples:\n"
+            "  - `/addcmd test /exec pytest -v`\n"
+            "  - `/addcmd review /chat \"Review this code: {args}\"`\n"
+            "• `/delcmd <name>` — Delete a shortcut\n"
+            "• `/customcmds` — List all shortcuts"
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Main Help", callback_data="help_menu:main")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def addcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Adds or updates a custom user-defined shortcut command."""
@@ -399,11 +630,17 @@ async def addcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmds[cmd_name] = template
     save_custom_commands(cmds)
 
+    # Re-sync autocomplete command list in Telegram
+    try:
+        await sync_bot_commands(context.application.bot)
+    except Exception as e:
+        logger.warning(f"Could not re-sync commands: {e}")
+
     await update.effective_message.reply_text(
-        f"✅ *Custom Command Saved!*\n\n"
+        f"✅ *Custom Command Saved & Autocompleted!*\n\n"
         f"• Command: `/{cmd_name}`\n"
         f"• Template: `{template}`\n\n"
-        f"You can now run `/{cmd_name}` directly in chat!",
+        f"You can now run `/{cmd_name}` directly in chat or from the autocomplete menu!",
         parse_mode="Markdown"
     )
 
@@ -424,6 +661,10 @@ async def delcmd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cmd_name in cmds:
         del cmds[cmd_name]
         save_custom_commands(cmds)
+        try:
+            await sync_bot_commands(context.application.bot)
+        except Exception as e:
+            logger.warning(f"Could not re-sync commands: {e}")
         await update.effective_message.reply_text(f"✅ Custom command `/{cmd_name}` deleted.", parse_mode="Markdown")
     else:
         await update.effective_message.reply_text(f"⚠️ Custom command `/{cmd_name}` not found.", parse_mode="Markdown")
@@ -712,13 +953,31 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 models = [m.get("id") for m in data.get("data", [])]
                 if models:
                     model_str = "\n".join([f"• `{m}`" for m in models])
+                    text = (
+                        f"✅ *Active AI Model Endpoints ({len(models)}):*\n\n"
+                        f"{model_str}\n\n"
+                        f"🎯 *Virtual Smart Routers:*\n"
+                        f"• `coder-fast` — Instant triage & fast edits\n"
+                        f"• `coder-smart` — Deep coding & refactoring\n"
+                        f"• `reasoning-heavy` — Architecture & math analysis"
+                    )
+                    keyboard = [
+                        [
+                            InlineKeyboardButton("⚡ Ask Gemini", switch_inline_query_current_chat="/gemini "),
+                            InlineKeyboardButton("🧠 Ask Coder-Smart", switch_inline_query_current_chat="/chat "),
+                        ],
+                        [
+                            InlineKeyboardButton("📖 Model Guide & Tips", callback_data="btn_modelhelp"),
+                            InlineKeyboardButton("🔄 Refresh", callback_data="btn_models"),
+                        ]
+                    ]
                     await msg.edit_text(
-                        f"✅ *Active AI Model Endpoints:*\n\n{model_str}\n\n"
-                        f"Routing: `coder-fast` | `coder-smart` | `reasoning-heavy`",
-                        parse_mode="Markdown"
+                        text,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
                     )
                 else:
-                    await msg.edit_text(
+                    text = (
                         "📋 *AI Model Gateway Status*\n\n"
                         "⚠️ *No AI Model Providers Configured Yet.*\n\n"
                         "To activate AI models, enter at least one API key in OMV WebGUI:\n"
@@ -726,8 +985,18 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "• *Google Gemini (Recommended Free):* [Google AI Studio](https://aistudio.google.com/app/apikey)\n"
                         "• *GitHub Models (Free Copilot / GPT-4o):* [GitHub Tokens](https://github.com/settings/tokens/new)\n"
                         "• *Anthropic Direct (Claude 3.7):* [Anthropic Console](https://console.anthropic.com/settings/keys)\n"
-                        "• *DeepSeek / Mistral / OpenRouter*",
-                        parse_mode="Markdown"
+                        "• *DeepSeek / Mistral / OpenRouter*"
+                    )
+                    keyboard = [
+                        [
+                            InlineKeyboardButton("🔄 Check Again", callback_data="btn_models"),
+                            InlineKeyboardButton("📖 Model Guide", callback_data="btn_modelhelp"),
+                        ]
+                    ]
+                    await msg.edit_text(
+                        text,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
                     )
             else:
                 await msg.edit_text(f"⚠️ LiteLLM returned HTTP {resp.status_code}")
@@ -1318,13 +1587,15 @@ def main():
         while True:
             time.sleep(3600)
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(sync_bot_commands).build()
 
     # Core Built-in Command Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("models", models_cmd))
+    app.add_handler(CommandHandler("modelhelp", modelhelp_cmd))
+    app.add_handler(CommandHandler("aihelp", modelhelp_cmd))
     app.add_handler(CommandHandler("projects", projects_cmd))
     app.add_handler(CommandHandler("newrepo", newrepo_cmd))
     app.add_handler(CommandHandler("create", newrepo_cmd))
@@ -1351,10 +1622,13 @@ def main():
     app.add_handler(CommandHandler("claude", claude_cmd))
     app.add_handler(CommandHandler("exec", exec_cmd))
 
+    # Interactive Inline Keyboard Callback Handler
+    app.add_handler(CallbackQueryHandler(help_callback_handler))
+
     # Dynamic Custom Command Fallback Handler
     app.add_handler(MessageHandler(filters.COMMAND, dynamic_command_handler))
 
-    print("🤖 Telegram Agent Relay Bot starting polling with custom commands support...")
+    print("🤖 Telegram Agent Relay Bot starting polling with autocomplete & dashboard support...")
     app.run_polling()
 
 if __name__ == "__main__":
