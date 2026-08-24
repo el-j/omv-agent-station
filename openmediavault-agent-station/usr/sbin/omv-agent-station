@@ -159,11 +159,11 @@ apply_sync() {
     if [ "$ENABLE" = "True" ] || [ "$ENABLE" = "true" ]; then
         echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Starting Agent Station Stack Provisioning..." >> "$LOG_FILE" 2>/dev/null || true
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing, Terminal)..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing)..." >> "$LOG_FILE" 2>/dev/null || true
         if [ -d "$STACK_DIR" ]; then
-            (cd "$STACK_DIR" && run_compose --env-file .env pull >> "$LOG_FILE" 2>&1 || true)
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
-            (cd "$STACK_DIR" && run_compose --env-file .env up -d --remove-orphans >> "$LOG_FILE" 2>&1 || true)
+            (cd "$STACK_DIR" && (run_compose --env-file .env pull --ignore-buildable || run_compose --env-file .env pull) >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Building and starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
+            (cd "$STACK_DIR" && run_compose --env-file .env up -d --build --remove-orphans >> "$LOG_FILE" 2>&1 || true)
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Agent Station stack is up and active!" >> "$LOG_FILE" 2>/dev/null || true
         fi
     else
