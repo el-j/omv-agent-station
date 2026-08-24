@@ -70,7 +70,7 @@ BUILTIN_COMMANDS = {
     "start", "help", "status", "models", "modelhelp", "aihelp", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
     "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "addcmd", "alias", "delcmd",
-    "removecmd", "customcmds", "cmds", "aliases"
+    "removecmd", "customcmds", "cmds", "aliases", "createtopic", "topic"
 }
 
 def init_git_credentials():
@@ -357,6 +357,9 @@ async def sync_bot_commands(target):
         BotCommand("projects", "📁 List workspaces & git repos"),
         BotCommand("newrepo", "✨ Create a new GitHub repo"),
         BotCommand("clone", "📥 Clone a git repository"),
+        BotCommand("createtopic", "🧵 Create project sub-channel topic"),
+        BotCommand("bind", "🔗 Bind topic to workspace project"),
+        BotCommand("unbind", "🔓 Unbind topic from project"),
         BotCommand("pull", "⬇️ Git pull changes"),
         BotCommand("push", "⬆️ Git push changes"),
         BotCommand("branch", "🌿 List / switch git branches"),
@@ -961,6 +964,65 @@ async def unbind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     remove_bound_project(chat.id, thread_id)
     await update.effective_message.reply_text("✅ Topic unlinked from project context.")
+
+async def createtopic_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Creates a dedicated Telegram Forum Topic for a project and binds it."""
+    if not await check_auth(update):
+        return
+    chat = update.effective_chat
+    if not chat or chat.type not in ("supergroup", "group"):
+        await update.effective_message.reply_text("ℹ️ This command must be run inside a Telegram Group / Supergroup with **Topics** enabled.", parse_mode="Markdown")
+        return
+
+    if not context.args:
+        projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")] if WORKSPACE.exists() else []
+        proj_str = ", ".join([f"`{p}`" for p in projects]) if projects else "none"
+        await update.effective_message.reply_text(
+            f"Usage: `/createtopic <project-folder-name>`\n\nAvailable projects: {proj_str}",
+            parse_mode="Markdown",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="Type project name for new topic...")
+        )
+        return
+
+    folder_name = context.args[0].strip()
+    target_dir = sanitize_project_path(WORKSPACE, folder_name)
+    if not target_dir or not target_dir.exists():
+        await update.effective_message.reply_text(f"❌ Project directory `{folder_name}` not found in `/data/workspace`.", parse_mode="Markdown")
+        return
+
+    try:
+        forum_topic = await context.bot.create_forum_topic(
+            chat_id=chat.id,
+            name=f"📂 {folder_name}"
+        )
+        if forum_topic and forum_topic.message_thread_id:
+            set_bound_project(chat.id, forum_topic.message_thread_id, folder_name)
+            await update.effective_message.reply_text(
+                f"✅ *Created Forum Topic:* `📂 {folder_name}`!\n\n"
+                f"This topic channel is now automatically bound to `{folder_name}`.\n\n"
+                f"All commands (`/task`, `/diff`, `/push`, `/pull`, `/branch`) inside that topic will directly target this project!",
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        err_s = str(e).lower()
+        if "not a forum" in err_s:
+            await update.effective_message.reply_text(
+                "⚠️ *Topics are not enabled for this group yet.*\n\n"
+                "👉 *How to enable Topics in Telegram:*\n"
+                "1. Click/tap Group Name at the top (`Agent-station-projects`)\n"
+                "2. Click the **Edit** (✏️) icon ➔ **Group Settings**\n"
+                "3. Turn ON the **Topics** toggle switch\n"
+                "4. Re-run `/createtopic " + folder_name + "`!",
+                parse_mode="Markdown"
+            )
+        elif "rights" in err_s or "admin" in err_s:
+            await update.effective_message.reply_text(
+                "⚠️ *Bot lacks permission to create topics.*\n\n"
+                "👉 Please promote `@agent_station_bot` to **Administrator** and enable the **Manage Topics** permission.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.effective_message.reply_text(f"❌ Could not create topic: {e}")
 
 async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -1760,6 +1822,8 @@ def main():
     app.add_handler(CommandHandler("aliases", customcmds_cmd))
     app.add_handler(CommandHandler("bind", bind_cmd))
     app.add_handler(CommandHandler("unbind", unbind_cmd))
+    app.add_handler(CommandHandler("createtopic", createtopic_cmd))
+    app.add_handler(CommandHandler("topic", createtopic_cmd))
     app.add_handler(CommandHandler("clone", clone_cmd))
     app.add_handler(CommandHandler("pull", pull_cmd))
     app.add_handler(CommandHandler("push", push_cmd))

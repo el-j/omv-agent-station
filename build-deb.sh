@@ -7,7 +7,7 @@
 set -e
 
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="0.0.2-alpha.32"
+VERSION="0.0.2-alpha.33"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"
