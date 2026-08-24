@@ -165,7 +165,22 @@ async def newrepo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     set_bound_project(chat.id, forum_topic.message_thread_id, repo_name)
                     topic_info = f"\n🧵 *Created Forum Topic:* `📂 {repo_name}` (automatically bound!)"
             except Exception as te:
+                err_s = str(te).lower()
                 logger.info(f"Could not create forum topic: {te}")
+                if "not enough rights" in err_s or "rights" in err_s or "admin" in err_s:
+                    topic_info = (
+                        f"\n\n⚠️ *Could not auto-create sub-channel topic:*\n"
+                        f"Telegram requires bot to be an **Administrator** with **Manage Topics** permission.\n"
+                        f"👉 Promote bot to Admin in group settings, then type `/createtopic {repo_name}`!"
+                    )
+                elif "not a forum" in err_s:
+                    topic_info = (
+                        f"\n\n⚠️ *Could not auto-create sub-channel topic:*\n"
+                        f"Topics are not enabled yet in this group.\n"
+                        f"👉 Turn ON **Topics** in Group Settings, then type `/createtopic {repo_name}`!"
+                    )
+                else:
+                    topic_info = f"\n\nℹ️ Run `/createtopic {repo_name}` to create its dedicated sub-channel topic."
 
         await msg.edit_text(
             f"✅ *New GitHub Repository Created & Cloned!*\n\n"
@@ -250,7 +265,22 @@ async def clone_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         set_bound_project(chat.id, forum_topic.message_thread_id, folder_name)
                         topic_info = f"\n🧵 *Created Forum Topic:* `📂 {folder_name}` (automatically bound!)"
                 except Exception as te:
+                    err_s = str(te).lower()
                     logger.info(f"Could not create forum topic: {te}")
+                    if "not enough rights" in err_s or "rights" in err_s or "admin" in err_s:
+                        topic_info = (
+                            f"\n\n⚠️ *Could not auto-create sub-channel topic:*\n"
+                            f"Telegram requires bot to be an **Administrator** with **Manage Topics** permission.\n"
+                            f"👉 Promote bot to Admin in group settings, then type `/createtopic {folder_name}`!"
+                        )
+                    elif "not a forum" in err_s:
+                        topic_info = (
+                            f"\n\n⚠️ *Could not auto-create sub-channel topic:*\n"
+                            f"Topics are not enabled yet in this group.\n"
+                            f"👉 Turn ON **Topics** in Group Settings, then type `/createtopic {folder_name}`!"
+                        )
+                    else:
+                        topic_info = f"\n\nℹ️ Run `/createtopic {folder_name}` to create its dedicated sub-channel topic."
 
             keyboard = [
                 [
