@@ -1,10 +1,10 @@
 Package: openmediavault-agent-station
-Version: 0.0.2-beta.1
+Version: 0.0.2-beta.2
 Section: net
 Priority: optional
 Architecture: all
 Maintainer: Fabian <dev@local>
-Depends: openmediavault (>= 6.0), docker.io | docker-ce | docker, docker-compose-plugin | docker-compose-v2 | docker-compose, tmux
+Depends: openmediavault (>= 6.0), docker.io | docker-ce | docker, docker-cli | podman-docker | docker.io, docker-compose-plugin | docker-compose-v2 | docker-compose, tmux
 Homepage: https://github.com/el-j/omv-agent-station
 Description: OpenMediaVault Agent Station & Remote Coding Stack
  A 24/7 self-hosted AI development & remote coding stack for OpenMediaVault.

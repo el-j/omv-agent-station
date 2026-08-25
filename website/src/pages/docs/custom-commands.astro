@@ -1,0 +1,65 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Custom Commands & Dynamic Shortcuts" 
+  description="Create and manage dynamic user-defined shortcut commands via chat with automatic Telegram autocomplete synchronization and argument interpolation."
+  category="Customization"
+  prevPage={{ title: "Discord & Signal Relays", href: `${baseUrl}/docs/discord-signal` }}
+  nextPage={{ title: "Git Workspaces & Auto-Cloning", href: `${baseUrl}/docs/git-workspaces` }}
+>
+  <div class="docs-callout docs-callout-success">
+    <strong>⚡ Hot-Reloading Shortcuts:</strong><br />
+    Whenever you add or delete a custom command using <code>/addcmd</code> or <code>/delcmd</code>, the bot instantly reloads the configuration and updates your Telegram client's native command autocomplete list via <code>setMyCommands</code> in real-time!
+  </div>
+
+  <h2>➕ Creating Custom Commands (<code>/addcmd</code>)</h2>
+  <p>
+    Use <code>/addcmd &lt;name&gt; &lt;template&gt;</code> to create shortcuts for common shell scripts, agent prompts, or code reviews:
+  </p>
+
+  <pre><code># 1. Shell command shortcut:
+/addcmd test /exec pytest -v
+
+# 2. Build shortcut:
+/addcmd build /exec npm run build
+
+# 3. Dynamic argument placeholder &#123;args&#125;:
+/addcmd review /chat "Review this code and suggest refactorings: &#123;args&#125;"
+
+# 4. Autonomous PR summary:
+/addcmd pr /task "Create PR draft, update CHANGELOG.md, and run test suite"</code></pre>
+
+  <h2>🎯 Dynamic Argument Interpolation (<code>&#123;args&#125;</code>)</h2>
+  <p>
+    When you define <code>&#123;args&#125;</code> in a template, any arguments you pass when calling the shortcut are automatically substituted:
+  </p>
+
+  <div style="background: rgba(14, 20, 36, 0.85); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem; margin: 1.5rem 0;">
+    <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem;">Creation:</div>
+    <code>/addcmd lint /exec flake8 &#123;args&#125;</code>
+    <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem; margin-bottom: 0.5rem;">Execution:</div>
+    <code>/lint --max-line-length=120 src/</code>
+    <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem; margin-bottom: 0.5rem;">Resulting Execution:</div>
+    <code>/exec flake8 --max-line-length=120 src/</code>
+  </div>
+
+  <h2>📋 Listing & Deleting Custom Commands</h2>
+  <pre><code># List all configured shortcuts
+/cmds
+/customcmds
+
+# Delete a shortcut
+/delcmd test</code></pre>
+
+  <h2>💾 Storage & Obsidian Sync</h2>
+  <p>
+    Custom commands are persisted in two synchronized locations:
+  </p>
+  <ul>
+    <li><code>/data/workspace/.custom_commands.json</code> (Live bot configuration)</li>
+    <li><code>/data/obsidian/Config/commands.json</code> (Synchronized to your Obsidian Second Brain via Syncthing)</li>
+  </ul>
+</DocsLayout>

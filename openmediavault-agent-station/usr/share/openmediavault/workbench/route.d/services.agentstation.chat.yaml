@@ -4,4 +4,5 @@ data:
   url: "/services/agentstation/chat"
   title: _("Chat & Messenger")
   editing: true
+  notificationTitle: _("Chat & messenger settings saved.")
   component: omv-services-agentstation-chat-form-page

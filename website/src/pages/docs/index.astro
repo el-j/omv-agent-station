@@ -1,0 +1,131 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="System Architecture & Overview" 
+  description="Comprehensive technical guide to the 24/7 self-hosted AI orchestrator stack, OpenMediaVault native plugin, LiteLLM gateway, and autonomous dev agent lifecycle."
+  category="Getting Started"
+  nextPage={{ title: "Quickstart & Installation", href: `${baseUrl}/docs/quickstart` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>💡 What is OMV AI Agent Station?</strong><br />
+    A production-grade, self-hosted AI development powerhouse that turns your OpenMediaVault (OMV 6, 7 & 8) NAS into an always-on autonomous software engineering agent. Dispatch coding tasks, manage git repositories, and query multi-tier LLMs directly via Telegram, Discord, or Signal 24/7.
+  </div>
+
+  <h2>🏛️ High-Level System Architecture</h2>
+  <p>
+    The stack is engineered around four decoupled layers designed for low memory footprint (120–280MB RAM), resilient multi-model redundancy, and zero-compromise credential security:
+  </p>
+
+  <div style="background: #090d16; border: 1px solid var(--border-color); border-radius: 1rem; padding: 1.5rem; margin: 1.5rem 0;">
+    <pre style="background: transparent; border: none; padding: 0; margin: 0; color: #a5f3fc; font-size: 0.85rem; line-height: 1.5;">
+┌────────────────────────────────────────────────────────────────────────┐
+│               OMV 8 / 7 WebGUI (Angular & Workbench Datamodel)          │
+│               • AI Providers • Telegram/Discord Bots • Syncthing Sync   │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │ Saves to /etc/openmediavault/config.xml &
+                                   │ /etc/agent-station/credentials.json (0600)
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               Backend CLI Engine (/usr/sbin/omv-agent-station)         │
+│               • apply / restart / performance / status / diagnostics   │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Docker Compose Runtime Layer                    │
+│                                                                        │
+│  ┌───────────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
+│  │ LiteLLM Proxy Gateway │  │ Telegram Bot     │  │ Obsidian Vault  │ │
+│  │ (Port 4000)           │  │ (25 Commands)    │  │ Syncthing (8384)│ │
+│  │ Multi-tier Redundancy │  │ Topics / Relays  │  │ Second-Brain    │ │
+│  └───────────┬───────────┘  └────────┬─────────┘  └─────────────────┘ │
+│              │                       │                                │
+│              ▼                       ▼                                │
+│  ┌──────────────────────────────────────────────────────────────────┐ │
+│  │               Autonomous Coding Agent & Workspace Loop           │ │
+│  │               • Workspace: /data/workspace/&lt;project&gt;             │ │
+│  │               • Claude Code CLI / Gemini Flash / GPT-4o          │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+
+  <h2>📦 Core Stack Components</h2>
+  <table class="docs-table">
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Container / Service</th>
+        <th>Internal Port</th>
+        <th>Purpose & Responsibilities</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>LiteLLM AI Gateway</strong></td>
+        <td><code>litellm-proxy</code></td>
+        <td><code>4000</code></td>
+        <td>Centralized OpenAI-compatible proxy with dynamic fallbacks, token spend telemetry, and smart router aliases (<code>coder-smart</code>, <code>reasoning-heavy</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Telegram Relay Bot</strong></td>
+        <td><code>telegram-agent-bot</code></td>
+        <td>Polling (TLS)</td>
+        <td>25 interactive commands, native autocomplete (<code>setMyCommands</code>), Forum Topic auto-binding, ForceReply input prompts, and plain-text chat.</td>
+      </tr>
+      <tr>
+        <td><strong>Obsidian Second-Brain</strong></td>
+        <td><code>syncthing</code></td>
+        <td><code>8384</code> / <code>22000</code></td>
+        <td>Bi-directional peer-to-peer sync for project specs, markdown notes, agent execution logs, and live architecture documentation.</td>
+      </tr>
+      <tr>
+        <td><strong>OMV Debian Plugin</strong></td>
+        <td><code>openmediavault-agent-station</code></td>
+        <td>OMV Workbench</td>
+        <td>Native settings management, encrypted credential persistence, systemd daemon management, and live health diagnostics.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>🗺️ Documentation Directory</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin: 2rem 0;">
+    <a href={`${baseUrl}/docs/quickstart`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚡</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Quickstart Guide</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Install via 1-click script or .deb package and configure in WebGUI in under 3 minutes.</div>
+    </a>
+    
+    <a href={`${baseUrl}/docs/ai-models`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🧠</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">AI Models & Routing</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Configure Google Gemini, GPT-4o, Claude 3.7, DeepSeek-R1, and multi-tier failover chains.</div>
+    </a>
+
+    <a href={`${baseUrl}/docs/telegram`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✈️</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Telegram Handbook</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Full reference for all 25 commands, Forum Topics, interactive prompts, and direct chat.</div>
+    </a>
+
+    <a href={`${baseUrl}/docs/custom-commands`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚡</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Custom Commands</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Create dynamic shortcut commands on the fly that hot-reload straight into Telegram autocomplete.</div>
+    </a>
+
+    <a href={`${baseUrl}/docs/git-workspaces`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📂</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Git & Workspaces</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">URL paste auto-cloning, PAT credentials, branch management, and automated project setup.</div>
+    </a>
+
+    <a href={`${baseUrl}/docs/security`} class="glass-card" style="text-decoration: none;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🛡️</div>
+      <div style="font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Security Architecture</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Multi-tier credential persistence, strict 0600 file masks, password masking, and path validation.</div>
+    </a>
+  </div>
+</DocsLayout>

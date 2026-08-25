@@ -1,0 +1,10 @@
+{
+  "type": "rpc",
+  "id": "rpc.agentstation.getsettings",
+  "title": "Get Agent Station Settings",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": true
+  }
+}

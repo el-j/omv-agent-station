@@ -9,8 +9,10 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 if [ -f "/etc/openmediavault-agent-station.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
-else
+elif [ -f "/etc/openmediavault-ai-orchestrator.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-ai-orchestrator.json"
+else
+    DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
 fi
 
 if [ -d "/usr/share/openmediavault/agent-station" ]; then
@@ -39,9 +41,34 @@ run_compose() {
 }
 
 write_env_file() {
+    # Check if primary config is missing or empty, but persistent storage backup exists
+    if [ ! -s "$CONFIG_FILE" ] && [ -s "/srv/dev-data/config/agent-station.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/srv/dev-data/config/agent-station.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    elif [ ! -s "$CONFIG_FILE" ] && [ -s "/etc/openmediavault-ai-orchestrator.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/etc/openmediavault-ai-orchestrator.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "Configuration file $CONFIG_FILE does not exist."
-        return 0
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cat <<'EOF' > "$CONFIG_FILE"
+{
+  "enable": false,
+  "data_dir": "/srv/dev-data",
+  "enable_aimodels": true,
+  "enable_gemini": true,
+  "enable_anthropic": true,
+  "enable_github_models": true,
+  "enable_git": true,
+  "enable_chat": true,
+  "enable_telegram": true,
+  "enable_security": true
+}
+EOF
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
     fi
 
     # Read config with python
@@ -52,10 +79,16 @@ write_env_file() {
     ENABLE_AIMODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_aimodels', True))" 2>/dev/null || echo "True")
     ENABLE_GEMINI=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_gemini', True))" 2>/dev/null || echo "True")
     GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))" 2>/dev/null || echo "")
-    ENABLE_ANTHROPIC=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_anthropic', True))" 2>/dev/null || echo "True")
+    ENABLE_ANTHROPIC=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_anthropic', False))" 2>/dev/null || echo "False")
     ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))" 2>/dev/null || echo "")
     ENABLE_GH_MODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_github_models', True))" 2>/dev/null || echo "True")
     GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))" 2>/dev/null || echo "")
+    ENABLE_MISTRAL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_mistral', False))" 2>/dev/null || echo "False")
+    MISTRAL_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('mistral_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_OPENROUTER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_openrouter', False))" 2>/dev/null || echo "False")
+    OPENROUTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('openrouter_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_DEEPSEEK=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_deepseek', False))" 2>/dev/null || echo "False")
+    DEEPSEEK_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('deepseek_api_key', ''))" 2>/dev/null || echo "")
     
     # Git
     ENABLE_GIT=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_git', True))" 2>/dev/null || echo "True")
@@ -92,6 +125,7 @@ write_env_file() {
     # Create directories
     mkdir -p "$DATA_DIR/obsidian" 2>/dev/null || true
     mkdir -p "$DATA_DIR/workspace" 2>/dev/null || true
+    mkdir -p "$DATA_DIR/.agent-auth" 2>/dev/null || true
     mkdir -p "$DATA_DIR/ssh" 2>/dev/null || true
     mkdir -p "$STACK_DIR/credentials" 2>/dev/null || true
     mkdir -p "$STACK_DIR/ssh" 2>/dev/null || true
@@ -110,6 +144,12 @@ ENABLE_ANTHROPIC=$ENABLE_ANTHROPIC
 ANTHROPIC_API_KEY=$ANTHROPIC_KEY
 ENABLE_GITHUB_MODELS=$ENABLE_GH_MODELS
 GITHUB_TOKEN=$GITHUB_TOKEN
+ENABLE_MISTRAL=$ENABLE_MISTRAL
+MISTRAL_API_KEY=$MISTRAL_KEY
+ENABLE_OPENROUTER=$ENABLE_OPENROUTER
+OPENROUTER_API_KEY=$OPENROUTER_KEY
+ENABLE_DEEPSEEK=$ENABLE_DEEPSEEK
+DEEPSEEK_API_KEY=$DEEPSEEK_KEY
 ENABLE_GIT=$ENABLE_GIT
 GIT_AUTHOR_NAME=$GIT_NAME
 GIT_AUTHOR_EMAIL=$GIT_EMAIL
@@ -146,11 +186,11 @@ apply_sync() {
     if [ "$ENABLE" = "True" ] || [ "$ENABLE" = "true" ]; then
         echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Starting Agent Station Stack Provisioning..." >> "$LOG_FILE" 2>/dev/null || true
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing, Terminal)..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing)..." >> "$LOG_FILE" 2>/dev/null || true
         if [ -d "$STACK_DIR" ]; then
-            (cd "$STACK_DIR" && run_compose --env-file .env pull --progress=plain >> "$LOG_FILE" 2>&1 || true)
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
-            (cd "$STACK_DIR" && run_compose --env-file .env up -d --remove-orphans >> "$LOG_FILE" 2>&1 || true)
+            (cd "$STACK_DIR" && (run_compose --env-file .env pull --ignore-buildable || run_compose --env-file .env pull) >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Building and starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
+            (cd "$STACK_DIR" && run_compose --env-file .env up -d --build --remove-orphans >> "$LOG_FILE" 2>&1 || true)
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Agent Station stack is up and active!" >> "$LOG_FILE" 2>/dev/null || true
         fi
     else
@@ -186,14 +226,17 @@ def check_cmd(cmd):
     except Exception:
         return False
 
-def get_container_info(name):
-    try:
-        res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
-        status = res.stdout.strip()
-        running = "Up" in status
-        return {"running": running, "status": status if status else "Not created"}
-    except Exception:
-        return {"running": False, "status": "Docker unavailable"}
+def get_container_info(filter_names):
+    for name in filter_names:
+        try:
+            res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+            status = res.stdout.strip()
+            if status:
+                running = "Up" in status
+                return {"running": running, "status": status}
+        except Exception:
+            pass
+    return {"running": False, "status": "Not created"}
 
 # Collect host metrics
 load1, load5, load15 = 0.0, 0.0, 0.0
@@ -235,22 +278,22 @@ try:
 except Exception:
     pass
 
-containers = {
-    "litellm": check_cmd(["docker", "ps", "-q", "-f", "name=litellm"]),
-    "syncthing": check_cmd(["docker", "ps", "-q", "-f", "name=syncthing"]),
-    "web_terminal": check_cmd(["docker", "ps", "-q", "-f", "name=web-terminal"]),
-    "telegram_bot": check_cmd(["docker", "ps", "-q", "-f", "name=telegram-agent-bot"]),
-    "signal_bot": check_cmd(["docker", "ps", "-q", "-f", "name=signal-agent-bot"]),
-    "discord_bot": check_cmd(["docker", "ps", "-q", "-f", "name=discord-agent-bot"])
+container_details = {
+    "LiteLLM Gateway": get_container_info(["litellm-proxy", "litellm"]),
+    "Syncthing": get_container_info(["syncthing"]),
+    "Web Terminal": get_container_info(["omv-agent-terminal", "web-terminal"]),
+    "Telegram Bot": get_container_info(["telegram-agent-bot", "telegram-bot"]),
+    "Signal Bot": get_container_info(["signal-agent-bot", "signal-bot"]),
+    "Discord Bot": get_container_info(["discord-agent-bot", "discord-bot"])
 }
 
-container_details = {
-    "LiteLLM Gateway": get_container_info("litellm"),
-    "Syncthing": get_container_info("syncthing"),
-    "Web Terminal": get_container_info("web-terminal"),
-    "Telegram Bot": get_container_info("telegram-agent-bot"),
-    "Signal Bot": get_container_info("signal-agent-bot"),
-    "Discord Bot": get_container_info("discord-agent-bot")
+containers = {
+    "litellm": container_details["LiteLLM Gateway"]["running"],
+    "syncthing": container_details["Syncthing"]["running"],
+    "web_terminal": container_details["Web Terminal"]["running"],
+    "telegram_bot": container_details["Telegram Bot"]["running"],
+    "signal_bot": container_details["Signal Bot"]["running"],
+    "discord_bot": container_details["Discord Bot"]["running"]
 }
 
 data = {
@@ -313,6 +356,28 @@ case "$1" in
             cd "$STACK_DIR" && run_compose --env-file .env logs --tail=100 "$SERVICE"
         fi
         ;;
+    install-claude-cli)
+        echo "=========================================================="
+        echo "📦 Installing Claude Code CLI on OpenMediaVault..."
+        echo "=========================================================="
+        if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+            echo "📦 Installing Node.js and NPM runtime..."
+            apt-get update -qq && apt-get install -y -qq nodejs npm || true
+        fi
+        echo "📦 Installing @anthropic-ai/claude-code via npm..."
+        npm install -g @anthropic-ai/claude-code
+        echo ""
+        if command -v claude >/dev/null 2>&1 || [ -x /usr/local/bin/claude ]; then
+            echo "=========================================================="
+            echo "✅ Claude Code CLI successfully installed!"
+            echo "👉 Location: $(which claude || echo '/usr/local/bin/claude')"
+            echo "👉 Usage: Open Web Terminal (Port 7681) and run 'claude'"
+            echo "👉 Log in with your active claude.ai subscription via browser!"
+            echo "=========================================================="
+        else
+            echo "⚠️ Installation completed, binary at /usr/local/bin/claude"
+        fi
+        ;;
     uninstall)
         echo "🛑 Stopping Agent Station stack..."
         cd "$STACK_DIR" 2>/dev/null && run_compose --env-file .env down 2>/dev/null || true
@@ -324,7 +389,7 @@ case "$1" in
         echo "✅ Uninstallation complete."
         ;;
     help|-h|--help)
-        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|install-claude-cli|uninstall}"
         exit 0
         ;;
     *)

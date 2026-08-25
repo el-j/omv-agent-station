@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-chat-form-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>🤖 Quick Access Bot Creation Tools -</strong><br><br>• <a href='https://t.me/BotFather' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Telegram @BotFather ↗</a> - Create a new bot and copy your HTTP API bot token<br>• <a href='https://t.me/userinfobot' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Telegram @userinfobot ↗</a> - Send a message to get your numeric Telegram User ID<br>• <a href='https://discord.com/developers/applications' target='_blank' style='font-weight:bold;text-decoration:underline;'>🔗 Discord Developer Portal ↗</a> - Create an application and copy the Bot Token")
     request:
       service: AgentStation
       get:
@@ -14,13 +17,13 @@ data:
       - type: checkbox
         name: enable_chat
         label: _("Enable Remote Messenger Relay")
-        value: true
+        value: false
         hint: _("Master switch for interactive chat bots controlling your coding workspace")
       - type: select
         name: chat_service
         label: _("Primary Active Messenger Relay")
-        hint: _("Choose which chat application acts as the primary interactive agent controller")
         value: "telegram"
+        hint: _("Choose which chat application acts as the primary interactive agent controller")
         options:
           - value: "telegram"
             text: _("Telegram Bot (Instant setup, BotFather token)")
@@ -35,15 +38,17 @@ data:
       - type: checkbox
         name: enable_telegram
         label: _("Enable Telegram Bot")
-        value: true
+        value: false
       - type: passwordInput
         name: telegram_bot_token
         label: _("Telegram Bot Token")
-        hint: _("Create your bot via BotFather at https://t.me/BotFather")
+        value: ""
+        hint: _("Paste your BotFather HTTP API bot token")
       - type: textInput
         name: telegram_allowed_user_id
         label: _("Allowed Telegram Numeric User ID")
-        hint: _("Get your numeric user ID from userinfobot at https://t.me/userinfobot")
+        value: ""
+        hint: _("Paste your numeric user ID from @userinfobot (Restricts bot strictly to you)")
       - type: divider
         title: _("Signal Messenger Configuration")
       - type: checkbox
@@ -53,10 +58,12 @@ data:
       - type: textInput
         name: signal_phone_number
         label: _("Signal Bot Phone / Linked Number")
+        value: ""
         hint: _("Server Signal number or linked device number")
       - type: textInput
         name: signal_allowed_phone_number
         label: _("Allowed Personal Signal Number")
+        value: ""
         hint: _("Your personal phone number (e.g. +491701234567)")
       - type: divider
         title: _("Discord Bot Configuration")
@@ -67,11 +74,13 @@ data:
       - type: passwordInput
         name: discord_bot_token
         label: _("Discord Bot Token")
-        hint: _("Create bot token in Developer Portal at https://discord.com/developers/applications")
+        value: ""
+        hint: _("Paste your Discord Bot token from Developer Portal")
       - type: textInput
         name: discord_allowed_user_id
         label: _("Allowed Discord User ID")
-        hint: _("Your numeric Discord User ID (Enable Developer Mode in Discord -> Right-click profile -> Copy User ID)")
+        value: ""
+        hint: _("Your numeric Discord User ID (Right-click profile -> Copy User ID)")
     buttons:
       - template: submit
       - template: cancel

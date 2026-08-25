@@ -1,0 +1,6 @@
+version: "1.0"
+type: component
+data:
+  name: omv-services-agentstation-blank-page
+  type: blankPage
+  config: {}

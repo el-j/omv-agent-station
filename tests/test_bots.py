@@ -45,16 +45,16 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (Root-level sidebar menu only)
+        # Check navigation files (Services submenu)
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         for nav_name in [
-            "agentstation",
-            "agentstation.overview",
-            "agentstation.aimodels",
-            "agentstation.git",
-            "agentstation.chat",
-            "agentstation.security",
-            "agentstation.diagnostics"
+            "services.agentstation",
+            "services.agentstation.overview",
+            "services.agentstation.aimodels",
+            "services.agentstation.git",
+            "services.agentstation.chat",
+            "services.agentstation.security",
+            "services.agentstation.diagnostics"
         ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 

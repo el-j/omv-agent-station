@@ -2,61 +2,21 @@
 
 All notable changes to the OpenMediaVault Agent Station plugin will be documented in this file.
 
-## [0.0.2-beta.1] - 2026-08-23
+## [0.0.2-beta.2] - 2026-08-25
 
 ### Added
-- GitHub repository integration in Git Providers with guided token generator link.
-- Granular per-provider enable/disable switches for GitHub, GitLab, and Bitbucket.
-- Dedicated enable/disable switches for Telegram, Signal, and Discord messenger bots.
-- Diagnostics & Logs real-time monitoring view under Agent Station sidebar.
-- Guided 'Get token here' direct generation URLs for all AI, Git, and Messenger providers.
+- Multi-messenger single source of truth library `agent_station_core` powering Telegram, Discord, and Signal.
+- Comprehensive 11-page static documentation website built with Astro under `/docs/*`.
+- Automated GitFlow PR validation workflow (`pr-target-guard.yml`) enforcing `feature/*` / `fix/*` ➔ `develop` ➔ `main`.
+- Automated GitHub Release publisher workflow (`release.yml`) attaching compiled Debian `.deb` packages and SHA256 checksums.
+- Automatic Forum Topic / Sub-channel creation and project context binding (`/createtopic`, `/bind`, `/unbind`).
+- User-defined dynamic custom command shortcuts (`/addcmd`, `/delcmd`, `/cmds`) with `{args}` interpolation.
+- GitHub repository creation (`/newrepo`) and automated PAT-authenticated cloning (`/clone`).
+- Obsidian second-brain note capture (`/note`, `/vault`) and automated project spec provisioning.
 
 ### Fixed
+- Fixed Telegram Forum Topic creation permission feedback when bot lacks Manage Topics permission.
+- Fixed multi-page Astro static documentation compilation and routing.
 - Fixed 504 Gateway Timeout on Engine startup by switching to asynchronous stack lifecycle management.
 - Fixed exit code 127 during 'omv-agent-station apply' with multi-binary compose fallback detection.
 - Clean root-level sidebar navigation for OpenMediaVault Workbench.
-
-
-### Added
-- GitHub repository integration in Git Providers with guided token generator link.
-- Granular per-provider enable/disable switches for GitHub, GitLab, and Bitbucket.
-- Dedicated enable/disable switches for Telegram, Signal, and Discord messenger bots.
-- Diagnostics & Logs real-time monitoring view under Agent Station sidebar.
-- Guided 'Get token here' direct generation URLs for all AI, Git, and Messenger providers.
-
-### Fixed
-- Fixed 504 Gateway Timeout on Engine startup by switching to asynchronous stack lifecycle management.
-- Fixed exit code 127 during 'omv-agent-station apply' with multi-binary compose fallback detection.
-- Clean root-level sidebar navigation for OpenMediaVault Workbench.
-
-
-### Added
-- GitHub repository integration in Git Providers with guided token generator link.
-- Granular per-provider enable/disable switches for GitHub, GitLab, and Bitbucket.
-- Dedicated enable/disable switches for Telegram, Signal, and Discord messenger bots.
-- Diagnostics & Logs real-time monitoring view under Agent Station sidebar.
-- Guided 'Get token here' direct generation URLs for all AI, Git, and Messenger providers.
-
-### Fixed
-- Fixed 504 Gateway Timeout on Engine startup by switching to asynchronous stack lifecycle management.
-- Fixed exit code 127 during 'omv-agent-station apply' with multi-binary compose fallback detection.
-- Clean root-level sidebar navigation for OpenMediaVault Workbench.
-
-
-### Added
-- GitHub repository integration in Git Providers with guided token generator link.
-- Granular per-provider enable/disable switches for GitHub, GitLab, and Bitbucket.
-- Dedicated enable/disable switches for Telegram, Signal, and Discord messenger bots.
-- Diagnostics & Logs real-time monitoring view under Agent Station sidebar.
-- Guided 'Get token here' direct generation URLs for all AI, Git, and Messenger providers.
-
-### Fixed
-- Fixed 504 Gateway Timeout on Engine startup by switching to asynchronous stack lifecycle management (`apply-bg`).
-- Fixed exit code 127 during 'omv-agent-station apply' with multi-binary compose fallback detection.
-- Clean root-level sidebar navigation for OpenMediaVault Workbench.
-
-## [0.0.1] - 2026-08-22
-
-### Added
-- Initial OpenMediaVault Agent Station plugin structure with Debian packaging.
-- LiteLLM multi-provider gateway, obsidian sync, and chat bot relays.

@@ -4,15 +4,44 @@ data:
   name: omv-services-agentstation-diagnostics-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>📊 Real-Time Agent Station Diagnostic Center -</strong><br>Live container matrix, storage utilization, connected AI model gateways, and execution logs. Data loads automatically on page open.")
     request:
       service: AgentStation
       get:
         method: getDiagnostics
     fields:
       - type: divider
-        title: _("Agent Station Engine & Docker Container Logs")
+        title: _("1. Sandboxed Docker Containers & Services Status")
+      - type: textarea
+        name: container_status
+        label: _("Live Container Matrix (Status, Memory & Ports)")
+        value: ""
+        readonly: true
+        rows: 6
+      - type: divider
+        title: _("2. Storage & Sandboxed Workspace Utilization")
+      - type: textarea
+        name: storage_status
+        label: _("Workspace, Obsidian Vault & Volume Capacity")
+        value: ""
+        readonly: true
+        rows: 4
+      - type: divider
+        title: _("3. Connected AI Providers & Router Gateway")
+      - type: textarea
+        name: ai_status
+        label: _("Active AI Model Endpoints & CLI Runtimes")
+        value: ""
+        readonly: true
+        rows: 8
+      - type: divider
+        title: _("4. Live Provisioning & Docker Execution Logs")
       - type: textarea
         name: log_output
-        label: _("Live Startup & Execution Logs")
+        label: _("Full Execution Stream (Image Downloads, Compose & Container Startup)")
         value: ""
-        hint: _("Recent diagnostic output from Docker Compose, image downloads, and background container processes")
+        readonly: true
+        rows: 18
+    buttons: []

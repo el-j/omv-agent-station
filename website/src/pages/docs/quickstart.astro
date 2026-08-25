@@ -1,0 +1,84 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Quickstart & Installation Guide" 
+  description="Step-by-step installation on OpenMediaVault 6, 7 & 8 using the native 1-click script or Debian .deb package."
+  category="Getting Started"
+  prevPage={{ title: "Architecture & Overview", href: `${baseUrl}/docs` }}
+  nextPage={{ title: "AI Models & Multi-Tier Routing", href: `${baseUrl}/docs/ai-models` }}
+>
+  <div class="docs-callout docs-callout-success">
+    <strong>✅ Supported Systems:</strong><br />
+    OpenMediaVault 6 (Debian 11 Bullseye), OpenMediaVault 7 (Debian 12 Bookworm), and OpenMediaVault 8 on x86_64 and ARM64 (Raspberry Pi 4/5).
+  </div>
+
+  <h2>⚡ Method 1: 1-Click Automated Script (Recommended)</h2>
+  <p>
+    Connect to your OpenMediaVault server via SSH as <code>root</code> and run the single-command installer:
+  </p>
+
+  <pre><code>wget -qO- https://raw.githubusercontent.com/el-j/omv-agent-station/main/scripts/install-plugin.sh | bash</code></pre>
+
+  <p>
+    The script automatically performs all of the following steps:
+  </p>
+  <ol>
+    <li>Verifies Debian Bookworm / Bullseye prerequisites (<code>git</code>, <code>python3</code>, <code>wget</code>, <code>docker-compose-plugin</code>).</li>
+    <li>Builds and installs <code>openmediavault-agent-station_all.deb</code> with native Debian package management.</li>
+    <li>Compiles OMV Workbench Angular components and registers the <strong>Agent Station</strong> sidebar menu item.</li>
+    <li>Provisions secure directory structures with <code>0600</code> permission protections.</li>
+  </ol>
+
+  <h2>📦 Method 2: Manual .deb Package Installation</h2>
+  <p>
+    If you prefer downloading the release package directly from GitHub Releases:
+  </p>
+
+  <pre><code># 1. Download latest release .deb
+wget https://github.com/el-j/omv-agent-station/releases/latest/download/openmediavault-agent-station_latest_all.deb
+
+# 2. Install using apt (resolves dependencies automatically)
+sudo apt install -y ./openmediavault-agent-station_latest_all.deb
+
+# 3. Reload OMV system services
+sudo omv-agent-station apply</code></pre>
+
+  <h2>🌐 Step 3: WebGUI Setup in OpenMediaVault</h2>
+  <p>
+    After installation, open your OMV WebGUI (e.g. <code>http://192.168.1.200</code>):
+  </p>
+  <ol>
+    <li>Press <code>Cmd+Shift+R</code> or <code>Ctrl+F5</code> to reload your browser cache.</li>
+    <li>Navigate to the left navigation menu: <strong>Services ➔ Agent Station</strong>.</li>
+    <li><strong>Configure AI Provider Keys:</strong>
+      <ul>
+        <li><strong>Google Gemini API Key:</strong> Get your key free at <a href="https://aistudio.google.com" target="_blank" style="color: var(--accent-secondary);">Google AI Studio</a>.</li>
+        <li><strong>GitHub Token:</strong> Add your GitHub Personal Access Token (PAT) with <code>repo</code> & <code>workflow</code> scopes.</li>
+      </ul>
+    </li>
+    <li><strong>Configure Messenger Bot:</strong>
+      <ul>
+        <li>Paste your <strong>Telegram Bot Token</strong> (from <code>@BotFather</code>).</li>
+        <li>Enter your personal numeric <strong>Telegram User ID</strong> (from <code>@userinfobot</code>) for strict authorization.</li>
+      </ul>
+    </li>
+    <li>Click <strong>Save</strong> and tap the yellow <strong>Apply Changes</strong> banner!</li>
+  </ol>
+
+  <h2>🖥️ Step 4: Verify Live Service Status</h2>
+  <p>
+    You can inspect the running containers and service health anytime via SSH:
+  </p>
+
+  <pre><code># Check full status dashboard
+omv-agent-station status
+
+# Stream live Telegram bot logs
+omv-agent-station logs telegram-bot
+
+# Test LiteLLM proxy health
+curl http://localhost:4000/health</code></pre>
+</DocsLayout>

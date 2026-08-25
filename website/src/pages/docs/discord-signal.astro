@@ -1,0 +1,77 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Discord & Signal Messenger Relays" 
+  description="Configure multi-channel Discord servers and private Signal end-to-end encrypted bots on OpenMediaVault."
+  category="Messenger Bots"
+  prevPage={{ title: "Telegram Bot Handbook", href: `${baseUrl}/docs/telegram` }}
+  nextPage={{ title: "Custom Commands & Aliases", href: `${baseUrl}/docs/custom-commands` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>📡 Multi-Messenger Single Source of Truth Architecture:</strong><br />
+    All messenger bots (<strong>Telegram</strong>, <strong>Discord</strong>, and <strong>Signal</strong>) share the unified <code>agent_station_core</code> engine. Every single feature—autonomous coding agent loops (<code>/task</code>), smart AI router querying (<code>/chat</code>, <code>/gemini</code>, <code>/gpt4</code>), GitHub auto-cloning (<code>/clone</code>, <code>/newrepo</code>), git branches/diffs, Obsidian notes (<code>/note</code>, <code>/vault</code>), and user-defined dynamic shortcuts (<code>/addcmd</code>)—works identically across every messenger!
+  </div>
+
+  <h2>🏛️ Shared Engine Architecture</h2>
+  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; font-family: monospace; font-size: 0.9rem; line-height: 1.6; color: #94a3b8;">
+    <div style="color: #38bdf8; font-weight: bold; margin-bottom: 0.5rem;">[ Messenger Transport Layer ]</div>
+    &nbsp;&nbsp;├─ 📱 Telegram Bot &nbsp;&nbsp;&nbsp;&nbsp;➔ Forum Topics & Inline Keyboards<br />
+    &nbsp;&nbsp;├─ 🎮 Discord Bot &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ Server Channels & Threads<br />
+    &nbsp;&nbsp;└─ 🔒 Signal Bot &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ End-to-End Encrypted Direct Messaging<br />
+    <div style="color: #a855f7; font-weight: bold; margin: 0.75rem 0 0.5rem 0;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ (Importing Single Source of Truth)</div>
+    <div style="color: #4ade80; font-weight: bold; margin-bottom: 0.5rem;">[ agent_station_core ]</div>
+    &nbsp;&nbsp;├─ 🧠 <strong>ai_service.py</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ LiteLLM Proxy, Gemini 3.6, GPT-4o, Claude 3.7<br />
+    &nbsp;&nbsp;├─ 🚀 <strong>task_service.py</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ Aider agent loops, Claude Code CLI, shell exec<br />
+    &nbsp;&nbsp;├─ 📁 <strong>git_service.py</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ Automated PAT clone, GitHub newrepo, push, pull, diff<br />
+    &nbsp;&nbsp;├─ 📓 <strong>vault_service.py</strong> &nbsp;&nbsp;&nbsp;&nbsp;➔ Obsidian Inbox note capture, project specs<br />
+    &nbsp;&nbsp;├─ ⚡ <strong>custom_cmds_service.py</strong> ➔ Dynamic shortcut expansion (&#123;args&#125; interpolation)<br />
+    &nbsp;&nbsp;├─ 🧵 <strong>topics_service.py</strong> &nbsp;&nbsp;&nbsp;➔ Project-to-Channel / Thread bindings<br />
+    &nbsp;&nbsp;└─ 🛡️ <strong>security.py</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ Path traversal guards, repo & branch sanitizers
+  </div>
+
+  <h2>🎮 Setting Up the Discord Agent Bot</h2>
+  <p>
+    The Discord bot leverages Discord Slash Commands and channel threads for multi-project development:
+  </p>
+
+  <ol>
+    <li>Create an application in the <a href="https://discord.com/developers/applications" target="_blank" style="color: var(--accent-secondary);">Discord Developer Portal</a>.</li>
+    <li>Under <strong>Bot</strong>, copy your <strong>Bot Token</strong> and enable <strong>Message Content Intent</strong>.</li>
+    <li>Copy your personal numeric <strong>Discord User ID</strong> (Enable Developer Mode in Discord ➔ Right-click your avatar ➔ Copy User ID).</li>
+    <li>In OMV WebGUI ➔ <strong>Services ➔ Agent Station ➔ Chat & Messenger</strong>:
+      <ul>
+        <li>Paste your <strong>Discord Bot Token</strong> and <strong>Discord Allowed User ID</strong>.</li>
+        <li>Click <strong>Save</strong> and <strong>Apply</strong>.</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>🧵 Thread & Channel Context Binding</h3>
+  <p>
+    Inside any Discord channel or thread, use <code>/bind &lt;project-name&gt;</code> to lock that channel to a specific repository. Once bound, all subsequent <code>/task</code>, <code>/diff</code>, <code>/push</code>, and <code>/pull</code> commands automatically execute against that project workspace.
+  </p>
+
+  <h2>🔒 Setting Up the Signal Messenger Bot</h2>
+  <p>
+    The Signal bot uses a local <code>signal-cli-rest-api</code> container for end-to-end encrypted messaging with zero third-party cloud data retention:
+  </p>
+
+  <ol>
+    <li>Register or link a dedicated Signal phone number for your OMV server using <code>signal-cli</code>.</li>
+    <li>In OMV WebGUI ➔ <strong>Services ➔ Agent Station ➔ Chat & Messenger</strong>:
+      <ul>
+        <li>Enter your <strong>Signal Phone Number</strong> (e.g. <code>+1234567890</code>).</li>
+        <li>Enter your <strong>Signal Allowed Number</strong> for authorized commands.</li>
+      </ul>
+    </li>
+    <li>Save and apply configuration in OMV.</li>
+  </ol>
+
+  <h3>💬 Conversational Natural Language Mode</h3>
+  <p>
+    On Signal and Telegram private chats, sending any message without a slash prefix automatically queries the <code>coder-smart</code> AI router, giving you an instant AI coding companion right inside your private messages.
+  </p>
+</DocsLayout>

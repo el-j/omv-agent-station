@@ -7,7 +7,7 @@
 set -e
 
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="0.0.2-beta.1"
+VERSION="0.0.2-beta.2"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"
@@ -50,9 +50,11 @@ chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station"
 cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station" 2>/dev/null || true
 
-# Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots)
+# Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots, Agent Workspace)
 cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/agent-station/"
 cp litellm/config.yaml "$BUILD_DIR/usr/share/openmediavault/agent-station/litellm/"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/agent-workspace"
+cp -r agent-workspace/* "$BUILD_DIR/usr/share/openmediavault/agent-station/agent-workspace/"
 cp -r telegram-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/telegram-agent-bot/"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot"
 cp -r signal-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot/"
