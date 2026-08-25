@@ -1,0 +1,40 @@
+name: GitFlow PR Target Guard
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  validate-branch-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Pull Request Branch Flow
+        run: |
+          BASE_BRANCH="${{ github.base_ref }}"
+          HEAD_BRANCH="${{ github.head_ref }}"
+
+          echo "🔍 Inspecting PR branch flow..."
+          echo "   Target (Base) Branch: ${BASE_BRANCH}"
+          echo "   Source (Head) Branch: ${HEAD_BRANCH}"
+
+          # Rule 1: 'main' can ONLY receive PRs from 'develop' or 'hotfix/*'
+          if [ "$BASE_BRANCH" = "main" ]; then
+            if [ "$HEAD_BRANCH" != "develop" ] && [[ ! "$HEAD_BRANCH" =~ ^hotfix/ ]]; then
+              echo "❌ ERROR: Pull requests directly targeting 'main' are only allowed from 'develop' or 'hotfix/*' branches."
+              echo "👉 Please change the target base branch of this PR to 'develop'."
+              exit 1
+            fi
+            echo "✅ Valid release promotion: $HEAD_BRANCH ➔ main"
+          fi
+
+          # Rule 2: 'feature/*' and 'fix/*' must target 'develop'
+          if [[ "$HEAD_BRANCH" =~ ^(feature|fix)/ ]]; then
+            if [ "$BASE_BRANCH" != "develop" ]; then
+              echo "❌ ERROR: Feature and fix branches ('${HEAD_BRANCH}') must target 'develop', not '${BASE_BRANCH}'."
+              echo "👉 Please change the target base branch of this PR to 'develop'."
+              exit 1
+            fi
+            echo "✅ Valid GitFlow PR: $HEAD_BRANCH ➔ develop"
+          fi
+
+          echo "🎉 All GitFlow branch hierarchy checks passed!"
