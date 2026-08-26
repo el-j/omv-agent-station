@@ -1,0 +1,220 @@
+"""
+Tests for agent_station_core.task_service (issue #19): run_autonomous_task,
+run_claude_cli, and run_shell_exec spawn agent subprocesses and had no test
+coverage at all. All subprocess creation is mocked -- no real network or
+process access.
+"""
+
+import asyncio
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(Path(__file__).parent))
+import stubs  # noqa: F401
+
+
+class FakeProc:
+    def __init__(self, returncode=0, stdout=b"", stderr=b""):
+        self.returncode = returncode
+        self._stdout = stdout
+        self._stderr = stderr
+
+    async def communicate(self):
+        return self._stdout, self._stderr
+
+
+class TestTaskService(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.task_service as task_service
+        self.task_service = task_service
+        self._orig_exec = asyncio.create_subprocess_exec
+        self._orig_shell = asyncio.create_subprocess_shell
+
+    def tearDown(self):
+        asyncio.create_subprocess_exec = self._orig_exec
+        asyncio.create_subprocess_shell = self._orig_shell
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    # -- run_autonomous_task --------------------------------------------
+
+    def test_run_autonomous_task_success_in_git_repo_checks_out_and_pushes(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                project_dir = Path(tmpdir)
+                (project_dir / ".git").mkdir()
+
+                calls = []
+                attached = []
+
+                async def fake_exec(*args, **kwargs):
+                    calls.append(list(args))
+                    if args[0] == self.task_service.AIDER_BIN:
+                        return FakeProc(returncode=0, stdout=b"Applied edit to foo.py")
+                    return FakeProc(returncode=0)
+
+                asyncio.create_subprocess_exec = fake_exec
+                res = await self.task_service.run_autonomous_task(
+                    project_dir, "add tests", "task_1", "agent/task_1",
+                    on_proc=lambda p: attached.append(p),
+                )
+
+                self.assertTrue(res["success"])
+                self.assertIn("Applied edit", res["summary"])
+                self.assertTrue(any(c[:2] == [self.task_service.GIT_BIN, "checkout"] for c in calls))
+                self.assertTrue(any(c[:2] == [self.task_service.GIT_BIN, "push"] for c in calls))
+                self.assertEqual(len(attached), 1)
+
+        asyncio.run(scenario())
+
+    def test_run_autonomous_task_non_git_dir_skips_checkout_and_push(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                project_dir = Path(tmpdir)  # no .git
+
+                calls = []
+
+                async def fake_exec(*args, **kwargs):
+                    calls.append(list(args))
+                    return FakeProc(returncode=0, stdout=b"done")
+
+                asyncio.create_subprocess_exec = fake_exec
+                res = await self.task_service.run_autonomous_task(project_dir, "add tests", "task_2", "agent/task_2")
+
+                self.assertTrue(res["success"])
+                self.assertFalse(any(self.task_service.GIT_BIN in c for c in calls))
+
+        asyncio.run(scenario())
+
+    def test_run_autonomous_task_reports_failure_on_nonzero_exit(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                project_dir = Path(tmpdir)
+
+                async def fake_exec(*args, **kwargs):
+                    return FakeProc(returncode=1, stderr=b"aider crashed")
+
+                asyncio.create_subprocess_exec = fake_exec
+                res = await self.task_service.run_autonomous_task(project_dir, "x", "task_3", "agent/task_3")
+
+                self.assertFalse(res["success"])
+                self.assertIn("crashed", res["summary"])
+
+        asyncio.run(scenario())
+
+    def test_run_autonomous_task_returns_error_dict_on_exception(self):
+        async def scenario():
+            async def fake_exec(*args, **kwargs):
+                raise OSError("no such binary")
+
+            asyncio.create_subprocess_exec = fake_exec
+            res = await self.task_service.run_autonomous_task(Path("/nonexistent"), "x", "task_4", "agent/task_4")
+
+            self.assertFalse(res["success"])
+            self.assertIn("no such binary", res["error"])
+
+        asyncio.run(scenario())
+
+    # -- run_claude_cli ---------------------------------------------------
+
+    def test_run_claude_cli_success(self):
+        async def scenario():
+            async def fake_exec(*args, **kwargs):
+                return FakeProc(returncode=0, stdout=b"Here is the fix")
+
+            asyncio.create_subprocess_exec = fake_exec
+            res = await self.task_service.run_claude_cli(Path("/tmp"), "fix the bug")
+
+            self.assertTrue(res["success"])
+            self.assertEqual(res["output"], "Here is the fix")
+
+        asyncio.run(scenario())
+
+    def test_run_claude_cli_not_installed(self):
+        async def scenario():
+            async def fake_exec(*args, **kwargs):
+                raise FileNotFoundError()
+
+            asyncio.create_subprocess_exec = fake_exec
+            res = await self.task_service.run_claude_cli(Path("/tmp"), "fix the bug")
+
+            self.assertFalse(res["success"])
+            self.assertIn("not installed", res["error"])
+
+        asyncio.run(scenario())
+
+    def test_run_claude_cli_invokes_on_proc_callback(self):
+        async def scenario():
+            fake = FakeProc(returncode=0, stdout=b"ok")
+
+            async def fake_exec(*args, **kwargs):
+                return fake
+
+            asyncio.create_subprocess_exec = fake_exec
+            attached = []
+            await self.task_service.run_claude_cli(Path("/tmp"), "x", on_proc=lambda p: attached.append(p))
+
+            self.assertEqual(attached, [fake])
+
+        asyncio.run(scenario())
+
+    # -- run_shell_exec ----------------------------------------------------
+
+    def test_run_shell_exec_success(self):
+        async def scenario():
+            async def fake_shell(*args, **kwargs):
+                return FakeProc(returncode=0, stdout=b"hello\n")
+
+            asyncio.create_subprocess_shell = fake_shell
+            res = await self.task_service.run_shell_exec("echo hello")
+
+            self.assertTrue(res["success"])
+            self.assertIn("hello", res["output"])
+
+        asyncio.run(scenario())
+
+    def test_run_shell_exec_nonzero_exit_still_returns_output(self):
+        async def scenario():
+            async def fake_shell(*args, **kwargs):
+                return FakeProc(returncode=1, stderr=b"command not found")
+
+            asyncio.create_subprocess_shell = fake_shell
+            res = await self.task_service.run_shell_exec("bogus-command")
+
+            self.assertFalse(res["success"])
+            self.assertIn("command not found", res["output"])
+
+        asyncio.run(scenario())
+
+    def test_run_shell_exec_empty_output_returns_placeholder(self):
+        async def scenario():
+            async def fake_shell(*args, **kwargs):
+                return FakeProc(returncode=0, stdout=b"", stderr=b"")
+
+            asyncio.create_subprocess_shell = fake_shell
+            res = await self.task_service.run_shell_exec("true")
+
+            self.assertEqual(res["output"], "(No output)")
+
+        asyncio.run(scenario())
+
+    def test_run_shell_exec_returns_error_dict_on_exception(self):
+        async def scenario():
+            async def fake_shell(*args, **kwargs):
+                raise RuntimeError("boom")
+
+            asyncio.create_subprocess_shell = fake_shell
+            res = await self.task_service.run_shell_exec("anything")
+
+            self.assertFalse(res["success"])
+            self.assertIn("boom", res["error"])
+
+        asyncio.run(scenario())
+
+
+if __name__ == "__main__":
+    unittest.main()

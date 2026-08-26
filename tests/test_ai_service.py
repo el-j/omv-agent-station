@@ -8,6 +8,7 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
@@ -76,6 +77,49 @@ class TestListAiModels(unittest.TestCase):
         models, live = asyncio.run(self.ai_service.list_ai_models())
         self.assertFalse(live)
         self.assertGreater(len(models), 0)
+
+
+class TestQueryAiModel(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.ai_service as ai_service
+        self.ai_service = ai_service
+        self._orig_create = ai_service.ai_client.chat.completions.create
+
+    def tearDown(self):
+        self.ai_service.ai_client.chat.completions.create = self._orig_create
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    def test_success_returns_answer_and_model(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="The answer is 42."))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        res = asyncio.run(self.ai_service.query_ai_model("what is the answer?", model="coder-smart"))
+
+        self.assertTrue(res["success"])
+        self.assertEqual(res["answer"], "The answer is 42.")
+        self.assertEqual(res["model"], "coder-smart")
+
+    def test_empty_content_falls_back_to_placeholder(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content=None))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        res = asyncio.run(self.ai_service.query_ai_model("hello"))
+
+        self.assertTrue(res["success"])
+        self.assertEqual(res["answer"], "No response received.")
+
+    def test_failure_returns_error_dict(self):
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(side_effect=ConnectionError("gateway down"))
+
+        res = asyncio.run(self.ai_service.query_ai_model("hello", model="reasoning-heavy"))
+
+        self.assertFalse(res["success"])
+        self.assertIn("gateway down", res["error"])
+        self.assertEqual(res["model"], "reasoning-heavy")
 
 
 class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
