@@ -32,18 +32,15 @@ from core.config import (
     BOT_TOKEN,
     ALLOWED_USER_ID,
     WORKSPACE,
-    OBSIDIAN_VAULT,  # noqa: F401 -- re-exported for tests importing bot.OBSIDIAN_VAULT
     TOPICS_FILE,
     CUSTOM_CMDS_FILE,
     OBSIDIAN_CMDS_FILE,
-    BUILTIN_COMMANDS,  # noqa: F401 -- re-exported for tests importing bot.BUILTIN_COMMANDS
     logger,
 )
-from core.security import (
-    sanitize_project_path,  # noqa: F401 -- re-exported for tests importing bot.sanitize_project_path
-    sanitize_repo_name,  # noqa: F401 -- re-exported for tests importing bot.sanitize_repo_name
-    sanitize_cmd_name,  # noqa: F401 -- re-exported for tests importing bot.sanitize_cmd_name
-)
+# Not used directly below -- re-exported so tests/test_blackbox.py and
+# tests/test_mutation.py can reach them as bot.<name>.
+from core.config import OBSIDIAN_VAULT, BUILTIN_COMMANDS  # noqa: F401
+from core.security import sanitize_project_path, sanitize_repo_name, sanitize_cmd_name  # noqa: F401
 from core.git_auth import init_git_credentials
 
 # Handlers & UI Components

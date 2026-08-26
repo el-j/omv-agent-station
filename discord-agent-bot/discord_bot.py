@@ -74,10 +74,22 @@ async def check_auth(ctx: commands.Context) -> bool:
         return False
     return True
 
+def channel_scope(ctx: commands.Context) -> tuple[str, str | None]:
+    """Resolves the stable (channel_id, thread_id) binding key for a context.
+
+    A Discord Thread has its own stable id distinct from every message posted
+    in it -- using ctx.message.id here (as this used to) makes every message
+    look like a different thread, so a binding set by /bind can never be
+    found again by a later message.
+    """
+    if isinstance(ctx.channel, discord.Thread):
+        parent_id = ctx.channel.parent_id or ctx.channel.id
+        return str(parent_id), str(ctx.channel.id)
+    return str(ctx.channel.id), None
+
 def resolve_ctx_project(ctx: commands.Context, args: list[str]) -> tuple[str | None, list[str]]:
     """Resolves project context based on thread ID or channel ID."""
-    channel_id = str(ctx.channel.id)
-    thread_id = str(ctx.message.id) if isinstance(ctx.channel, discord.Thread) else None
+    channel_id, thread_id = channel_scope(ctx)
     return resolve_project_context_raw(channel_id, thread_id, args, WORKSPACE)
 
 # ---------------------------------------------------------------------------
@@ -481,8 +493,7 @@ async def bind_cmd(ctx: commands.Context, project_name: str = ""):
     if not p_dir or not p_dir.exists():
         await ctx.reply(f"❌ Project `{project_name}` not found in `/data/workspace`.")
         return
-    channel_id = str(ctx.channel.id)
-    thread_id = str(ctx.message.id) if isinstance(ctx.channel, discord.Thread) else None
+    channel_id, thread_id = channel_scope(ctx)
     set_bound_project(channel_id, thread_id, project_name)
     await ctx.reply(f"✅ Channel bound to project `{project_name}`. All tasks now target this repo.")
 
@@ -490,8 +501,7 @@ async def bind_cmd(ctx: commands.Context, project_name: str = ""):
 async def unbind_cmd(ctx: commands.Context):
     if not await check_auth(ctx):
         return
-    channel_id = str(ctx.channel.id)
-    thread_id = str(ctx.message.id) if isinstance(ctx.channel, discord.Thread) else None
+    channel_id, thread_id = channel_scope(ctx)
     remove_bound_project(channel_id, thread_id)
     await ctx.reply("✅ Unbound project context from this channel.")
 

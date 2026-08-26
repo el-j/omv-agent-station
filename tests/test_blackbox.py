@@ -180,6 +180,51 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
 
+    def test_discord_channel_scope_uses_stable_thread_id_not_message_id(self):
+        """channel_scope() must key a Discord Thread by the thread's own stable id,
+        not by ctx.message.id -- every message has a unique snowflake, so a binding
+        set on one message could never be found again by a later message in the
+        same thread if message id were used as the thread key."""
+        sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        try:
+            import discord_bot
+
+            class FakeThread:
+                def __init__(self, thread_id, parent_id):
+                    self.id = thread_id
+                    self.parent_id = parent_id
+
+            # Patch the (otherwise mocked) discord.Thread with a real class so
+            # isinstance() checks in channel_scope() behave correctly.
+            discord_bot.discord.Thread = FakeThread
+
+            class FakeMessage:
+                def __init__(self, mid):
+                    self.id = mid
+
+            class FakeCtx:
+                def __init__(self, channel, message_id):
+                    self.channel = channel
+                    self.message = FakeMessage(message_id)
+
+            thread = FakeThread(thread_id=999, parent_id=100)
+
+            first_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=111))
+            second_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=222))
+
+            self.assertEqual(first_message_scope, second_message_scope)
+            self.assertEqual(first_message_scope, ("100", "999"))
+
+            class FakeChannel:
+                def __init__(self, cid):
+                    self.id = cid
+
+            plain_channel_scope = discord_bot.channel_scope(FakeCtx(FakeChannel(555), message_id=333))
+            self.assertEqual(plain_channel_scope, ("555", None))
+        finally:
+            if str(ROOT_DIR / "discord-agent-bot") in sys.path:
+                sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+
     def test_custom_commands_lifecycle_and_expansion_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
         try:

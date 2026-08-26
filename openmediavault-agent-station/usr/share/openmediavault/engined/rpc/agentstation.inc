@@ -33,6 +33,7 @@ class AgentStation extends ServiceAbstract
         $this->registerMethod("getPerformance");
         $this->registerMethod("restartServices");
         $this->registerMethod("getLogs");
+        $this->registerMethod("installClaudeCli");
     }
 
     public function getSettings($params, $context): array
