@@ -321,6 +321,112 @@ print(json.dumps(data, indent=2))
 PYEOF
 }
 
+check_update() {
+    CURRENT_VERSION=$(dpkg-query -W -f='${Version}' openmediavault-agent-station 2>/dev/null || echo "unknown")
+    RELEASE_JSON=$(curl -fsSL --max-time 10 "https://api.github.com/repos/el-j/omv-agent-station/releases/latest" 2>/dev/null || echo "")
+
+    if [ -z "$RELEASE_JSON" ]; then
+        python3 -c "import json,sys; print(json.dumps({'current_version': sys.argv[1], 'error': 'Could not reach GitHub. Check network connectivity.'}))" "$CURRENT_VERSION"
+        return
+    fi
+
+    LATEST_VERSION=$(printf '%s' "$RELEASE_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('tag_name', '').lstrip('v'))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+    UPDATE_AVAILABLE="false"
+    if [ -n "$LATEST_VERSION" ] && [ "$CURRENT_VERSION" != "unknown" ]; then
+        if dpkg --compare-versions "$CURRENT_VERSION" lt "$LATEST_VERSION" 2>/dev/null; then
+            UPDATE_AVAILABLE="true"
+        fi
+    fi
+
+    printf '%s' "$RELEASE_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print(json.dumps({'current_version': sys.argv[1], 'error': 'Could not parse GitHub release response.'}))
+    sys.exit(0)
+asset_url = ''
+for a in data.get('assets', []):
+    if a.get('name', '').endswith('.deb'):
+        asset_url = a.get('browser_download_url', '')
+        break
+print(json.dumps({
+    'current_version': sys.argv[1],
+    'latest_version': data.get('tag_name', '').lstrip('v'),
+    'update_available': sys.argv[2] == 'true',
+    'release_url': data.get('html_url', ''),
+    'asset_url': asset_url,
+    'published_at': data.get('published_at', ''),
+}))
+" "$CURRENT_VERSION" "$UPDATE_AVAILABLE"
+}
+
+update_plugin() {
+    echo "=========================================================="
+    echo "🔄 Checking for Agent Station updates..."
+    echo "=========================================================="
+    UPDATE_JSON=$(check_update)
+    echo "$UPDATE_JSON"
+
+    UPDATE_AVAILABLE=$(printf '%s' "$UPDATE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('update_available', False))" 2>/dev/null || echo "False")
+    ASSET_URL=$(printf '%s' "$UPDATE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('asset_url', ''))" 2>/dev/null || echo "")
+
+    if [ "$UPDATE_AVAILABLE" != "True" ]; then
+        echo ""
+        echo "✅ Already running the latest version. Nothing to do."
+        exit 0
+    fi
+
+    if [ -z "$ASSET_URL" ]; then
+        echo ""
+        echo "❌ Latest release has no .deb asset attached. Cannot auto-update -- install manually from the GitHub release page."
+        exit 1
+    fi
+
+    case "$ASSET_URL" in
+        https://github.com/*) ;;
+        *)
+            echo "❌ Refusing to download from untrusted host: $ASSET_URL"
+            exit 1
+            ;;
+    esac
+
+    TMP_DIR=$(mktemp -d)
+    TMP_DEB="$TMP_DIR/update.deb"
+    echo ""
+    echo "⬇️  Downloading $ASSET_URL ..."
+    if ! curl -fsSL --max-time 120 -o "$TMP_DEB" "$ASSET_URL"; then
+        echo "❌ Download failed."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+
+    if ! dpkg-deb --info "$TMP_DEB" >/dev/null 2>&1; then
+        echo "❌ Downloaded file is not a valid .deb package."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+
+    echo "📦 Installing update via apt (pulls any new dependencies automatically)..."
+    if apt-get install -y "$TMP_DEB"; then
+        echo ""
+        echo "✅ Update installed successfully! The workbench menu will refresh automatically within a few seconds."
+    else
+        echo "❌ Package installation failed. Check the apt output above."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    rm -rf "$TMP_DIR"
+}
+
 case "$1" in
     apply)
         apply_sync
@@ -378,6 +484,12 @@ case "$1" in
             echo "⚠️ Installation completed, binary at /usr/local/bin/claude"
         fi
         ;;
+    check-update)
+        check_update
+        ;;
+    update-plugin)
+        update_plugin
+        ;;
     uninstall)
         echo "🛑 Stopping Agent Station stack..."
         cd "$STACK_DIR" 2>/dev/null && run_compose --env-file .env down 2>/dev/null || true
@@ -389,11 +501,11 @@ case "$1" in
         echo "✅ Uninstallation complete."
         ;;
     help|-h|--help)
-        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|install-claude-cli|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|install-claude-cli|check-update|update-plugin|uninstall}"
         exit 0
         ;;
     *)
-        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|check-update|update-plugin|uninstall}"
         exit 1
         ;;
 esac

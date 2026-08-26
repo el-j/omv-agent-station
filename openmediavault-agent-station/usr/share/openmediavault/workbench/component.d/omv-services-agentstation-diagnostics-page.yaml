@@ -44,4 +44,28 @@ data:
         value: ""
         readonly: true
         rows: 18
-    buttons: []
+      - type: divider
+        title: _("5. Plugin Version & Updates")
+      - type: textarea
+        name: update_status
+        label: _("Installed vs. Latest GitHub Release")
+        value: ""
+        readonly: true
+        rows: 3
+    buttons:
+      - text: _("Update Plugin Now")
+        icon: "mdi:cloud-download"
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Update OMV Agent Station Plugin")
+              width: 75%
+              startOnInit: true
+              request:
+                service: AgentStation
+                method: updatePlugin
+                task: true
+              buttons:
+                stop:
+                  hidden: true

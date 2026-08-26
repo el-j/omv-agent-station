@@ -34,6 +34,8 @@ class AgentStation extends ServiceAbstract
         $this->registerMethod("restartServices");
         $this->registerMethod("getLogs");
         $this->registerMethod("installClaudeCli");
+        $this->registerMethod("checkForUpdate");
+        $this->registerMethod("updatePlugin");
     }
 
     public function getSettings($params, $context): array
@@ -307,10 +309,28 @@ class AgentStation extends ServiceAbstract
             $statusText = implode("\n", $slice);
         }
 
+        // 5. Plugin version & update status
+        $updateInfo = $this->checkForUpdate([], $context);
+        $updateLines = [];
+        if (!empty($updateInfo["error"])) {
+            $updateLines[] = sprintf("⚠️ %s", $updateInfo["error"]);
+            if (!empty($updateInfo["current_version"])) {
+                $updateLines[] = sprintf("📦 Installed Version : %s", $updateInfo["current_version"]);
+            }
+        } else {
+            $updateLines[] = sprintf("📦 Installed Version : %s", $updateInfo["current_version"] ?? "unknown");
+            $updateLines[] = sprintf("🚀 Latest Release    : %s", $updateInfo["latest_version"] ?? "unknown");
+            $updateLines[] = !empty($updateInfo["update_available"])
+                ? "✨ An update is available! Use the \"Update Plugin Now\" button below."
+                : "✅ You are running the latest version.";
+        }
+        $updateStatus = implode("\n", $updateLines);
+
         return [
             "container_status" => $containerStatus,
             "storage_status" => $storageStatus,
             "ai_status" => $aiStatus,
+            "update_status" => $updateStatus,
             "log_output" => $statusText ?: "No startup logs recorded yet. Enable the Agent Station in Overview to provision containers."
         ];
     }
@@ -363,6 +383,33 @@ class AgentStation extends ServiceAbstract
 
         return $this->execBgProc(function ($bgStatusFilename, $bgOutputFilename) {
             $cmd = new Process("omv-agent-station", ["install-claude-cli"]);
+            $cmd->setRedirectOutput(true);
+            $cmd->setAsync(false);
+            $cmd->execute($output);
+            file_put_contents($bgOutputFilename, implode("\n", $output));
+        });
+    }
+
+    public function checkForUpdate($params, $context): array
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["check-update"]);
+            $cmd->execute($output);
+            $data = json_decode(implode("", $output), true);
+            return is_array($data) ? $data : ["error" => "Could not parse update check response."];
+        }
+
+        return ["error" => "omv-agent-station CLI helper not found."];
+    }
+
+    public function updatePlugin($params, $context)
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        return $this->execBgProc(function ($bgStatusFilename, $bgOutputFilename) {
+            $cmd = new Process("omv-agent-station", ["update-plugin"]);
             $cmd->setRedirectOutput(true);
             $cmd->setAsync(false);
             $cmd->execute($output);
