@@ -10,10 +10,29 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
 import stubs  # noqa: F401
+
+# run_autonomous_task() unconditionally checks Path("/root/.anthropic/token").exists()
+# before ever touching the (mocked) subprocess. On a real developer machine that
+# path just doesn't exist, so .exists() returns False -- but on GitHub Actions'
+# non-root runner, /root isn't traversable at all, and Python 3.12+ no longer
+# swallows PermissionError inside Path.exists() (only FileNotFoundError/
+# NotADirectoryError), so it raises instead. That's a real, already-handled
+# outcome in production (the function's own try/except catches it and returns
+# it as an error) -- but it isn't what these tests are exercising, so pin this
+# one lookup to "doesn't exist" everywhere and let every other Path.exists()
+# call behave normally.
+_real_path_exists = Path.exists
+
+
+def _fake_path_exists(self, *args, **kwargs):
+    if str(self) == "/root/.anthropic/token":
+        return False
+    return _real_path_exists(self, *args, **kwargs)
 
 
 class FakeProc:
@@ -33,8 +52,11 @@ class TestTaskService(unittest.TestCase):
         self.task_service = task_service
         self._orig_exec = asyncio.create_subprocess_exec
         self._orig_shell = asyncio.create_subprocess_shell
+        self._path_exists_patcher = patch.object(Path, "exists", _fake_path_exists)
+        self._path_exists_patcher.start()
 
     def tearDown(self):
+        self._path_exists_patcher.stop()
         asyncio.create_subprocess_exec = self._orig_exec
         asyncio.create_subprocess_shell = self._orig_shell
         if str(ROOT_DIR) in sys.path:
