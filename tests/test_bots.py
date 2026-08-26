@@ -92,9 +92,13 @@ class TestBotsAndPackaging(unittest.TestCase):
         # No leftover navigation entries nested under Services.
         self.assertEqual(list(nav_dir.glob("services.agentstation*.yaml")), [])
 
+        # OMV's navigation-item schema requires a url on every entry (verified
+        # against a real install: omv-mkworkbench rejects one without it with
+        # "Missing required attribute 'data.url'"), so the root item points
+        # at the Overview page rather than being a true url-less container.
         root_text = (nav_dir / "agentstation.yaml").read_text(encoding="utf-8")
         self.assertIn('path: "agentstation"', root_text)
-        self.assertNotIn("url:", root_text, "Root nav item must be a container only (no url)")
+        self.assertIn('url: "/agentstation/overview"', root_text)
 
         for sub in ["overview", "aimodels", "git", "chat", "security", "diagnostics"]:
             sub_text = (nav_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
