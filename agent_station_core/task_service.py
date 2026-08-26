@@ -118,8 +118,25 @@ async def run_shell_exec(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def get_ram_usage() -> str:
+    """Reads /proc/meminfo for a human-readable used/total RAM summary.
+    Returns 'N/A' off-Linux (e.g. local dev on macOS) where it doesn't exist."""
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            meminfo = {}
+            for line in f:
+                key, _, rest = line.partition(":")
+                meminfo[key] = int(rest.strip().split()[0])  # kB
+        total_mb = meminfo["MemTotal"] // 1024
+        avail_mb = meminfo.get("MemAvailable", meminfo["MemTotal"]) // 1024
+        used_mb = max(0, total_mb - avail_mb)
+        pct = round((used_mb / total_mb) * 100) if total_mb else 0
+        return f"{used_mb} MB used of {total_mb} MB ({pct}%)"
+    except Exception:
+        return "N/A"
+
 def get_system_status() -> dict:
-    """Collects system uptime, disk usage, and active tmux sessions."""
+    """Collects system uptime, RAM usage, disk usage, and active tmux sessions."""
     try:
         tmux_out = subprocess.check_output([TMUX_BIN, "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()  # nosec B603,B607
     except Exception:
@@ -134,6 +151,7 @@ def get_system_status() -> dict:
 
     return {
         "uptime": uptime_out,
+        "ram": get_ram_usage(),
         "disk": df_out,
         "tmux": tmux_out
     }

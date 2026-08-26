@@ -2,6 +2,7 @@
 Configuration and YAML validation tests for OMV AI Orchestrator Stack.
 """
 
+import re
 import unittest
 import yaml
 from pathlib import Path
@@ -83,14 +84,32 @@ class TestConfig(unittest.TestCase):
         env_path = ROOT_DIR / "env.example"
         self.assertTrue(env_path.exists())
         content = env_path.read_text()
-        
+
         self.assertIn("GEMINI_API_KEY", content)
         self.assertIn("ANTHROPIC_API_KEY", content)
         self.assertIn("GITHUB_TOKEN", content)
         self.assertIn("OPENROUTER_API_KEY", content)
+        self.assertIn("MISTRAL_API_KEY", content)
+        self.assertIn("DEEPSEEK_API_KEY", content)
         self.assertIn("TELEGRAM_BOT_TOKEN", content)
         self.assertIn("SIGNAL_PHONE_NUMBER", content)
+        self.assertIn("DISCORD_BOT_TOKEN", content)
+        self.assertIn("DISCORD_ALLOWED_USER_ID", content)
         self.assertIn("GIT_AUTHOR_NAME", content)
+
+    def test_env_example_covers_every_litellm_env_var(self):
+        """Regression coverage for issue #15: every os.environ/X reference in
+        litellm/config.yaml must have a corresponding line in env.example, so
+        adding a new provider there can't silently leave users unable to
+        discover the variable that unlocks it."""
+        config_path = ROOT_DIR / "litellm" / "config.yaml"
+        config_text = config_path.read_text(encoding="utf-8")
+        referenced_vars = set(re.findall(r"os\.environ/([A-Z0-9_]+)", config_text))
+        self.assertTrue(referenced_vars, "Expected at least one os.environ/ reference in litellm/config.yaml")
+
+        env_content = (ROOT_DIR / "env.example").read_text(encoding="utf-8")
+        missing = sorted(v for v in referenced_vars if v not in env_content)
+        self.assertEqual(missing, [], f"env.example is missing variables referenced by litellm/config.yaml: {missing}")
 
     def test_omv_datamodel_schema_validity(self):
         import json
@@ -166,6 +185,41 @@ class TestConfig(unittest.TestCase):
             self.assertIn("name", comp_data)
             self.assertIn("type", comp_data)
             self.assertIn("config", comp_data)
+
+class TestDocsMatchCode(unittest.TestCase):
+    """Regression coverage for issue #14: three doc-vs-code mismatches found
+    in the 2026-08-26 audit pass."""
+
+    def test_spec_filename_matches_vault_service(self):
+        vault_service = (ROOT_DIR / "agent_station_core" / "vault_service.py").read_text(encoding="utf-8")
+        self.assertIn('"project-spec.md"', vault_service)
+
+        for doc_path in (ROOT_DIR / "README.md", ROOT_DIR / "OMV_AI_SERVER_HANDBOOK.md"):
+            text = doc_path.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "/spec.md", text,
+                f"{doc_path.name} still references the wrong filename 'spec.md' -- "
+                f"the code actually creates 'project-spec.md'",
+            )
+
+    def test_no_agent_log_md_claim_without_matching_code(self):
+        for path in ROOT_DIR.rglob("*.md"):
+            if "node_modules" in path.parts:
+                continue
+            self.assertNotIn(
+                "agent-log.md", path.read_text(encoding="utf-8"),
+                f"{path.relative_to(ROOT_DIR)} claims agents write to 'agent-log.md', "
+                f"but no code anywhere creates or writes that file",
+            )
+
+    def test_status_ram_claim_matches_implementation(self):
+        task_service = (ROOT_DIR / "agent_station_core" / "task_service.py").read_text(encoding="utf-8")
+        self.assertIn("def get_ram_usage", task_service)
+        self.assertIn('"ram":', task_service)
+
+        telegram_system = (ROOT_DIR / "telegram-agent-bot" / "handlers" / "system.py").read_text(encoding="utf-8")
+        self.assertIn("ram_out", telegram_system)
+
 
 if __name__ == "__main__":
     unittest.main()

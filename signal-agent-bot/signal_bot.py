@@ -400,6 +400,7 @@ async def handle_signal_command(sender: str, text: str):
             sender,
             f"🖥️ OMV Server Status\n\n"
             f"⏱️ Uptime: {metrics['uptime']}\n"
+            f"🧠 RAM: {metrics['ram']}\n"
             f"💾 Disk Space: {metrics['disk']}\n\n"
             f"🧵 Active Tmux Sessions:\n{metrics['tmux']}"
         )

@@ -136,9 +136,24 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uptime_out = "N/A"
         df_out = "N/A"
 
+    try:
+        meminfo = {}
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                key, _, rest = line.partition(":")
+                meminfo[key] = int(rest.strip().split()[0])
+        total_mb = meminfo["MemTotal"] // 1024
+        avail_mb = meminfo.get("MemAvailable", meminfo["MemTotal"]) // 1024
+        used_mb = max(0, total_mb - avail_mb)
+        pct = round((used_mb / total_mb) * 100) if total_mb else 0
+        ram_out = f"{used_mb} MB used of {total_mb} MB ({pct}%)"
+    except Exception:
+        ram_out = "N/A"
+
     report = (
         f"🖥️ *OMV Server Status*\n\n"
         f"⏱️ *Uptime:* `{uptime_out}`\n"
+        f"🧠 *RAM:* `{ram_out}`\n"
         f"💾 *Disk Space:* `{df_out}`\n\n"
         f"🧵 *Active Agent Sessions:*\n```\n{tmux_out}\n```"
     )

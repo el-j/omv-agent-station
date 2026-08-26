@@ -100,7 +100,7 @@ Once launched, open your Telegram chat with your bot and try:
 | `/vault` | View status and recently modified files in your Obsidian second brain |
 | `/note <Title> \| <Body>` | Instantly save a new note to `Inbox/` in your Obsidian vault |
 | `/models` | Query the LiteLLM proxy for active provider endpoints and health |
-| `/status` | View server uptime, RAM, disk space, and active tmux sessions |
+| `/status` | View server uptime, RAM usage, disk space, and active tmux sessions |
 
 ---
 
@@ -112,8 +112,8 @@ Once launched, open your Telegram chat with your bot and try:
    - On Server: `/data/obsidian`
    - On Mac/PC: `~/Documents/ObsidianVault`
 4. **How the Agent uses Obsidian:**
-   - Place project specs in `ObsidianVault/Projects/<ProjectName>/spec.md`.
-   - Your Telegram bot and coding agent read specs from this path and write execution summaries back to `agent-log.md`.
+   - Place project specs in `ObsidianVault/Projects/<ProjectName>/project-spec.md`.
+   - The Telegram bot automatically creates this note (with a Git remote, clone date, and an "Agent Execution History" section) whenever you run `/clone` or `/newrepo`.
 
 ---
 
