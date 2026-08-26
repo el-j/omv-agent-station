@@ -1,7 +1,7 @@
 version: "1.0"
 type: route
 data:
-  url: "/services/agentstation/diagnostics"
+  url: "/agentstation/diagnostics"
   title: _("Diagnostics & Logs")
   editing: true
   component: omv-services-agentstation-diagnostics-page

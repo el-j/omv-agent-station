@@ -45,29 +45,29 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (Services submenu)
+        # Check navigation files (root-level 'Agent Station' menu, not buried
+        # under Services -- see issue #4)
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         for nav_name in [
-            "services.agentstation",
-            "services.agentstation.overview",
-            "services.agentstation.aimodels",
-            "services.agentstation.git",
-            "services.agentstation.chat",
-            "services.agentstation.security",
-            "services.agentstation.diagnostics"
+            "agentstation",
+            "agentstation.overview",
+            "agentstation.aimodels",
+            "agentstation.git",
+            "agentstation.chat",
+            "agentstation.security",
+            "agentstation.diagnostics"
         ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
-        # Check route files
+        # The root nav item is a container only (no url), so it has no route
         route_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
         for route_name in [
-            "services.agentstation",
-            "services.agentstation.overview",
-            "services.agentstation.aimodels",
-            "services.agentstation.git",
-            "services.agentstation.chat",
-            "services.agentstation.security",
-            "services.agentstation.diagnostics"
+            "agentstation.overview",
+            "agentstation.aimodels",
+            "agentstation.git",
+            "agentstation.chat",
+            "agentstation.security",
+            "agentstation.diagnostics"
         ]:
             self.assertTrue((route_dir / f"{route_name}.yaml").exists(), f"Missing route file: {route_name}.yaml")
 
@@ -82,6 +82,24 @@ class TestBotsAndPackaging(unittest.TestCase):
             "omv-services-agentstation-diagnostics-page"
         ]:
             self.assertTrue((comp_dir / f"{comp_name}.yaml").exists(), f"Missing component file: {comp_name}.yaml")
+
+    def test_agentstation_is_a_root_level_menu_not_buried_under_services(self):
+        """Regression coverage for issue #4: 'Agent Station' must be a root
+        sidebar item alongside System/Storage/Services, not nested under the
+        Services submenu."""
+        nav_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
+
+        # No leftover navigation entries nested under Services.
+        self.assertEqual(list(nav_dir.glob("services.agentstation*.yaml")), [])
+
+        root_text = (nav_dir / "agentstation.yaml").read_text(encoding="utf-8")
+        self.assertIn('path: "agentstation"', root_text)
+        self.assertNotIn("url:", root_text, "Root nav item must be a container only (no url)")
+
+        for sub in ["overview", "aimodels", "git", "chat", "security", "diagnostics"]:
+            sub_text = (nav_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
+            self.assertIn(f'path: "agentstation.{sub}"', sub_text)
+            self.assertIn(f'url: "/agentstation/{sub}"', sub_text)
 
 if __name__ == "__main__":
     unittest.main()
