@@ -38,13 +38,25 @@ class AgentStation extends ServiceAbstract
         $this->registerMethod("updatePlugin");
     }
 
+    /**
+     * Resolves the primary config file path. Always self::CONFIG_PATH in
+     * production; overridable via AGENTSTATION_TEST_CONFIG_PATH so the
+     * PHPUnit harness (tests/php/) can exercise getSettings/setSettings
+     * without writing to the real /etc/ path.
+     */
+    private function getConfigPath(): string
+    {
+        $override = getenv("AGENTSTATION_TEST_CONFIG_PATH");
+        return $override !== false ? $override : self::CONFIG_PATH;
+    }
+
     public function getSettings($params, $context): array
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
         $data = [];
-        if (file_exists(self::CONFIG_PATH)) {
-            $data = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        if (file_exists($this->getConfigPath())) {
+            $data = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
         // Fallback to persistent storage backup if primary config is empty/missing
         if (empty($data) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
@@ -107,8 +119,8 @@ class AgentStation extends ServiceAbstract
 
         // Merge with existing configuration so partial submenu updates preserve other tabs
         $existing = [];
-        if (file_exists(self::CONFIG_PATH)) {
-            $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        if (file_exists($this->getConfigPath())) {
+            $existing = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
         if (empty($existing) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
             $existing = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
@@ -152,8 +164,8 @@ class AgentStation extends ServiceAbstract
 
         $config = array_merge($existing, $sanitized);
 
-        file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
-        @chmod(self::CONFIG_PATH, 0600);
+        file_put_contents($this->getConfigPath(), json_encode($config, JSON_PRETTY_PRINT));
+        @chmod($this->getConfigPath(), 0600);
 
         // Persistent storage backup
         $dataDir = (string)($config["data_dir"] ?? self::DEFAULT_DATA_DIR);

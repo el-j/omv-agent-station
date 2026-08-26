@@ -54,3 +54,24 @@ jobs:
         with:
           name: openmediavault-agent-station-deb-${{ matrix.python-version }}
           path: openmediavault-agent-station_*.deb
+
+  test-php:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      - name: Install PHPUnit
+        working-directory: tests/php
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run AgentStation RPC Tests
+        working-directory: tests/php
+        run: php vendor/bin/phpunit
