@@ -22,6 +22,7 @@ for path_cand in [str(_bot_dir), str(_root_dir)]:
     if path_cand not in sys.path:
         sys.path.insert(0, path_cand)
 
+from agent_station_core import task_registry
 from agent_station_core import (
     WORKSPACE,
     logger,
@@ -122,6 +123,7 @@ async def handle_signal_command(sender: str, text: str):
             "• /chat <message> — Ask questions via smart router\n"
             "• /gemini <prompt> | /gpt4 <prompt> — Quick model shortcuts\n"
             "• /claude <prompt> — Run Claude Code CLI in workspace\n"
+            "• /cancel — Stop the task/claude/exec command currently running\n"
             "• /projects — List workspace repositories\n"
             "• /newrepo <name> [desc] — Create new GitHub repository\n"
             "• /clone <url> [name] — Clone git repository\n"
@@ -140,7 +142,8 @@ async def handle_signal_command(sender: str, text: str):
             "• /models | /modelhelp\n\n"
             "2. Coding Agent & Execution:\n"
             "• /task [project] <instructions>\n"
-            "• /claude <prompt> | /exec <cmd>\n\n"
+            "• /claude <prompt> | /exec <cmd>\n"
+            "• /cancel — Stop the task/claude/exec command currently running\n\n"
             "3. Git & Workspaces:\n"
             "• /projects | /newrepo | /clone | /pull | /push | /branch | /diff\n\n"
             "4. Notes & Vault:\n"
@@ -307,36 +310,52 @@ async def handle_signal_command(sender: str, text: str):
             await send_signal_message(sender, f"❌ Project directory `{proj}` not found in /data/workspace.")
             return
 
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         session_id = f"task_{timestamp}"
         task_branch = f"agent/{session_id}"
 
         await send_signal_message(sender, f"🚀 Launching Autonomous Agent Task for {proj} on {task_branch}...")
-        res = await run_autonomous_task(p_dir, instructions, session_id, task_branch)
-        if res["success"]:
-            await send_signal_message(sender, f"✅ Task Completed ({proj}):\n\n{res['summary']}")
-        else:
-            await send_signal_message(sender, f"❌ Task execution error: {res.get('error')}")
+        t = asyncio.create_task(run_task_background(sender, proj, p_dir, instructions, session_id, task_branch))
+        task_registry.start(sender, label=f"task: {instructions}", asyncio_task=t)
 
     elif cmd == "claude":
         if not args:
             await send_signal_message(sender, "Usage: /claude <instructions>")
             return
+
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
+        prompt = " ".join(args)
         await send_signal_message(sender, "🤖 Dispatching Claude Code CLI...")
-        res = await run_claude_cli(WORKSPACE, " ".join(args))
-        if res["success"]:
-            await send_signal_message(sender, f"✅ Claude Code:\n\n{res['output']}")
-        else:
-            await send_signal_message(sender, f"❌ Claude error: {res.get('error')}")
+        t = asyncio.create_task(run_claude_background(sender, prompt))
+        task_registry.start(sender, label=f"claude: {prompt}", asyncio_task=t)
 
     elif cmd == "exec":
         if not args:
             await send_signal_message(sender, "Usage: /exec <shell command>")
             return
+
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
         shell_cmd = " ".join(args)
         await send_signal_message(sender, f"⏳ Executing: {shell_cmd}...")
-        res = await run_shell_exec(shell_cmd, cwd=WORKSPACE)
-        await send_signal_message(sender, f"🖥️ Output:\n{res['output']}")
+        t = asyncio.create_task(run_exec_background(sender, shell_cmd))
+        task_registry.start(sender, label=f"exec: {shell_cmd}", asyncio_task=t)
+
+    elif cmd in ("cancel", "stop"):
+        label = await task_registry.cancel(sender)
+        if label is None:
+            await send_signal_message(sender, "ℹ️ Nothing is currently running for you to cancel.")
+        else:
+            await send_signal_message(sender, f"🛑 Cancelling: {label}...")
 
     elif cmd == "status":
         metrics = get_system_status()
@@ -410,6 +429,53 @@ async def handle_signal_command(sender: str, text: str):
             return
         lines = [f"• /{k} ➔ {v}" for k, v in sorted(cmds.items())]
         await send_signal_message(sender, f"⚡ Custom Shortcuts ({len(cmds)}):\n\n" + "\n".join(lines))
+
+async def run_task_background(sender, proj, p_dir, instructions, session_id, task_branch):
+    """Runs the autonomous agent in the background so /cancel can stop it and
+    a second /task from the same sender can't race it on the same git dir."""
+    try:
+        res = await run_autonomous_task(
+            p_dir, instructions, session_id, task_branch,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
+        )
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Task Completed ({proj}):\n\n{res['summary']}")
+        else:
+            await send_signal_message(sender, f"❌ Task execution error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, f"🛑 Task Cancelled ({proj}, branch {task_branch})")
+        raise
+    finally:
+        task_registry.finish(sender)
+
+async def run_claude_background(sender, prompt):
+    try:
+        res = await run_claude_cli(
+            WORKSPACE, prompt,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
+        )
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Claude Code:\n\n{res['output']}")
+        else:
+            await send_signal_message(sender, f"❌ Claude error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, "🛑 Claude Code Cancelled")
+        raise
+    finally:
+        task_registry.finish(sender)
+
+async def run_exec_background(sender, shell_cmd):
+    try:
+        res = await run_shell_exec(
+            shell_cmd, cwd=WORKSPACE,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
+        )
+        await send_signal_message(sender, f"🖥️ Output:\n{res['output']}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, f"🛑 Cancelled: {shell_cmd}")
+        raise
+    finally:
+        task_registry.finish(sender)
 
 async def signal_event_listener():
     """Connects to signal-cli JSON-RPC WebSocket stream to listen for incoming messages."""

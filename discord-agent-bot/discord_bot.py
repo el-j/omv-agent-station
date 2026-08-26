@@ -18,9 +18,12 @@ for path_cand in [str(_bot_dir), str(_root_dir)]:
     if path_cand not in sys.path:
         sys.path.insert(0, path_cand)
 
+import asyncio
+
 import discord
 from discord.ext import commands
 
+from agent_station_core import task_registry
 from agent_station_core import (
     WORKSPACE,
     logger,
@@ -113,6 +116,7 @@ async def start_cmd(ctx: commands.Context):
         "• `/chat <message>` — Ask questions via smart router\n"
         "• `/gemini <prompt>` | `/gpt4 <prompt>` — Direct model shortcuts\n"
         "• `/claude <prompt>` — Run Claude Code CLI in workspace\n"
+        "• `/cancel` — Stop the task/claude/exec command currently running\n"
         "• `/projects` — List workspace repositories\n"
         "• `/newrepo <name> [desc]` — Create new GitHub repo\n"
         "• `/clone <url> [name]` — Clone git repository\n"
@@ -136,7 +140,8 @@ async def help_cmd(ctx: commands.Context):
         "**2. Coding Agent & Execution:**\n"
         "• `/task [project] <instructions>` — Autonomous coding agent\n"
         "• `/claude <prompt>` — Claude Code CLI execution\n"
-        "• `/exec <cmd>` — Sandboxed bash execution\n\n"
+        "• `/exec <cmd>` — Sandboxed bash execution\n"
+        "• `/cancel` — Stop the task/claude/exec command currently running\n\n"
         "**3. Git & Workspaces:**\n"
         "• `/projects` | `/newrepo` | `/clone` | `/pull` | `/push` | `/branch` | `/diff`\n\n"
         "**4. Notes & Vault:**\n"
@@ -353,19 +358,37 @@ async def task_cmd(ctx: commands.Context, *, args_str: str = ""):
         await ctx.reply(f"❌ Project directory `{proj}` not found in `/data/workspace`.")
         return
 
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
+        return
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_id = f"task_{timestamp}"
     task_branch = f"agent/{session_id}"
 
     msg = await ctx.reply(f"🚀 **Launching Autonomous Agent Task** for `{proj}` on `{task_branch}`...")
-    res = await run_autonomous_task(p_dir, instructions, session_id, task_branch)
-    if res["success"]:
-        summary = res["summary"]
-        if len(summary) > 1800:
-            summary = summary[:1800] + "\n...(truncated)"
-        await msg.edit(content=f"✅ **Task Completed (`{proj}`):**\n```{summary}```")
-    else:
-        await msg.edit(content=f"❌ Task execution error: {res.get('error')}")
+    t = asyncio.create_task(run_task_background(scope, msg, proj, p_dir, instructions, session_id, task_branch))
+    task_registry.start(*scope, label=f"task: {instructions}", asyncio_task=t)
+
+async def run_task_background(scope, msg, proj, p_dir, instructions, session_id, task_branch):
+    try:
+        res = await run_autonomous_task(
+            p_dir, instructions, session_id, task_branch,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
+        )
+        if res["success"]:
+            summary = res["summary"]
+            if len(summary) > 1800:
+                summary = summary[:1800] + "\n...(truncated)"
+            await msg.edit(content=f"✅ **Task Completed (`{proj}`):**\n```{summary}```")
+        else:
+            await msg.edit(content=f"❌ Task execution error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await msg.edit(content=f"🛑 **Task Cancelled** (`{proj}`, branch `{task_branch}`)")
+        raise
+    finally:
+        task_registry.finish(*scope)
 
 @bot.command(name="claude")
 async def claude_cmd(ctx: commands.Context, *, prompt: str = ""):
@@ -374,15 +397,34 @@ async def claude_cmd(ctx: commands.Context, *, prompt: str = ""):
     if not prompt:
         await ctx.reply("Usage: `/claude <instructions>`")
         return
+
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
+        return
+
     msg = await ctx.reply("🤖 **Dispatching Claude Code CLI...**")
-    res = await run_claude_cli(WORKSPACE, prompt)
-    if res["success"]:
-        out = res["output"]
-        if len(out) > 1900:
-            out = out[:1900] + "\n...(truncated)"
-        await msg.edit(content=f"✅ **Claude Code:**\n\n{out}")
-    else:
-        await msg.edit(content=f"❌ Claude error: {res.get('error')}")
+    t = asyncio.create_task(run_claude_background(scope, msg, prompt))
+    task_registry.start(*scope, label=f"claude: {prompt}", asyncio_task=t)
+
+async def run_claude_background(scope, msg, prompt):
+    try:
+        res = await run_claude_cli(
+            WORKSPACE, prompt,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
+        )
+        if res["success"]:
+            out = res["output"]
+            if len(out) > 1900:
+                out = out[:1900] + "\n...(truncated)"
+            await msg.edit(content=f"✅ **Claude Code:**\n\n{out}")
+        else:
+            await msg.edit(content=f"❌ Claude error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await msg.edit(content="🛑 **Claude Code Cancelled**")
+        raise
+    finally:
+        task_registry.finish(*scope)
 
 @bot.command(name="exec")
 async def exec_cmd(ctx: commands.Context, *, shell_cmd: str = ""):
@@ -391,12 +433,42 @@ async def exec_cmd(ctx: commands.Context, *, shell_cmd: str = ""):
     if not shell_cmd:
         await ctx.reply("Usage: `/exec <shell command>`")
         return
+
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
+        return
+
     msg = await ctx.reply(f"⏳ Executing: `{shell_cmd}`...")
-    res = await run_shell_exec(shell_cmd, cwd=WORKSPACE)
-    out = res["output"]
-    if len(out) > 1800:
-        out = out[:1800] + "\n...(truncated)"
-    await msg.edit(content=f"🖥️ **Output:**\n```{out}```")
+    t = asyncio.create_task(run_exec_background(scope, msg, shell_cmd))
+    task_registry.start(*scope, label=f"exec: {shell_cmd}", asyncio_task=t)
+
+async def run_exec_background(scope, msg, shell_cmd):
+    try:
+        res = await run_shell_exec(
+            shell_cmd, cwd=WORKSPACE,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
+        )
+        out = res["output"]
+        if len(out) > 1800:
+            out = out[:1800] + "\n...(truncated)"
+        await msg.edit(content=f"🖥️ **Output:**\n```{out}```")
+    except asyncio.CancelledError:
+        await msg.edit(content=f"🛑 **Cancelled:** `{shell_cmd}`")
+        raise
+    finally:
+        task_registry.finish(*scope)
+
+@bot.command(name="cancel", aliases=["stop"])
+async def cancel_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    scope = channel_scope(ctx)
+    label = await task_registry.cancel(*scope)
+    if label is None:
+        await ctx.reply("ℹ️ Nothing is currently running here to cancel.")
+        return
+    await ctx.reply(f"🛑 Cancelling: `{label}`...")
 
 @bot.command(name="status")
 async def status_cmd(ctx: commands.Context):
