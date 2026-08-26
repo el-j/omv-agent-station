@@ -11,3 +11,4 @@ from .task_service import *  # noqa: F401,F403 -- intentional package re-export
 from .vault_service import *  # noqa: F401,F403 -- intentional package re-export
 from .custom_cmds_service import *  # noqa: F401,F403 -- intentional package re-export
 from .topics_service import *  # noqa: F401,F403 -- intentional package re-export
+from .upload_service import *  # noqa: F401,F403 -- intentional package re-export

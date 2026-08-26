@@ -27,9 +27,12 @@ def save_topic_bindings(bindings: dict):
         logger.error(f"Failed to write {TOPICS_FILE}: {e}")
 
 def get_bound_project(chat_id: int | str, thread_id: int | str | None) -> str | None:
-    """Returns the project folder name bound to a given (chat_id, thread_id) pair."""
-    if not thread_id:
-        return None
+    """Returns the project folder name bound to a given (chat_id, thread_id) pair.
+
+    thread_id may legitimately be None -- Discord channels without a Thread
+    and Signal senders both bind at that granularity, so a binding stored
+    under a None thread_id must still be resolvable here.
+    """
     bindings = load_topic_bindings()
     key = f"{chat_id}:{thread_id}"
     return bindings.get(key)
