@@ -6,7 +6,6 @@ Dispatches Aider, Claude Code CLI, and shell commands in isolated subprocesses.
 import asyncio
 import subprocess  # nosec B404
 from pathlib import Path
-from datetime import datetime
 from .config import (
     AIDER_BIN,
     CLAUDE_BIN,
@@ -19,7 +18,6 @@ from .config import (
     WORKSPACE,
     logger,
 )
-from .security import sanitize_project_path
 
 async def run_autonomous_task(project_dir: Path, instructions: str, session_id: str, task_branch: str) -> dict:
     """Executes the autonomous agent (Aider with LiteLLM proxy), auto-commits, and pushes branch."""

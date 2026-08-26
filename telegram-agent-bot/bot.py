@@ -7,9 +7,7 @@ Telegram Forum Topics (project-scoped sub-channels), and User-Defined Dynamic Cu
 """
 
 import sys
-import os
 import json
-import re
 from pathlib import Path
 
 try:
@@ -33,37 +31,20 @@ from telegram.ext import (
 from core.config import (
     BOT_TOKEN,
     ALLOWED_USER_ID,
-    LITELLM_BASE,
-    LITELLM_KEY,
     WORKSPACE,
-    OBSIDIAN_VAULT,
-    GIT_BIN,
-    GIT_AUTHOR_NAME,
-    GIT_AUTHOR_EMAIL,
-    GITHUB_USER,
-    GITHUB_TOKEN,
-    GITLAB_USER,
-    GITLAB_TOKEN,
-    BITBUCKET_USER,
-    BITBUCKET_TOKEN,
-    TMUX_BIN,
-    UPTIME_BIN,
-    DF_BIN,
-    AIDER_BIN,
+    OBSIDIAN_VAULT,  # noqa: F401 -- re-exported for tests importing bot.OBSIDIAN_VAULT
     TOPICS_FILE,
     CUSTOM_CMDS_FILE,
     OBSIDIAN_CMDS_FILE,
-    BUILTIN_COMMANDS,
+    BUILTIN_COMMANDS,  # noqa: F401 -- re-exported for tests importing bot.BUILTIN_COMMANDS
     logger,
 )
 from core.security import (
-    sanitize_project_path,
-    sanitize_repo_name,
-    sanitize_branch_name,
-    sanitize_cmd_name,
-    sanitize_git_url,
+    sanitize_project_path,  # noqa: F401 -- re-exported for tests importing bot.sanitize_project_path
+    sanitize_repo_name,  # noqa: F401 -- re-exported for tests importing bot.sanitize_repo_name
+    sanitize_cmd_name,  # noqa: F401 -- re-exported for tests importing bot.sanitize_cmd_name
 )
-from core.git_auth import init_git_credentials, ai_client
+from core.git_auth import init_git_credentials
 
 # Handlers & UI Components
 from ui.command_menu import sync_bot_commands
@@ -74,7 +55,6 @@ from handlers.system import (
     exec_cmd,
     task_cmd,
     claude_cmd,
-    run_agent_task,
     cancel_cmd,
 )
 from handlers.ai_chat import (
@@ -107,7 +87,6 @@ from handlers.custom_cmds import (
 from handlers.vault import (
     vault_cmd,
     note_cmd,
-    init_obsidian_project_spec,
 )
 from handlers.interactive import interactive_text_handler
 from handlers.callbacks import help_callback_handler

@@ -6,7 +6,7 @@ Captures notes and provisions project-spec markdown files with bi-directional sy
 from datetime import datetime
 from telegram import Update, ForceReply
 from telegram.ext import ContextTypes
-from core.config import OBSIDIAN_VAULT, WORKSPACE, logger
+from core.config import OBSIDIAN_VAULT, logger
 from core.security import check_auth
 
 async def vault_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -97,7 +97,6 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
             if str(ROOT_DIR / "discord-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
 
-
     def test_repo_name_sanitization_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
         try:

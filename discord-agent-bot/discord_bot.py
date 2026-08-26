@@ -23,13 +23,10 @@ from discord.ext import commands
 
 from agent_station_core import (
     WORKSPACE,
-    OBSIDIAN_VAULT,
     logger,
     init_git_credentials,
     sanitize_project_path,
-    sanitize_repo_name,
     sanitize_branch_name,
-    sanitize_git_url,
     sanitize_cmd_name,
     clone_repository,
     create_new_repository,
@@ -49,7 +46,6 @@ from agent_station_core import (
     load_custom_commands,
     save_custom_commands,
     expand_custom_command,
-    get_bound_project,
     set_bound_project,
     remove_bound_project,
     resolve_project_context_raw,
