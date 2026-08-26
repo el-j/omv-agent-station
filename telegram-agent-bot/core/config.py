@@ -48,6 +48,6 @@ OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
 BUILTIN_COMMANDS = {
     "start", "help", "status", "models", "modelhelp", "aihelp", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
-    "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "addcmd", "alias", "delcmd",
+    "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "cancel", "stop", "addcmd", "alias", "delcmd",
     "removecmd", "customcmds", "cmds", "aliases", "createtopic", "topic"
 }

@@ -75,6 +75,7 @@ from handlers.system import (
     task_cmd,
     claude_cmd,
     run_agent_task,
+    cancel_cmd,
 )
 from handlers.ai_chat import (
     chat_cmd,
@@ -283,6 +284,8 @@ def main():
     app.add_handler(CommandHandler("task", task_cmd))
     app.add_handler(CommandHandler("claude", claude_cmd))
     app.add_handler(CommandHandler("exec", exec_cmd))
+    app.add_handler(CommandHandler("cancel", cancel_cmd))
+    app.add_handler(CommandHandler("stop", cancel_cmd))
 
     # Interactive Inline Keyboard Callback Handler
     app.add_handler(CallbackQueryHandler(help_callback_handler))
