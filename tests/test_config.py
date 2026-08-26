@@ -220,6 +220,21 @@ class TestDocsMatchCode(unittest.TestCase):
         telegram_system = (ROOT_DIR / "telegram-agent-bot" / "handlers" / "system.py").read_text(encoding="utf-8")
         self.assertIn("ram_out", telegram_system)
 
+    def test_upload_feature_is_documented(self):
+        """Regression coverage for issue #30: the file-upload-to-GitHub
+        feature isn't a slash command, so it's invisible to a new user
+        unless /help and the handbook explicitly call it out."""
+        handbook = (ROOT_DIR / "OMV_AI_SERVER_HANDBOOK.md").read_text(encoding="utf-8")
+        self.assertIn("upload/<timestamp>", handbook)
+
+        for bot_file, marker in (
+            ("telegram-agent-bot/handlers/system.py", "upload it into the bound project's repo"),
+            ("discord-agent-bot/discord_bot.py", "destination path"),
+            ("signal-agent-bot/signal_bot.py", "destination path"),
+        ):
+            text = (ROOT_DIR / bot_file).read_text(encoding="utf-8")
+            self.assertIn(marker, text, f"{bot_file} doesn't mention the file-upload feature in its help text")
+
 
 if __name__ == "__main__":
     unittest.main()

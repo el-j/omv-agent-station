@@ -102,6 +102,18 @@ Once launched, open your Telegram chat with your bot and try:
 | `/models` | Query the LiteLLM proxy for active provider endpoints and health |
 | `/status` | View server uptime, RAM usage, disk space, and active tmux sessions |
 
+### Uploading Files to a Repository by Sending Them to the Bot
+
+This isn't a slash command -- send a file, photo, or document directly to a chat (Telegram, Discord, or Signal all support it) and it gets committed into a repository:
+
+1. **Bind a project first.** Use `/bind <project-name>` (Telegram forum topic, Discord channel, or your Signal chat) so the bot knows which repo to target.
+2. **Send the file.** The caption controls where it lands:
+   - No caption -> written to `uploads/<original-filename>`
+   - `docs/notes.md` -> written to that exact path in the repo
+   - `myapi: docs/notes.md` -> overrides the bound project and targets `myapi` instead, without needing to `/bind` first
+3. **It never touches your current branch.** The bot always creates a fresh `upload/<timestamp>` branch, commits the file there, and pushes it -- then replies with a ready-to-open GitHub compare/PR link. Review and merge on your own terms.
+4. **Size limit:** Telegram's Bot API caps file downloads at 20 MB regardless of your own bandwidth; larger files are rejected with an explicit error rather than failing silently.
+
 ---
 
 ## 5. Integrating Obsidian (Second Brain) & Syncthing
