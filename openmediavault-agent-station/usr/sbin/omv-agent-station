@@ -217,7 +217,7 @@ apply_async() {
 
 get_performance() {
     python3 - <<'PYEOF'
-import json, os, subprocess
+import json, os, re, subprocess
 
 def check_cmd(cmd):
     try:
@@ -232,11 +232,22 @@ def get_container_info(filter_names):
             res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
             status = res.stdout.strip()
             if status:
-                running = "Up" in status
-                return {"running": running, "status": status}
+                running = status.startswith("Up")
+                state = "running"
+                if running:
+                    state = "running"
+                else:
+                    exit_match = re.match(r"^Exited \((\d+)\)", status)
+                    if exit_match:
+                        state = "exited_clean" if exit_match.group(1) == "0" else "exited_error"
+                    else:
+                        # e.g. "Created", "Restarting (1) 2 seconds ago" -- not yet up, not a
+                        # confirmed crash either.
+                        state = "starting"
+                return {"running": running, "status": status, "state": state}
         except Exception:
             pass
-    return {"running": False, "status": "Not created"}
+    return {"running": False, "status": "Not created", "state": "not_created"}
 
 # Collect host metrics
 load1, load5, load15 = 0.0, 0.0, 0.0

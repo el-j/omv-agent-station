@@ -209,9 +209,10 @@ async def gpt4_cmd(ctx: commands.Context, *, prompt: str = ""):
 async def models_cmd(ctx: commands.Context):
     if not await check_auth(ctx):
         return
-    models = await list_ai_models()
+    models, live = await list_ai_models()
     model_str = "\n".join([f"• `{m}`" for m in models])
-    await ctx.reply(f"🤖 **Active AI Models ({len(models)}):**\n\n{model_str}\n\n*Routers:* `coder-smart`, `reasoning-heavy`")
+    label = "Active AI Models" if live else "⚠️ Fallback AI Models (LiteLLM gateway unreachable, list may be stale)"
+    await ctx.reply(f"🤖 **{label} ({len(models)}):**\n\n{model_str}\n\n*Routers:* `coder-smart`, `reasoning-heavy`")
 
 @bot.command(name="modelhelp")
 async def modelhelp_cmd(ctx: commands.Context):

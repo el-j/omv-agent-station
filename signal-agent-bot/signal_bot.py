@@ -200,9 +200,10 @@ async def handle_signal_command(sender: str, text: str):
         await send_signal_message(sender, ans)
 
     elif cmd == "models":
-        models = await list_ai_models()
+        models, live = await list_ai_models()
         model_str = "\n".join([f"• {m}" for m in models])
-        await send_signal_message(sender, f"🤖 Active AI Models ({len(models)}):\n\n{model_str}\n\nRouters: coder-smart, reasoning-heavy")
+        label = "Active AI Models" if live else "⚠️ Fallback AI Models (LiteLLM gateway unreachable, list may be stale)"
+        await send_signal_message(sender, f"🤖 {label} ({len(models)}):\n\n{model_str}\n\nRouters: coder-smart, reasoning-heavy")
 
     elif cmd in ("modelhelp", "aihelp"):
         await send_signal_message(sender, get_modelhelp_markdown())

@@ -36,8 +36,13 @@ async def query_ai_model(prompt: str, model: str = "coder-smart", system_prompt:
         logger.error(f"AI query failed on model {model}: {e}")
         return {"success": False, "error": str(e), "model": model}
 
-async def list_ai_models() -> list[str]:
-    """Retrieves active models from the LiteLLM proxy."""
+async def list_ai_models() -> tuple[list[str], bool]:
+    """Retrieves active models from the LiteLLM proxy.
+
+    Returns (models, live) -- live is False whenever the proxy call failed
+    and the hardcoded fallback list is being returned instead, so callers
+    can tell users the list may be stale rather than presenting it as a
+    confirmed-reachable live gateway read."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
@@ -46,10 +51,10 @@ async def list_ai_models() -> list[str]:
             )
             if resp.status_code == 200:
                 data = resp.json()
-                return [m.get("id") for m in data.get("data", [])]
+                return [m.get("id") for m in data.get("data", [])], True
     except Exception as e:
         logger.warning(f"Could not fetch models from LiteLLM: {e}")
-    return ["coder-smart", "gemini-3.6-flash", "github-gpt-4o", "reasoning-heavy", "claude"]
+    return ["coder-smart", "gemini-3.6-flash", "github-gpt-4o", "reasoning-heavy", "claude"], False
 
 def get_modelhelp_markdown() -> str:
     """Returns comprehensive model documentation and capability guide."""

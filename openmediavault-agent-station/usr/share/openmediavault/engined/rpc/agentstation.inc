@@ -181,6 +181,7 @@ class AgentStation extends ServiceAbstract
 
         $perf = $this->getPerformance([], $context);
         $containers = $perf["containers"] ?? [];
+        $containerDetails = $perf["container_details"] ?? [];
         $hasRunningContainer = false;
         foreach ($containers as $isRunning) {
             if ($isRunning) {
@@ -188,10 +189,26 @@ class AgentStation extends ServiceAbstract
                 break;
             }
         }
+        // A container in "exited_error" state (non-zero exit code) means the
+        // stack tried to start and crashed -- distinct from "provisioning",
+        // where nothing has failed yet, it just hasn't come up as "Up" yet.
+        $hasCrashedContainer = false;
+        foreach ($containerDetails as $info) {
+            if (($info["state"] ?? "") === "exited_error") {
+                $hasCrashedContainer = true;
+                break;
+            }
+        }
 
         $engineDetail = "Stopped";
         if ($masterEnabled) {
-            $engineDetail = $hasRunningContainer ? "Active (Containers Running)" : "Provisioning (Pulling Images / Starting)...";
+            if ($hasCrashedContainer) {
+                $engineDetail = "Crashed (a container exited with an error -- check Diagnostics & Logs)";
+            } elseif ($hasRunningContainer) {
+                $engineDetail = "Active (Containers Running)";
+            } else {
+                $engineDetail = "Provisioning (Pulling Images / Starting)...";
+            }
         }
 
         $gitProviders = [];
@@ -204,26 +221,31 @@ class AgentStation extends ServiceAbstract
             [
                 "name" => "Engine",
                 "enabled" => $masterEnabled && $hasRunningContainer,
+                "crashed" => $masterEnabled && $hasCrashedContainer,
                 "detail" => $engineDetail
             ],
             [
                 "name" => "AI Models",
                 "enabled" => $masterEnabled && (bool)($settings["enable_aimodels"] ?? true),
+                "crashed" => false,
                 "detail" => !empty($settings["gemini_api_key"]) || !empty($settings["anthropic_api_key"]) || !empty($settings["github_token"]) ? "Keys configured" : "No keys set"
             ],
             [
                 "name" => "Git Sync",
                 "enabled" => $masterEnabled && (bool)($settings["enable_git"] ?? true),
+                "crashed" => false,
                 "detail" => $gitDetail
             ],
             [
                 "name" => "Messenger",
                 "enabled" => $masterEnabled && (bool)($settings["enable_chat"] ?? true) && ($settings["chat_service"] ?? "none") !== "none",
+                "crashed" => false,
                 "detail" => ucfirst((string)($settings["chat_service"] ?? "telegram"))
             ],
             [
                 "name" => "Security",
                 "enabled" => $masterEnabled && (bool)($settings["enable_security"] ?? true),
+                "crashed" => false,
                 "detail" => "Port 7681 protected"
             ]
         ];

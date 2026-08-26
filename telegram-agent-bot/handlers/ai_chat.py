@@ -203,7 +203,7 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Failed to query LiteLLM models: {e}")
         await msg.edit_text(
-            f"ℹ️ *Default Configured AI Routers:*\n\n"
+            f"⚠️ *Fallback AI Routers (LiteLLM gateway unreachable, list may be stale):*\n\n"
             f"• `coder-smart` — Auto-fallback coding chain\n"
             f"• `gemini-3.6-flash` — High speed Gemini Flash\n"
             f"• `github-gpt-4o` — GitHub Models GPT-4o\n"
