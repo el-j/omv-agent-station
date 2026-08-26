@@ -4,6 +4,7 @@ Treats all scripts, packaging tools, and security barriers as black-box systems.
 """
 
 import os
+import re
 import sys
 import json
 import subprocess  # nosec B404
@@ -96,7 +97,6 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
             if str(ROOT_DIR / "discord-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
 
-
     def test_repo_name_sanitization_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
         try:
@@ -179,6 +179,51 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+
+    def test_discord_channel_scope_uses_stable_thread_id_not_message_id(self):
+        """channel_scope() must key a Discord Thread by the thread's own stable id,
+        not by ctx.message.id -- every message has a unique snowflake, so a binding
+        set on one message could never be found again by a later message in the
+        same thread if message id were used as the thread key."""
+        sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        try:
+            import discord_bot
+
+            class FakeThread:
+                def __init__(self, thread_id, parent_id):
+                    self.id = thread_id
+                    self.parent_id = parent_id
+
+            # Patch the (otherwise mocked) discord.Thread with a real class so
+            # isinstance() checks in channel_scope() behave correctly.
+            discord_bot.discord.Thread = FakeThread
+
+            class FakeMessage:
+                def __init__(self, mid):
+                    self.id = mid
+
+            class FakeCtx:
+                def __init__(self, channel, message_id):
+                    self.channel = channel
+                    self.message = FakeMessage(message_id)
+
+            thread = FakeThread(thread_id=999, parent_id=100)
+
+            first_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=111))
+            second_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=222))
+
+            self.assertEqual(first_message_scope, second_message_scope)
+            self.assertEqual(first_message_scope, ("100", "999"))
+
+            class FakeChannel:
+                def __init__(self, cid):
+                    self.id = cid
+
+            plain_channel_scope = discord_bot.channel_scope(FakeCtx(FakeChannel(555), message_id=333))
+            self.assertEqual(plain_channel_scope, ("555", None))
+        finally:
+            if str(ROOT_DIR / "discord-agent-bot") in sys.path:
+                sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
 
     def test_custom_commands_lifecycle_and_expansion_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
@@ -312,12 +357,21 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
     def test_debian_package_structure_and_permissions(self):
         deb_script = ROOT_DIR / "build-deb.sh"
         self.assertTrue(deb_script.exists())
-        
+
+        # Read the version build-deb.sh will actually stamp on the artifact,
+        # rather than hardcoding it, so this test can't silently go stale
+        # (drift between this literal and VERSION= previously made this test
+        # pass locally only by accident, off a leftover .deb from an older
+        # build, while failing on every fresh CI checkout).
+        version_match = re.search(r'^VERSION="([^"]+)"', deb_script.read_text(encoding="utf-8"), re.MULTILINE)
+        self.assertIsNotNone(version_match, "Could not find VERSION= in build-deb.sh")
+        version = version_match.group(1)
+
         # Build deb in isolated environment
         res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603,B607
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
-        
-        deb_file = ROOT_DIR / "openmediavault-agent-station_1.0.0_all.deb"
+
+        deb_file = ROOT_DIR / f"openmediavault-agent-station_{version}_all.deb"
         self.assertTrue(deb_file.exists(), "Debian package must exist after build")
         self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
 
@@ -389,6 +443,46 @@ class TestBlackboxRouterRedundancy(unittest.TestCase):
                 self.assertIn(primary, all_models, f"Fallback primary model '{primary}' not registered in model_list!")
                 for sec in secondary_list:
                     self.assertIn(sec, all_models, f"Fallback target '{sec}' for '{primary}' not in model_list!")
+
+    def test_modelhelp_text_matches_config_fallbacks(self):
+        """Regression coverage for issue #13: /modelhelp's described fallback
+        chains must match litellm/config.yaml's real router_settings.fallbacks,
+        in both the agent_station_core copy (Discord/Signal) and Telegram's
+        independent copy in handlers/ai_chat.py."""
+        import yaml
+        config_path = ROOT_DIR / "litellm" / "config.yaml"
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        fallbacks = {}
+        for fb in data["router_settings"]["fallbacks"]:
+            fallbacks.update(fb)
+
+        # Human-readable labels used in the doc text for each model_name that
+        # appears in a fallback chain /modelhelp documents.
+        label = {
+            "gemini-3.7-pro": "Gemini 3.7 Pro",
+            "gemini-3.7-flash": "Gemini 3.7 Flash",
+            "gemini-2.5-flash": "Gemini 2.5 Flash",
+            "github-gpt-4o": "GPT-4o",
+            "github-deepseek-r1": "DeepSeek-R1",
+            "github-o3-mini": "o3-mini",
+        }
+
+        sys.path.insert(0, str(ROOT_DIR))
+        try:
+            import agent_station_core.ai_service as ai_service
+            shared_text = ai_service.get_modelhelp_markdown()
+        finally:
+            if str(ROOT_DIR) in sys.path:
+                sys.path.remove(str(ROOT_DIR))
+
+        telegram_text = (ROOT_DIR / "telegram-agent-bot" / "handlers" / "ai_chat.py").read_text(encoding="utf-8")
+
+        for router in ("coder-smart", "reasoning-heavy"):
+            chain = fallbacks[router]
+            expected = " ➔ ".join(label[m] for m in chain)
+            self.assertIn(expected, shared_text, f"agent_station_core modelhelp text out of sync with {router}'s real fallback chain")
+            self.assertIn(expected, telegram_text, f"Telegram modelhelp text out of sync with {router}'s real fallback chain")
 
 if __name__ == "__main__":
     unittest.main()

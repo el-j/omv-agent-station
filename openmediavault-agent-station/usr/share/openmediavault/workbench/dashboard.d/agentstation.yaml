@@ -16,5 +16,5 @@ data:
   grid:
     item:
       content: "{{ name }}"
-      tooltip: '{% if enabled %}{{ "Active" | translate }}{% else %}{{ "Inactive" | translate }}{% endif %} - {{ detail }}'
-      class: 'omv-text-center omv-text-nowrap {% if enabled %}omv-color-green{% else %}omv-color-gray{% endif %}'
+      tooltip: '{% if crashed %}{{ "Crashed" | translate }}{% elif enabled %}{{ "Active" | translate }}{% else %}{{ "Inactive" | translate }}{% endif %} - {{ detail }}'
+      class: 'omv-text-center omv-text-nowrap {% if crashed %}omv-color-red{% elif enabled %}omv-color-green{% else %}omv-color-gray{% endif %}'

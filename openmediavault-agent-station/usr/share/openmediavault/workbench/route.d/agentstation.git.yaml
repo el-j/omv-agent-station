@@ -1,7 +1,7 @@
 version: "1.0"
 type: route
 data:
-  url: "/services/agentstation/git"
+  url: "/agentstation/git"
   title: _("Git Providers")
   editing: true
   notificationTitle: _("Git provider settings saved.")

@@ -5,7 +5,6 @@ Unified business logic for repo creation, PAT cloning, branch switching, diffing
 
 import asyncio
 import subprocess  # nosec B404
-from pathlib import Path
 from datetime import datetime
 import httpx
 from .config import (

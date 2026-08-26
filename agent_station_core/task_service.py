@@ -6,7 +6,7 @@ Dispatches Aider, Claude Code CLI, and shell commands in isolated subprocesses.
 import asyncio
 import subprocess  # nosec B404
 from pathlib import Path
-from datetime import datetime
+from typing import Callable, Optional
 from .config import (
     AIDER_BIN,
     CLAUDE_BIN,
@@ -19,10 +19,17 @@ from .config import (
     WORKSPACE,
     logger,
 )
-from .security import sanitize_project_path
 
-async def run_autonomous_task(project_dir: Path, instructions: str, session_id: str, task_branch: str) -> dict:
-    """Executes the autonomous agent (Aider with LiteLLM proxy), auto-commits, and pushes branch."""
+async def run_autonomous_task(
+    project_dir: Path,
+    instructions: str,
+    session_id: str,
+    task_branch: str,
+    on_proc: Optional[Callable[[asyncio.subprocess.Process], None]] = None,
+) -> dict:
+    """Executes the autonomous agent (Aider with LiteLLM proxy), auto-commits, and pushes branch.
+    If on_proc is given, it is called with the live subprocess handle as soon as it's spawned,
+    so a caller can kill it (e.g. in response to a user /cancel) without waiting for completion."""
     try:
         is_git = (project_dir / ".git").exists()
         if is_git:
@@ -48,6 +55,8 @@ async def run_autonomous_task(project_dir: Path, instructions: str, session_id: 
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        if on_proc:
+            on_proc(proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace").strip()
         err = stderr.decode("utf-8", errors="replace").strip()
@@ -62,7 +71,11 @@ async def run_autonomous_task(project_dir: Path, instructions: str, session_id: 
         logger.error(f"Error in autonomous agent execution: {e}", exc_info=True)
         return {"success": False, "error": str(e), "task_branch": task_branch}
 
-async def run_claude_cli(work_dir: Path, prompt: str) -> dict:
+async def run_claude_cli(
+    work_dir: Path,
+    prompt: str,
+    on_proc: Optional[Callable[[asyncio.subprocess.Process], None]] = None,
+) -> dict:
     """Executes Claude Code CLI in headless print mode."""
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
@@ -71,6 +84,8 @@ async def run_claude_cli(work_dir: Path, prompt: str) -> dict:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        if on_proc:
+            on_proc(proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace").strip()
         err = stderr.decode("utf-8", errors="replace").strip()
@@ -80,7 +95,11 @@ async def run_claude_cli(work_dir: Path, prompt: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-async def run_shell_exec(cmd: str, cwd: Path = WORKSPACE) -> dict:
+async def run_shell_exec(
+    cmd: str,
+    cwd: Path = WORKSPACE,
+    on_proc: Optional[Callable[[asyncio.subprocess.Process], None]] = None,
+) -> dict:
     """Executes an arbitrary shell command within the workspace."""
     try:
         proc = await asyncio.create_subprocess_shell(  # nosec B602
@@ -89,6 +108,8 @@ async def run_shell_exec(cmd: str, cwd: Path = WORKSPACE) -> dict:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        if on_proc:
+            on_proc(proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace")
         err = stderr.decode("utf-8", errors="replace")
@@ -97,8 +118,25 @@ async def run_shell_exec(cmd: str, cwd: Path = WORKSPACE) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def get_ram_usage() -> str:
+    """Reads /proc/meminfo for a human-readable used/total RAM summary.
+    Returns 'N/A' off-Linux (e.g. local dev on macOS) where it doesn't exist."""
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            meminfo = {}
+            for line in f:
+                key, _, rest = line.partition(":")
+                meminfo[key] = int(rest.strip().split()[0])  # kB
+        total_mb = meminfo["MemTotal"] // 1024
+        avail_mb = meminfo.get("MemAvailable", meminfo["MemTotal"]) // 1024
+        used_mb = max(0, total_mb - avail_mb)
+        pct = round((used_mb / total_mb) * 100) if total_mb else 0
+        return f"{used_mb} MB used of {total_mb} MB ({pct}%)"
+    except Exception:
+        return "N/A"
+
 def get_system_status() -> dict:
-    """Collects system uptime, disk usage, and active tmux sessions."""
+    """Collects system uptime, RAM usage, disk usage, and active tmux sessions."""
     try:
         tmux_out = subprocess.check_output([TMUX_BIN, "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()  # nosec B603,B607
     except Exception:
@@ -113,6 +151,7 @@ def get_system_status() -> dict:
 
     return {
         "uptime": uptime_out,
+        "ram": get_ram_usage(),
         "disk": df_out,
         "tmux": tmux_out
     }

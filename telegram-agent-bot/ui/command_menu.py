@@ -19,6 +19,7 @@ async def sync_bot_commands(target):
         BotCommand("task", "🚀 Dispatch autonomous coding agent loop"),
         BotCommand("claude", "🧠 Run Claude Code CLI on workspace"),
         BotCommand("exec", "🖥️ Execute shell command in workspace"),
+        BotCommand("cancel", "🛑 Cancel the currently running task/claude/exec"),
         BotCommand("projects", "📁 List workspaces & git repos"),
         BotCommand("newrepo", "✨ Create a new GitHub repo"),
         BotCommand("clone", "📥 Clone a git repository"),

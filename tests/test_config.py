@@ -2,6 +2,7 @@
 Configuration and YAML validation tests for OMV AI Orchestrator Stack.
 """
 
+import re
 import unittest
 import yaml
 from pathlib import Path
@@ -33,6 +34,36 @@ class TestConfig(unittest.TestCase):
         self.assertIn("coder-smart", model_names)
         self.assertIn("reasoning-heavy", model_names)
 
+    def test_openrouter_free_tier_models_are_wired_into_virtual_routers(self):
+        """Free (":free"-suffixed) OpenRouter deployments must actually be part
+        of coder-fast/coder-smart/reasoning-heavy's model_list, not just present
+        somewhere in the file -- a standalone, unreferenced entry (like the
+        pre-existing openrouter-auto model) is unreachable by default and
+        defeats the point of a free tier."""
+        config_path = ROOT_DIR / "litellm" / "config.yaml"
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        deployments_by_group: dict[str, list[dict]] = {}
+        for deployment in data["model_list"]:
+            deployments_by_group.setdefault(deployment["model_name"], []).append(deployment)
+
+        free_model_names = {
+            name for name, deployments in deployments_by_group.items()
+            if any(":free" in d["litellm_params"].get("model", "") for d in deployments)
+        }
+        self.assertTrue(free_model_names, "No ':free' OpenRouter model_list entries found in litellm/config.yaml")
+
+        for router_name in ("coder-fast", "coder-smart", "reasoning-heavy"):
+            router_models = [d["litellm_params"].get("model", "") for d in deployments_by_group[router_name]]
+            self.assertTrue(
+                any(":free" in m for m in router_models),
+                f"'{router_name}' has no free OpenRouter deployment in its model_list -- "
+                "it will never actually be tried, same mistake openrouter-auto made."
+            )
+            for m in [x for x in router_models if ":free" in x]:
+                self.assertTrue(m.startswith("openrouter/"), f"Unexpected free model '{m}' not routed via openrouter/")
+
     def test_docker_compose_syntax(self):
         compose_path = ROOT_DIR / "docker-compose.yml"
         self.assertTrue(compose_path.exists())
@@ -53,13 +84,32 @@ class TestConfig(unittest.TestCase):
         env_path = ROOT_DIR / "env.example"
         self.assertTrue(env_path.exists())
         content = env_path.read_text()
-        
+
         self.assertIn("GEMINI_API_KEY", content)
         self.assertIn("ANTHROPIC_API_KEY", content)
         self.assertIn("GITHUB_TOKEN", content)
+        self.assertIn("OPENROUTER_API_KEY", content)
+        self.assertIn("MISTRAL_API_KEY", content)
+        self.assertIn("DEEPSEEK_API_KEY", content)
         self.assertIn("TELEGRAM_BOT_TOKEN", content)
         self.assertIn("SIGNAL_PHONE_NUMBER", content)
+        self.assertIn("DISCORD_BOT_TOKEN", content)
+        self.assertIn("DISCORD_ALLOWED_USER_ID", content)
         self.assertIn("GIT_AUTHOR_NAME", content)
+
+    def test_env_example_covers_every_litellm_env_var(self):
+        """Regression coverage for issue #15: every os.environ/X reference in
+        litellm/config.yaml must have a corresponding line in env.example, so
+        adding a new provider there can't silently leave users unable to
+        discover the variable that unlocks it."""
+        config_path = ROOT_DIR / "litellm" / "config.yaml"
+        config_text = config_path.read_text(encoding="utf-8")
+        referenced_vars = set(re.findall(r"os\.environ/([A-Z0-9_]+)", config_text))
+        self.assertTrue(referenced_vars, "Expected at least one os.environ/ reference in litellm/config.yaml")
+
+        env_content = (ROOT_DIR / "env.example").read_text(encoding="utf-8")
+        missing = sorted(v for v in referenced_vars if v not in env_content)
+        self.assertEqual(missing, [], f"env.example is missing variables referenced by litellm/config.yaml: {missing}")
 
     def test_omv_datamodel_schema_validity(self):
         import json
@@ -136,6 +186,55 @@ class TestConfig(unittest.TestCase):
             self.assertIn("type", comp_data)
             self.assertIn("config", comp_data)
 
+class TestDocsMatchCode(unittest.TestCase):
+    """Regression coverage for issue #14: three doc-vs-code mismatches found
+    in the 2026-08-26 audit pass."""
+
+    def test_spec_filename_matches_vault_service(self):
+        vault_service = (ROOT_DIR / "agent_station_core" / "vault_service.py").read_text(encoding="utf-8")
+        self.assertIn('"project-spec.md"', vault_service)
+
+        for doc_path in (ROOT_DIR / "README.md", ROOT_DIR / "OMV_AI_SERVER_HANDBOOK.md"):
+            text = doc_path.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "/spec.md", text,
+                f"{doc_path.name} still references the wrong filename 'spec.md' -- "
+                f"the code actually creates 'project-spec.md'",
+            )
+
+    def test_no_agent_log_md_claim_without_matching_code(self):
+        for path in ROOT_DIR.rglob("*.md"):
+            if "node_modules" in path.parts:
+                continue
+            self.assertNotIn(
+                "agent-log.md", path.read_text(encoding="utf-8"),
+                f"{path.relative_to(ROOT_DIR)} claims agents write to 'agent-log.md', "
+                f"but no code anywhere creates or writes that file",
+            )
+
+    def test_status_ram_claim_matches_implementation(self):
+        task_service = (ROOT_DIR / "agent_station_core" / "task_service.py").read_text(encoding="utf-8")
+        self.assertIn("def get_ram_usage", task_service)
+        self.assertIn('"ram":', task_service)
+
+        telegram_system = (ROOT_DIR / "telegram-agent-bot" / "handlers" / "system.py").read_text(encoding="utf-8")
+        self.assertIn("ram_out", telegram_system)
+
+    def test_upload_feature_is_documented(self):
+        """Regression coverage for issue #30: the file-upload-to-GitHub
+        feature isn't a slash command, so it's invisible to a new user
+        unless /help and the handbook explicitly call it out."""
+        handbook = (ROOT_DIR / "OMV_AI_SERVER_HANDBOOK.md").read_text(encoding="utf-8")
+        self.assertIn("upload/<timestamp>", handbook)
+
+        for bot_file, marker in (
+            ("telegram-agent-bot/handlers/system.py", "upload it into the bound project's repo"),
+            ("discord-agent-bot/discord_bot.py", "destination path"),
+            ("signal-agent-bot/signal_bot.py", "destination path"),
+        ):
+            text = (ROOT_DIR / bot_file).read_text(encoding="utf-8")
+            self.assertIn(marker, text, f"{bot_file} doesn't mention the file-upload feature in its help text")
+
+
 if __name__ == "__main__":
     unittest.main()
-

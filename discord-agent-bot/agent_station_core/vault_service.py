@@ -4,7 +4,6 @@ Captures notes into inbox and manages project specifications.
 """
 
 from datetime import datetime
-from pathlib import Path
 from .config import OBSIDIAN_VAULT, logger
 
 def save_obsidian_note(title: str, content: str) -> dict:

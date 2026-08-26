@@ -77,6 +77,27 @@ def sanitize_cmd_name(name: str) -> str | None:
         return name
     return None
 
+def sanitize_relative_path(base: Path, rel_path: str) -> Path | None:
+    """Validates a caption-provided relative file path resolves strictly within
+    base, blocking traversal and any write access into the repo's own .git
+    directory (a path there is a code-execution vector via git hooks)."""
+    if not rel_path:
+        return None
+    rel_path = rel_path.strip()
+    if not rel_path or rel_path.startswith(("/", "\\")):
+        return None
+    parts = Path(rel_path).parts
+    if not parts or ".." in parts or ".git" in parts:
+        return None
+    try:
+        base_resolved = base.resolve()
+        target = (base_resolved / rel_path).resolve()
+        if target == base_resolved or base_resolved not in target.parents:
+            return None
+        return target
+    except Exception:
+        return None
+
 def sanitize_git_url(url: str) -> str | None:
     """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
     if not url:

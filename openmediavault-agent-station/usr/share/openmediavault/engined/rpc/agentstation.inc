@@ -2,8 +2,8 @@
 /**
  * OpenMediaVault Agent Station RPC Service
  *
- * @author    Fabian <dev@local>
- * @copyright 2026 Fabian
+ * @author    el-j <bluearc.in.sky@gmail.com>
+ * @copyright 2026 el-j
  * @license   GPL-3.0-or-later
  */
 
@@ -33,6 +33,21 @@ class AgentStation extends ServiceAbstract
         $this->registerMethod("getPerformance");
         $this->registerMethod("restartServices");
         $this->registerMethod("getLogs");
+        $this->registerMethod("installClaudeCli");
+        $this->registerMethod("checkForUpdate");
+        $this->registerMethod("updatePlugin");
+    }
+
+    /**
+     * Resolves the primary config file path. Always self::CONFIG_PATH in
+     * production; overridable via AGENTSTATION_TEST_CONFIG_PATH so the
+     * PHPUnit harness (tests/php/) can exercise getSettings/setSettings
+     * without writing to the real /etc/ path.
+     */
+    private function getConfigPath(): string
+    {
+        $override = getenv("AGENTSTATION_TEST_CONFIG_PATH");
+        return $override !== false ? $override : self::CONFIG_PATH;
     }
 
     public function getSettings($params, $context): array
@@ -40,8 +55,8 @@ class AgentStation extends ServiceAbstract
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
         $data = [];
-        if (file_exists(self::CONFIG_PATH)) {
-            $data = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        if (file_exists($this->getConfigPath())) {
+            $data = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
         // Fallback to persistent storage backup if primary config is empty/missing
         if (empty($data) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
@@ -104,8 +119,8 @@ class AgentStation extends ServiceAbstract
 
         // Merge with existing configuration so partial submenu updates preserve other tabs
         $existing = [];
-        if (file_exists(self::CONFIG_PATH)) {
-            $existing = json_decode(file_get_contents(self::CONFIG_PATH), true) ?: [];
+        if (file_exists($this->getConfigPath())) {
+            $existing = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
         if (empty($existing) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
             $existing = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
@@ -149,8 +164,8 @@ class AgentStation extends ServiceAbstract
 
         $config = array_merge($existing, $sanitized);
 
-        file_put_contents(self::CONFIG_PATH, json_encode($config, JSON_PRETTY_PRINT));
-        @chmod(self::CONFIG_PATH, 0600);
+        file_put_contents($this->getConfigPath(), json_encode($config, JSON_PRETTY_PRINT));
+        @chmod($this->getConfigPath(), 0600);
 
         // Persistent storage backup
         $dataDir = (string)($config["data_dir"] ?? self::DEFAULT_DATA_DIR);
@@ -178,6 +193,7 @@ class AgentStation extends ServiceAbstract
 
         $perf = $this->getPerformance([], $context);
         $containers = $perf["containers"] ?? [];
+        $containerDetails = $perf["container_details"] ?? [];
         $hasRunningContainer = false;
         foreach ($containers as $isRunning) {
             if ($isRunning) {
@@ -185,10 +201,26 @@ class AgentStation extends ServiceAbstract
                 break;
             }
         }
+        // A container in "exited_error" state (non-zero exit code) means the
+        // stack tried to start and crashed -- distinct from "provisioning",
+        // where nothing has failed yet, it just hasn't come up as "Up" yet.
+        $hasCrashedContainer = false;
+        foreach ($containerDetails as $info) {
+            if (($info["state"] ?? "") === "exited_error") {
+                $hasCrashedContainer = true;
+                break;
+            }
+        }
 
         $engineDetail = "Stopped";
         if ($masterEnabled) {
-            $engineDetail = $hasRunningContainer ? "Active (Containers Running)" : "Provisioning (Pulling Images / Starting)...";
+            if ($hasCrashedContainer) {
+                $engineDetail = "Crashed (a container exited with an error -- check Diagnostics & Logs)";
+            } elseif ($hasRunningContainer) {
+                $engineDetail = "Active (Containers Running)";
+            } else {
+                $engineDetail = "Provisioning (Pulling Images / Starting)...";
+            }
         }
 
         $gitProviders = [];
@@ -201,26 +233,31 @@ class AgentStation extends ServiceAbstract
             [
                 "name" => "Engine",
                 "enabled" => $masterEnabled && $hasRunningContainer,
+                "crashed" => $masterEnabled && $hasCrashedContainer,
                 "detail" => $engineDetail
             ],
             [
                 "name" => "AI Models",
                 "enabled" => $masterEnabled && (bool)($settings["enable_aimodels"] ?? true),
+                "crashed" => false,
                 "detail" => !empty($settings["gemini_api_key"]) || !empty($settings["anthropic_api_key"]) || !empty($settings["github_token"]) ? "Keys configured" : "No keys set"
             ],
             [
                 "name" => "Git Sync",
                 "enabled" => $masterEnabled && (bool)($settings["enable_git"] ?? true),
+                "crashed" => false,
                 "detail" => $gitDetail
             ],
             [
                 "name" => "Messenger",
                 "enabled" => $masterEnabled && (bool)($settings["enable_chat"] ?? true) && ($settings["chat_service"] ?? "none") !== "none",
+                "crashed" => false,
                 "detail" => ucfirst((string)($settings["chat_service"] ?? "telegram"))
             ],
             [
                 "name" => "Security",
                 "enabled" => $masterEnabled && (bool)($settings["enable_security"] ?? true),
+                "crashed" => false,
                 "detail" => "Port 7681 protected"
             ]
         ];
@@ -306,10 +343,28 @@ class AgentStation extends ServiceAbstract
             $statusText = implode("\n", $slice);
         }
 
+        // 5. Plugin version & update status
+        $updateInfo = $this->checkForUpdate([], $context);
+        $updateLines = [];
+        if (!empty($updateInfo["error"])) {
+            $updateLines[] = sprintf("⚠️ %s", $updateInfo["error"]);
+            if (!empty($updateInfo["current_version"])) {
+                $updateLines[] = sprintf("📦 Installed Version : %s", $updateInfo["current_version"]);
+            }
+        } else {
+            $updateLines[] = sprintf("📦 Installed Version : %s", $updateInfo["current_version"] ?? "unknown");
+            $updateLines[] = sprintf("🚀 Latest Release    : %s", $updateInfo["latest_version"] ?? "unknown");
+            $updateLines[] = !empty($updateInfo["update_available"])
+                ? "✨ An update is available! Use the \"Update Plugin Now\" button below."
+                : "✅ You are running the latest version.";
+        }
+        $updateStatus = implode("\n", $updateLines);
+
         return [
             "container_status" => $containerStatus,
             "storage_status" => $storageStatus,
             "ai_status" => $aiStatus,
+            "update_status" => $updateStatus,
             "log_output" => $statusText ?: "No startup logs recorded yet. Enable the Agent Station in Overview to provision containers."
         ];
     }
@@ -362,6 +417,33 @@ class AgentStation extends ServiceAbstract
 
         return $this->execBgProc(function ($bgStatusFilename, $bgOutputFilename) {
             $cmd = new Process("omv-agent-station", ["install-claude-cli"]);
+            $cmd->setRedirectOutput(true);
+            $cmd->setAsync(false);
+            $cmd->execute($output);
+            file_put_contents($bgOutputFilename, implode("\n", $output));
+        });
+    }
+
+    public function checkForUpdate($params, $context): array
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        if (file_exists("/usr/sbin/omv-agent-station")) {
+            $cmd = new Process("omv-agent-station", ["check-update"]);
+            $cmd->execute($output);
+            $data = json_decode(implode("", $output), true);
+            return is_array($data) ? $data : ["error" => "Could not parse update check response."];
+        }
+
+        return ["error" => "omv-agent-station CLI helper not found."];
+    }
+
+    public function updatePlugin($params, $context)
+    {
+        $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
+
+        return $this->execBgProc(function ($bgStatusFilename, $bgOutputFilename) {
+            $cmd = new Process("omv-agent-station", ["update-plugin"]);
             $cmd->setRedirectOutput(true);
             $cmd->setAsync(false);
             $cmd->execute($output);

@@ -22,7 +22,14 @@ from core.config import (
     logger,
 )
 from core.security import check_auth, sanitize_project_path
+from core import task_registry
 from .topics import resolve_project_context, get_bound_project
+
+def _chat_scope(update: Update) -> tuple[int, int | None]:
+    """Returns the (chat_id, thread_id) scope key used to track this chat's active task."""
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
+    return chat_id, thread_id
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Greets the user and presents available core capabilities."""
@@ -35,6 +42,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/task [project] <prompt>` — Run autonomous coding agent on branch\n"
         "• `/chat <message>` — Ask questions via Gemini 3.7 / Claude 3.7 router\n"
         "• `/claude <prompt>` — Execute Claude Code CLI in sandboxed container\n"
+        "• `/cancel` — Stop the currently running task/claude/exec command\n"
         "• `/newrepo <name> [desc]` — Create a new GitHub repository & clone locally\n"
         "• `/addcmd <name> <template>` — Create custom shortcut command\n"
         "• `/customcmds` — List all user-defined custom commands\n"
@@ -69,10 +77,12 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "2️⃣ *Autonomous Coding Agent:*\n"
         "   • `/task my-api \"Add Redis caching layer with unit tests\"`\n"
         "   • `/claude <prompt>` — Headless Claude Code CLI execution\n"
-        "   • `/exec <cmd>` — Run sandboxed bash command in workspace\n\n"
+        "   • `/exec <cmd>` — Run sandboxed bash command in workspace\n"
+        "   • `/cancel` — Stop the task/claude/exec command currently running here\n\n"
         "3️⃣ *Create / Clone Repositories:*\n"
         "   • `/newrepo my-api \"FastAPI backend service\"` — Creates remote GitHub repo + local workspace + Topic!\n"
-        "   • `/clone https://github.com/user/repo` — Clones any repo with PAT auth\n\n"
+        "   • `/clone https://github.com/user/repo` — Clones any repo with PAT auth\n"
+        "   • Send any file/photo to upload it into the bound project's repo — caption sets the path (e.g. `docs/notes.md`), always pushed to a new `upload/<timestamp>` branch for review\n\n"
         "4️⃣ *Custom User Commands & Shortcuts:*\n"
         "   • `/addcmd test /exec pytest -v` ➔ Runs `/test` as a shortcut!\n"
         "   • `/addcmd review /chat \"Review this code: {args}\"`\n"
@@ -126,9 +136,24 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uptime_out = "N/A"
         df_out = "N/A"
 
+    try:
+        meminfo = {}
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                key, _, rest = line.partition(":")
+                meminfo[key] = int(rest.strip().split()[0])
+        total_mb = meminfo["MemTotal"] // 1024
+        avail_mb = meminfo.get("MemAvailable", meminfo["MemTotal"]) // 1024
+        used_mb = max(0, total_mb - avail_mb)
+        pct = round((used_mb / total_mb) * 100) if total_mb else 0
+        ram_out = f"{used_mb} MB used of {total_mb} MB ({pct}%)"
+    except Exception:
+        ram_out = "N/A"
+
     report = (
         f"🖥️ *OMV Server Status*\n\n"
         f"⏱️ *Uptime:* `{uptime_out}`\n"
+        f"🧠 *RAM:* `{ram_out}`\n"
         f"💾 *Disk Space:* `{df_out}`\n\n"
         f"🧵 *Active Agent Sessions:*\n```\n{tmux_out}\n```"
     )
@@ -149,8 +174,21 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    chat_id, thread_id = _chat_scope(update)
+    if task_registry.get(chat_id, thread_id):
+        await update.effective_message.reply_text(
+            "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
+            parse_mode="Markdown"
+        )
+        return
+
     cmd = " ".join(context.args)
     msg = await update.effective_message.reply_text(f"⏳ Executing: `{cmd}`...", parse_mode="Markdown")
+    t = asyncio.create_task(run_exec_task(chat_id, thread_id, msg, cmd))
+    task_registry.start(chat_id, thread_id, label=f"exec: {cmd}", asyncio_task=t)
+
+async def run_exec_task(chat_id: int, thread_id: int | None, status_msg, cmd: str):
+    """Runs a shell command in the background so it never blocks the bot's update loop."""
     try:
         proc = await asyncio.create_subprocess_shell(  # nosec B602
             cmd,
@@ -158,15 +196,21 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        task_registry.attach_proc(chat_id, thread_id, proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace")
         err = stderr.decode("utf-8", errors="replace")
         result = (out + "\n" + err).strip() or "(No output)"
         if len(result) > 3500:
             result = result[:3500] + "\n...(truncated)"
-        await msg.edit_text(f"🖥️ *Command Output:*\n```\n{result}\n```", parse_mode="Markdown")
+        await status_msg.edit_text(f"🖥️ *Command Output:*\n```\n{result}\n```", parse_mode="Markdown")
+    except asyncio.CancelledError:
+        await status_msg.edit_text(f"🛑 *Cancelled:* `{cmd}`", parse_mode="Markdown")
+        raise
     except Exception as e:
-        await msg.edit_text(f"❌ Exec error: {e}")
+        await status_msg.edit_text(f"❌ Exec error: {e}")
+    finally:
+        task_registry.finish(chat_id, thread_id)
 
 async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Dispatches autonomous coding agent on a project branch."""
@@ -187,6 +231,14 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selective=True,
                 input_field_placeholder=placeholder
             )
+        )
+        return
+
+    chat_id, thread_id = _chat_scope(update)
+    if task_registry.get(chat_id, thread_id):
+        await update.effective_message.reply_text(
+            "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
+            parse_mode="Markdown"
         )
         return
 
@@ -211,9 +263,10 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    asyncio.create_task(run_agent_task(update, msg, project_dir, instructions, session_id, task_branch))
+    t = asyncio.create_task(run_agent_task(chat_id, thread_id, msg, project_dir, instructions, session_id, task_branch))
+    task_registry.start(chat_id, thread_id, label=f"task: {instructions}", asyncio_task=t)
 
-async def run_agent_task(update: Update, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str):
+async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str):
     """Executes the autonomous agent (Aider with LiteLLM proxy), commits, and pushes branch."""
     try:
         is_git = (project_dir / ".git").exists()
@@ -240,6 +293,7 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        task_registry.attach_proc(chat_id, thread_id, proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace").strip()
         err = stderr.decode("utf-8", errors="replace").strip()
@@ -260,9 +314,17 @@ async def run_agent_task(update: Update, status_msg, project_dir: Path, instruct
             f"Inspect diff with `/diff` or create a PR on GitHub!",
             parse_mode="Markdown"
         )
+    except asyncio.CancelledError:
+        await status_msg.edit_text(
+            f"🛑 *Task Cancelled*\n\n📁 Project: `{project_dir.name}`\n🌿 Branch: `{task_branch}`",
+            parse_mode="Markdown"
+        )
+        raise
     except Exception as e:
         logger.error(f"Error in autonomous agent execution: {e}", exc_info=True)
         await status_msg.edit_text(f"❌ Autonomous Agent Error: {e}")
+    finally:
+        task_registry.finish(chat_id, thread_id)
 
 async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Dispatches Claude Code CLI directly inside the workspace."""
@@ -292,8 +354,20 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    msg = await update.effective_message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in `{work_dir.name}`...", parse_mode="Markdown")
+    chat_id, thread_id = _chat_scope(update)
+    if task_registry.get(chat_id, thread_id):
+        await update.effective_message.reply_text(
+            "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
+            parse_mode="Markdown"
+        )
+        return
 
+    msg = await update.effective_message.reply_text(f"🤖 *Dispatching Claude Code Agent...*\n\n📝 Prompt: _{prompt}_\n⏳ Running in `{work_dir.name}`...", parse_mode="Markdown")
+    t = asyncio.create_task(run_claude_task(chat_id, thread_id, msg, work_dir, prompt))
+    task_registry.start(chat_id, thread_id, label=f"claude: {prompt}", asyncio_task=t)
+
+async def run_claude_task(chat_id: int, thread_id: int | None, status_msg, work_dir: Path, prompt: str):
+    """Runs the Claude Code CLI in the background so it never blocks the bot's update loop."""
     claude_bin = shutil.which("claude") or "/usr/local/bin/claude"
     try:
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
@@ -302,6 +376,7 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        task_registry.attach_proc(chat_id, thread_id, proc)
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="replace").strip()
         err = stderr.decode("utf-8", errors="replace").strip()
@@ -313,9 +388,12 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if len(reply) > 4000:
             reply = reply[:4000] + "\n...(truncated)"
-        await msg.edit_text(reply)
+        await status_msg.edit_text(reply)
+    except asyncio.CancelledError:
+        await status_msg.edit_text(f"🛑 *Claude Code Cancelled*\n\n📝 Prompt: _{prompt}_", parse_mode="Markdown")
+        raise
     except FileNotFoundError:
-        await msg.edit_text(
+        await status_msg.edit_text(
             "⚠️ Claude Code CLI is not initialized on the server.\n\n"
             "👉 Please open your Web Terminal:\n"
             "🔗 `http://<your-omv-ip>:7681` (Port 7681)\n\n"
@@ -323,4 +401,20 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
     except Exception as e:
-        await msg.edit_text(f"❌ Error running Claude Code: {e}")
+        await status_msg.edit_text(f"❌ Error running Claude Code: {e}")
+    finally:
+        task_registry.finish(chat_id, thread_id)
+
+async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancels the currently running /task, /claude, or /exec command in this chat/topic."""
+    if not await check_auth(update):
+        return
+
+    chat_id, thread_id = _chat_scope(update)
+    label = await task_registry.cancel(chat_id, thread_id)
+
+    if label is None:
+        await update.effective_message.reply_text("ℹ️ Nothing is currently running here to cancel.")
+        return
+
+    await update.effective_message.reply_text(f"🛑 Cancelling: `{label}`...", parse_mode="Markdown")

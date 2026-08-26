@@ -6,4 +6,4 @@ openmediavault-agent-station (1.0.0) unstable; urgency=low
   * Obsidian bi-directional sync with Syncthing.
   * Web terminal remote management.
 
- -- Fabian <dev@local>  Sat, 22 Aug 2026 12:00:00 +0200
+ -- el-j <bluearc.in.sky@gmail.com>  Sat, 22 Aug 2026 12:00:00 +0200

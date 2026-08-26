@@ -14,7 +14,6 @@ from core.config import (
     GIT_AUTHOR_NAME,
     GIT_AUTHOR_EMAIL,
     GITHUB_TOKEN,
-    GITHUB_USER,
     logger,
 )
 from core.security import (

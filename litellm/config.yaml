@@ -153,6 +153,47 @@ model_list:
       model: openrouter/auto
       api_key: os.environ/OPENROUTER_API_KEY
 
+  # ----------------------------------------------------------------------------
+  # TIER 4.5: OPENROUTER FREE-TIER MODELS ($0/token -- tried before paid providers
+  # in the virtual routers below). Snapshot of openrouter.ai/api/v1/models'
+  # zero-price entries as of 2026-08-26 -- OpenRouter's free catalog changes
+  # over time (models get added/retired), re-check periodically.
+  # ----------------------------------------------------------------------------
+  - model_name: openrouter-laguna-s-free
+    litellm_params:
+      model: openrouter/poolside/laguna-s-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-laguna-xs-free
+    litellm_params:
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-north-mini-code-free
+    litellm_params:
+      model: openrouter/cohere/north-mini-code:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-super-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-ultra-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-lightning-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-glm-free
+    litellm_params:
+      model: openrouter/z-ai/glm-5.2:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
   - model_name: custom-llm
     litellm_params:
       model: openai/custom-model
@@ -163,6 +204,17 @@ model_list:
   # VIRTUAL SMART ROUTERS WITH AUTOMATIC FAILOVER & REDUNDANCY
   # ----------------------------------------------------------------------------
   # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)
+  # Free OpenRouter deployments listed first: usage-based-routing prefers the
+  # least-used deployment in the group, so with no OPENROUTER_API_KEY set these
+  # calls simply fail fast and fall through to the paid deployments below.
+  - model_name: coder-fast
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: coder-fast
     litellm_params:
       model: gemini/gemini-3.6-flash
@@ -181,6 +233,18 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 
   # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/poolside/laguna-s-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/cohere/north-mini-code:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: coder-smart
     litellm_params:
       model: gemini/gemini-3.6-flash
@@ -211,6 +275,14 @@ model_list:
       vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
 
   # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openrouter/z-ai/glm-5.2:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
       model: gemini/gemini-3.6-flash

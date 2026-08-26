@@ -17,6 +17,10 @@ website/node_modules/
 website/dist/
 website/.astro/
 
+# PHP test harness
+tests/php/vendor/
+tests/php/.phpunit.result.cache
+
 # Build artifacts
 build-pkg/
 *.deb
