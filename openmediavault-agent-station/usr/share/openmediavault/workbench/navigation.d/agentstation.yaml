@@ -5,6 +5,7 @@ data:
   text: _("Agent Station")
   position: 60
   icon: "mdi:robot"
+  url: "/agentstation/overview"
   permissions:
     role:
       - admin

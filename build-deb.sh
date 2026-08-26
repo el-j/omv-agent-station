@@ -83,7 +83,7 @@ deb_filename = "$DEB_FILE"
 
 # 1. Create control.tar.gz
 control_buf = io.BytesIO()
-with tarfile.open(fileobj=control_buf, mode="w:gz") as tar:
+with tarfile.open(fileobj=control_buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
     for item in sorted(os.listdir(os.path.join(build_dir, "DEBIAN"))):
         path = os.path.join(build_dir, "DEBIAN", item)
         tar.add(path, arcname=item)
@@ -91,7 +91,7 @@ control_data = control_buf.getvalue()
 
 # 2. Create data.tar.gz
 data_buf = io.BytesIO()
-with tarfile.open(fileobj=data_buf, mode="w:gz") as tar:
+with tarfile.open(fileobj=data_buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
     for root, dirs, files in os.walk(build_dir):
         rel_root = os.path.relpath(root, build_dir)
         if rel_root == "DEBIAN" or rel_root.startswith("DEBIAN/"):
