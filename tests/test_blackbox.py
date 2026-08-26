@@ -4,6 +4,7 @@ Treats all scripts, packaging tools, and security barriers as black-box systems.
 """
 
 import os
+import re
 import sys
 import json
 import subprocess  # nosec B404
@@ -312,12 +313,21 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
     def test_debian_package_structure_and_permissions(self):
         deb_script = ROOT_DIR / "build-deb.sh"
         self.assertTrue(deb_script.exists())
-        
+
+        # Read the version build-deb.sh will actually stamp on the artifact,
+        # rather than hardcoding it, so this test can't silently go stale
+        # (drift between this literal and VERSION= previously made this test
+        # pass locally only by accident, off a leftover .deb from an older
+        # build, while failing on every fresh CI checkout).
+        version_match = re.search(r'^VERSION="([^"]+)"', deb_script.read_text(encoding="utf-8"), re.MULTILINE)
+        self.assertIsNotNone(version_match, "Could not find VERSION= in build-deb.sh")
+        version = version_match.group(1)
+
         # Build deb in isolated environment
         res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603,B607
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
-        
-        deb_file = ROOT_DIR / "openmediavault-agent-station_1.0.0_all.deb"
+
+        deb_file = ROOT_DIR / f"openmediavault-agent-station_{version}_all.deb"
         self.assertTrue(deb_file.exists(), "Debian package must exist after build")
         self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
 
