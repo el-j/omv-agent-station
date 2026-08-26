@@ -87,6 +87,7 @@ from handlers.vault import (
 )
 from handlers.interactive import interactive_text_handler
 from handlers.callbacks import help_callback_handler
+from handlers.upload import upload_file_handler
 
 # ---------------------------------------------------------------------------
 # Dynamic Core Helpers (Module Globals Bound for Extensibility & Testing)
@@ -265,6 +266,10 @@ def main():
 
     # Interactive Inline Keyboard Callback Handler
     app.add_handler(CallbackQueryHandler(help_callback_handler))
+
+    # File Upload to GitHub: any Document or Photo is treated as an upload
+    # into the bound project's repo, on its own review branch.
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, upload_file_handler))
 
     # Interactive Plain Text & ForceReply Prompt Handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, interactive_text_handler))
