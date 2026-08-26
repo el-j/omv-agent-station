@@ -33,6 +33,36 @@ class TestConfig(unittest.TestCase):
         self.assertIn("coder-smart", model_names)
         self.assertIn("reasoning-heavy", model_names)
 
+    def test_openrouter_free_tier_models_are_wired_into_virtual_routers(self):
+        """Free (":free"-suffixed) OpenRouter deployments must actually be part
+        of coder-fast/coder-smart/reasoning-heavy's model_list, not just present
+        somewhere in the file -- a standalone, unreferenced entry (like the
+        pre-existing openrouter-auto model) is unreachable by default and
+        defeats the point of a free tier."""
+        config_path = ROOT_DIR / "litellm" / "config.yaml"
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        deployments_by_group: dict[str, list[dict]] = {}
+        for deployment in data["model_list"]:
+            deployments_by_group.setdefault(deployment["model_name"], []).append(deployment)
+
+        free_model_names = {
+            name for name, deployments in deployments_by_group.items()
+            if any(":free" in d["litellm_params"].get("model", "") for d in deployments)
+        }
+        self.assertTrue(free_model_names, "No ':free' OpenRouter model_list entries found in litellm/config.yaml")
+
+        for router_name in ("coder-fast", "coder-smart", "reasoning-heavy"):
+            router_models = [d["litellm_params"].get("model", "") for d in deployments_by_group[router_name]]
+            self.assertTrue(
+                any(":free" in m for m in router_models),
+                f"'{router_name}' has no free OpenRouter deployment in its model_list -- "
+                "it will never actually be tried, same mistake openrouter-auto made."
+            )
+            for m in [x for x in router_models if ":free" in x]:
+                self.assertTrue(m.startswith("openrouter/"), f"Unexpected free model '{m}' not routed via openrouter/")
+
     def test_docker_compose_syntax(self):
         compose_path = ROOT_DIR / "docker-compose.yml"
         self.assertTrue(compose_path.exists())
@@ -57,6 +87,7 @@ class TestConfig(unittest.TestCase):
         self.assertIn("GEMINI_API_KEY", content)
         self.assertIn("ANTHROPIC_API_KEY", content)
         self.assertIn("GITHUB_TOKEN", content)
+        self.assertIn("OPENROUTER_API_KEY", content)
         self.assertIn("TELEGRAM_BOT_TOKEN", content)
         self.assertIn("SIGNAL_PHONE_NUMBER", content)
         self.assertIn("GIT_AUTHOR_NAME", content)
