@@ -2,8 +2,8 @@
 /**
  * OpenMediaVault Agent Station RPC Service
  *
- * @author    Fabian <dev@local>
- * @copyright 2026 Fabian
+ * @author    el-j <bluearc.in.sky@gmail.com>
+ * @copyright 2026 el-j
  * @license   GPL-3.0-or-later
  */
 
