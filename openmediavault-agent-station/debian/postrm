@@ -3,14 +3,12 @@
 set -e
 
 clean_workbench() {
-    # Ensure cache archives dir exists and remove cached schema
-    mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
-    find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
-    
-    # Recompile OMV Workbench after removing plugin assets so routes and widgets are purged from UI
-    if command -v omv-mkworkbench >/dev/null 2>&1; then
-        omv-mkworkbench all 2>/dev/null || true
-    fi
+    # Activate the update-workbench trigger (handled by OMV core, deferred until
+    # dpkg finishes the whole transaction) so routes and widgets belonging to
+    # this plugin are recompiled out of the WebGUI. This avoids both a
+    # synchronous restart mid-RPC-session and clobbering the shared
+    # /var/cache/openmediavault/cache.* files that belong to other plugins.
+    dpkg-trigger update-workbench
 }
 
 case "$1" in
