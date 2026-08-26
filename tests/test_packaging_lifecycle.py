@@ -55,6 +55,18 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         install_script = (ROOT_DIR / "scripts" / "install-plugin.sh").read_text(encoding="utf-8")
         self.assertNotIn("omv-mkworkbench all 2>/dev/null", install_script)
 
+    def test_control_depends_accepts_docker_ce_cli(self):
+        """A fresh OMV install with Docker set up via Docker's own official
+        apt repo (get.docker.com / docs.docker.com) provides the package
+        docker-ce-cli, not docker-cli/docker.io. Reproduced by installing on
+        a clean OrbStack Debian 13 + OMV 8.5.6 VM: apt refused to configure
+        this package because the second alternation group in Depends only
+        listed docker-cli | podman-docker | docker.io, none of which were
+        satisfied even though a fully working Docker CLI was present."""
+        control = (DEBIAN_DIR / "control").read_text(encoding="utf-8")
+        depends_line = next(line for line in control.splitlines() if line.startswith("Depends:"))
+        self.assertIn("docker-ce-cli", depends_line)
+
 
 if __name__ == "__main__":
     unittest.main()
