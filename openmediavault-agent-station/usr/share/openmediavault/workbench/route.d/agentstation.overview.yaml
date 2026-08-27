@@ -1,0 +1,8 @@
+version: "1.0"
+type: route
+data:
+  url: "/agentstation/overview"
+  title: _("Overview")
+  editing: true
+  notificationTitle: _("Agent Station settings saved.")
+  component: omv-services-agentstation-overview-page

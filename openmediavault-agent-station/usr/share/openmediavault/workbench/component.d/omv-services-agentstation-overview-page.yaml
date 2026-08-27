@@ -4,6 +4,9 @@ data:
   name: omv-services-agentstation-overview-page
   type: formPage
   config:
+    hints:
+      - type: info
+        text: _("<strong>🚀 Agent Station Quick Access Endpoints -</strong><br><br>• <a href='http://192.168.1.200:7681' target='_blank' style='font-weight:bold;text-decoration:underline;'>🖥️ Open Web Terminal (Port 7681) ↗</a> - Interactive terminal workspace with tmux and AI agent CLI<br>• <a href='http://192.168.1.200:4000' target='_blank' style='font-weight:bold;text-decoration:underline;'>🤖 Open LiteLLM AI Gateway (Port 4000) ↗</a> - Multi-provider LLM load balancer and Swagger API explorer<br>• <a href='http://192.168.1.200:8384' target='_blank' style='font-weight:bold;text-decoration:underline;'>📂 Open Syncthing Web UI (Port 8384) ↗</a> - Bi-directional Obsidian Second Brain synchronization")
     request:
       service: AgentStation
       get:
@@ -15,14 +18,14 @@ data:
         name: enable
         label: _("Enable Agent Station Engine")
         value: false
-        hint: _("Master switch to start/stop the AI Agent Station docker stack")
+        hint: _("Master switch to start/stop the AI Agent Station docker stack. When enabled, core containers are provisioned in the background.")
       - type: textInput
         name: data_dir
         label: _("Workspace Data Directory")
-        hint: _("Storage path for Obsidian notes, code repositories, and workspace files (e.g. /srv/dev-data)")
         value: "/srv/dev-data"
+        hint: _("Storage path for Obsidian notes, code repositories, and workspace files (e.g. /srv/dev-data)")
       - type: divider
-        title: _("Integrated Web Endpoints - Web Terminal (Port 7681) | LiteLLM (Port 4000) | Web Chat (Port 3000)")
+        title: _("Service Credentials and Port Overview - Web Terminal (Port 7681) | LiteLLM (Port 4000) | Syncthing (Port 8384)")
     buttons:
       - template: submit
       - template: cancel

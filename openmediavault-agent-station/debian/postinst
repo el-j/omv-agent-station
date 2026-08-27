@@ -6,6 +6,17 @@ case "$1" in
     configure)
         # Ensure local deb repo archives directory exists
         mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
+
+        # Do NOT restart openmediavault-engined directly here: this postinst
+        # script runs synchronously inside the very RPC session that is
+        # performing the installation (e.g. from the WebGUI package manager).
+        # Killing engined mid-request causes the client to see
+        # "Failed to read from socket: Connection reset by peer" and can leave
+        # the install half-configured. Instead, activate the update-workbench
+        # trigger so engined recompiles the workbench, and arm the
+        # restart-engined trigger (declared in debian/triggers) so engined
+        # only restarts after dpkg finishes processing the whole transaction.
+        dpkg-trigger update-workbench
         ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

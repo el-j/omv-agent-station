@@ -1,0 +1,64 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout 
+  title="Git Workspaces & Automated Project Registration" 
+  description="Automated GitHub repository cloning, authenticated PAT credential injection, Obsidian project spec provisioning, and branch workflows."
+  category="Workspace & Notes"
+  prevPage={{ title: "Custom Commands & Aliases", href: `${baseUrl}/docs/custom-commands` }}
+  nextPage={{ title: "Obsidian & Syncthing Sync", href: `${baseUrl}/docs/obsidian-sync` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>📂 Fully Automated Project Onboarding:</strong><br />
+    Whenever you clone or create a repository via the chatbot, the Agent Station automatically registers the directory, injects your PAT token into the git remote, initializes an Obsidian Project Spec file, and creates a Telegram Topic sub-channel!
+  </div>
+
+  <h2>📥 Cloning Repositories (<code>/clone</code>)</h2>
+  <p>
+    You can clone any public or private GitHub, GitLab, or Bitbucket repository in three seamless ways:
+  </p>
+
+  <ol>
+    <li><strong>Direct URL Paste:</strong> In your private chat with the bot, simply paste any GitHub link (e.g. <code>https://github.com/fastapi/fastapi</code>). The bot automatically detects the git URL and clones it!</li>
+    <li><strong>Autocomplete Prompt:</strong> Tap <code>/clone</code> in Telegram ➔ The bot opens an interactive input placeholder asking for the URL.</li>
+    <li><strong>One-Line Command:</strong> <code>/clone https://github.com/owner/repo [custom-folder-name]</code></li>
+  </ol>
+
+  <h2>✨ Creating New Remote Repositories (<code>/newrepo</code>)</h2>
+  <p>
+    Create a new remote GitHub repository, initialize local git files, and push the initial commit in one step:
+  </p>
+
+  <pre><code>/newrepo my-awesome-app "Autonomous full-stack web application built on OMV"</code></pre>
+
+  <p>
+    The bot creates the repo on your GitHub account, configures <code>.gitignore</code>, <code>README.md</code>, sets the default branch to <code>main</code>, and pushes to origin.
+  </p>
+
+  <h2>🌿 Git Branch & Diff Workflows</h2>
+  <pre><code># Check uncommitted git changes:
+/diff
+
+# List all local and remote branches:
+/branch
+
+# Create and switch to a new feature branch:
+/branch feat/user-auth
+
+# Pull latest changes from remote:
+/pull
+
+# Push current branch to origin:
+/push</code></pre>
+
+  <h2>🛡️ Automated PAT Authentication</h2>
+  <p>
+    When cloning from GitHub, the bot embeds your configured <code>GITHUB_TOKEN</code> into the git push remote URL:
+  </p>
+  <pre><code>https://x-access-token:&lt;GITHUB_PAT&gt;@github.com/owner/repo.git</code></pre>
+  <p>
+    This allows autonomous agents running in <code>/task</code> or Claude Code CLI to commit and push PR branches without prompting for interactive credentials.
+  </p>
+</DocsLayout>

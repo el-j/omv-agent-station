@@ -7,7 +7,7 @@
 set -e
 
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="0.0.1"
+VERSION="0.0.2-beta.2"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"
@@ -30,11 +30,12 @@ mkdir -p "$BUILD_DIR/usr/sbin"
 
 # Copy package control files
 cp openmediavault-agent-station/debian/control "$BUILD_DIR/DEBIAN/"
+cp openmediavault-agent-station/debian/triggers "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
-chmod 644 "$BUILD_DIR/DEBIAN/control" 2>/dev/null || true
+chmod 644 "$BUILD_DIR/DEBIAN/control" "$BUILD_DIR/DEBIAN/triggers" 2>/dev/null || true
 
 # Copy OMV RPC backend & WebGUI assets
 cp openmediavault-agent-station/usr/share/openmediavault/engined/rpc/* "$BUILD_DIR/usr/share/openmediavault/engined/rpc/" 2>/dev/null || true
@@ -50,9 +51,11 @@ chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station"
 cp openmediavault-agent-station/usr/sbin/omv-agent-station "$BUILD_DIR/usr/sbin/" 2>/dev/null || true
 chmod 755 "$BUILD_DIR/usr/sbin/omv-agent-station" 2>/dev/null || true
 
-# Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots)
+# Copy stack files (Docker compose, LiteLLM config, Telegram, Signal & Discord Bots, Agent Workspace)
 cp docker-compose.yml "$BUILD_DIR/usr/share/openmediavault/agent-station/"
 cp litellm/config.yaml "$BUILD_DIR/usr/share/openmediavault/agent-station/litellm/"
+mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/agent-workspace"
+cp -r agent-workspace/* "$BUILD_DIR/usr/share/openmediavault/agent-station/agent-workspace/"
 cp -r telegram-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/telegram-agent-bot/"
 mkdir -p "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot"
 cp -r signal-agent-bot/* "$BUILD_DIR/usr/share/openmediavault/agent-station/signal-agent-bot/"
@@ -80,7 +83,7 @@ deb_filename = "$DEB_FILE"
 
 # 1. Create control.tar.gz
 control_buf = io.BytesIO()
-with tarfile.open(fileobj=control_buf, mode="w:gz") as tar:
+with tarfile.open(fileobj=control_buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
     for item in sorted(os.listdir(os.path.join(build_dir, "DEBIAN"))):
         path = os.path.join(build_dir, "DEBIAN", item)
         tar.add(path, arcname=item)
@@ -88,7 +91,7 @@ control_data = control_buf.getvalue()
 
 # 2. Create data.tar.gz
 data_buf = io.BytesIO()
-with tarfile.open(fileobj=data_buf, mode="w:gz") as tar:
+with tarfile.open(fileobj=data_buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
     for root, dirs, files in os.walk(build_dir):
         rel_root = os.path.relpath(root, build_dir)
         if rel_root == "DEBIAN" or rel_root.startswith("DEBIAN/"):

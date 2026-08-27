@@ -247,7 +247,7 @@ Once the bot is running, message it in your Telegram app:
 3. Share your Obsidian Vault directory:
    - **Server Path:** `/data/obsidian` (or `${DATA_DIR}/obsidian`)
    - **Local Device:** `~/Documents/ObsidianVault`
-4. **Best Practice:** Keep a `Projects/<ProjectName>/spec.md` note for each repository. The Telegram bot and agents can read these specs as source-of-truth context.
+4. **Best Practice:** Keep a `Projects/<ProjectName>/project-spec.md` note for each repository. The Telegram bot and agents can read these specs as source-of-truth context.
 
 ---
 

@@ -2,9 +2,15 @@ name: CI Quality & Package Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'fix/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - develop
+      - main
 
 jobs:
   test-and-lint:
@@ -25,9 +31,9 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 bandit pyyaml
+          pip install flake8 bandit pyyaml httpx openai websockets
 
-      - name: Run Unit Tests
+      - name: Run Unit & Black-Box Tests
         run: |
           bash scripts/test.sh
 
@@ -46,5 +52,26 @@ jobs:
       - name: Upload Debian Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openmediavault-ai-orchestrator-deb-${{ matrix.python-version }}
-          path: openmediavault-ai-orchestrator_1.0.0_all.deb
+          name: openmediavault-agent-station-deb-${{ matrix.python-version }}
+          path: openmediavault-agent-station_*.deb
+
+  test-php:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      - name: Install PHPUnit
+        working-directory: tests/php
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run AgentStation RPC Tests
+        working-directory: tests/php
+        run: php vendor/bin/phpunit

@@ -1,408 +1,638 @@
 #!/usr/bin/env python3
 """
-Signal Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8
+Signal Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8.
 Provides end-to-end encrypted remote command execution, autonomous coding agent dispatch (Aider/Claude Code),
 Git repository synchronization, Obsidian second-brain integration, and LiteLLM gateway telemetry over Signal.
+Powered by agent_station_core.
 """
 
 import os
 import sys
-import re
 import json
-import shutil
-import logging
 import asyncio
-import subprocess  # nosec B404
 from pathlib import Path
 from datetime import datetime
 import httpx
 import websockets
-from openai import OpenAI
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+# Auto-resolve agent_station_core in sys.path
+_bot_dir = Path(__file__).parent.resolve()
+_root_dir = _bot_dir.parent.resolve()
+for path_cand in [str(_bot_dir), str(_root_dir)]:
+    if path_cand not in sys.path:
+        sys.path.insert(0, path_cand)
+
+from agent_station_core import task_registry
+from agent_station_core import (
+    WORKSPACE,
+    logger,
+    init_git_credentials,
+    sanitize_project_path,
+    sanitize_branch_name,
+    sanitize_cmd_name,
+    sanitize_relative_path,
+    clone_repository,
+    create_new_repository,
+    git_pull_repo,
+    git_push_repo,
+    git_diff_repo,
+    list_workspace_projects,
+    query_ai_model,
+    list_ai_models,
+    get_modelhelp_markdown,
+    run_autonomous_task,
+    run_claude_cli,
+    run_shell_exec,
+    get_system_status,
+    save_obsidian_note,
+    list_vault_notes,
+    load_custom_commands,
+    save_custom_commands,
+    expand_custom_command,
+    set_bound_project,
+    remove_bound_project,
+    get_bound_project,
+    resolve_project_context_raw,
+    MAX_UPLOAD_BYTES,
+    parse_upload_caption,
+    run_repo_upload,
+    build_compare_url,
 )
-logger = logging.getLogger("SignalAgentBot")
 
-# Environment Configuration
+# Signal Environment Configuration
 SIGNAL_API_URL = os.environ.get("SIGNAL_CLI_URL", "http://signal-cli:8080")
 SIGNAL_PHONE_NUMBER = os.environ.get("SIGNAL_PHONE_NUMBER", "")
 SIGNAL_ALLOWED_NUMBER = os.environ.get("SIGNAL_ALLOWED_PHONE_NUMBER", "")
-LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
-OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
-WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
 
-# Git Configuration
-GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
-GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-box.local")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
-BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
-BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
+def is_authorized(sender: str) -> bool:
+    """Verifies that incoming Signal phone number matches SIGNAL_ALLOWED_NUMBER."""
+    if not SIGNAL_ALLOWED_NUMBER:
+        return True
+    if not sender:
+        return False
+    return sender.strip().replace(" ", "").replace("-", "") == SIGNAL_ALLOWED_NUMBER.strip().replace(" ", "").replace("-", "")
 
-GIT_BIN = shutil.which("git") or "/usr/bin/git"
-TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
-UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
-DF_BIN = shutil.which("df") or "/bin/df"
-AIDER_BIN = shutil.which("aider") or "aider"
-
-def init_git_credentials():
-    try:
-        subprocess.run([GIT_BIN, "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)  # nosec B603,B607
-        subprocess.run([GIT_BIN, "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)  # nosec B603,B607
-        subprocess.run([GIT_BIN, "config", "--global", "init.defaultBranch", "main"], check=True)  # nosec B603,B607
-
-        if GITHUB_TOKEN:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://x-access-token:{GITHUB_TOKEN}@github.com/.insteadOf",
-                "https://github.com/"
-            ], check=True)
-        if GITLAB_TOKEN:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://oauth2:{GITLAB_TOKEN}@gitlab.com/.insteadOf",
-                "https://gitlab.com/"
-            ], check=True)
-        if BITBUCKET_USER and BITBUCKET_PASS:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
-                "https://bitbucket.org/"
-            ], check=True)
-    except Exception as e:
-        logger.warning(f"Could not configure git credentials: {e}")
-
-def sanitize_git_url(url: str) -> str | None:
-    """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
-    if not url:
-        return None
-    url = url.strip()
-    if url.startswith("-"):
-        return None
-    pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
-    if re.match(pattern, url):
-        return url
-    return None
-
-def sanitize_branch_name(branch: str) -> str | None:
-    """Validates git branch names to prevent argument injection."""
-    if not branch:
-        return None
-    branch = branch.strip()
-    if branch.startswith("-") or ".." in branch or "\\" in branch or "@{" in branch:
-        return None
-    if re.match(r"^[a-zA-Z0-9_./-]+$", branch):
-        return branch
-    return None
-
-def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
-    """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
-    if not project_name or ".." in project_name or project_name.startswith(("/", "\\", "-")):
-        return None
-    try:
-        clean_name = project_name.strip().strip("./")
-        if not clean_name or clean_name.startswith("-"):
-            return None
-        target = (workspace / clean_name).resolve()
-        workspace_resolved = workspace.resolve()
-        if workspace_resolved in target.parents or target == workspace_resolved:
-            return target
-        return None
-    except Exception:
-        return None
-
-ai_client = OpenAI(
-    api_key=LITELLM_KEY,
-    base_url=f"{LITELLM_BASE}/v1"
-)
-
-async def send_signal_message(recipient: str, text: str):
-    """Sends an end-to-end encrypted message via signal-cli-rest-api."""
+async def send_signal_message(recipient: str, message: str):
+    """Sends an end-to-end encrypted message via signal-cli REST API."""
+    url = f"{SIGNAL_API_URL.rstrip('/')}/v2/send"
+    payload = {
+        "number": SIGNAL_PHONE_NUMBER,
+        "recipients": [recipient],
+        "message": message
+    }
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            payload = {
-                "message": text,
-                "number": SIGNAL_PHONE_NUMBER,
-                "recipients": [recipient]
-            }
-            resp = await client.post(f"{SIGNAL_API_URL}/v2/send", json=payload)
+            resp = await client.post(url, json=payload)
             if resp.status_code not in (200, 201):
-                logger.error(f"Failed to send Signal message: {resp.status_code} - {resp.text}")
+                logger.warning(f"Failed to send Signal message: {resp.status_code} - {resp.text}")
     except Exception as e:
-        logger.error(f"Error sending Signal message: {e}")
+        logger.error(f"Error sending Signal message to {recipient}: {e}")
 
-async def handle_command(sender: str, message_text: str):
-    """Parses and executes agent bot commands received from Signal."""
-    parts = message_text.strip().split()
-    if not parts:
+async def handle_signal_command(sender: str, text: str):
+    """Parses and handles all 25 Agent Station commands over Signal."""
+    if not is_authorized(sender):
+        logger.warning(f"Unauthorized Signal access attempt from sender: {sender}")
+        await send_signal_message(sender, "⛔ Unauthorized access. Configure your Signal Phone Number in OMV Agent Station settings.")
         return
 
+    text = text.strip()
+    if not text:
+        return
+
+    # Check for direct GitHub clone link
+    if text.startswith("https://github.com/") or text.startswith("http://github.com/") or text.startswith("git@github.com:"):
+        text = f"/clone {text}"
+
+    # Expand custom shortcut commands
+    if text.startswith("/"):
+        parts = text.lstrip("/").split(maxsplit=1)
+        cmd_name = parts[0].lower()
+        passed_args = parts[1] if len(parts) > 1 else ""
+        expanded = expand_custom_command(cmd_name, passed_args)
+        if expanded:
+            text = expanded if expanded.startswith("/") else f"/{expanded}"
+
+    # If message doesn't start with slash in 1-on-1 chat, route to conversational AI
+    if not text.startswith("/"):
+        res = await query_ai_model(text, model="coder-smart")
+        ans = res["answer"] if res["success"] else f"❌ AI error: {res.get('error')}"
+        await send_signal_message(sender, ans)
+        return
+
+    parts = text.lstrip("/").split()
     cmd = parts[0].lower()
     args = parts[1:]
 
-    logger.info(f"Received command '{cmd}' from {sender}")
+    if cmd in ("start", "menu"):
+        welcome = (
+            "🤖 OMV AI Agent Station — Signal Relay Online\n\n"
+            "24/7 AI Development Server Connected.\n\n"
+            "⚡ Core Commands:\n"
+            "• /task [project] <prompt> — Run autonomous coding agent on branch\n"
+            "• /chat <message> — Ask questions via smart router\n"
+            "• /gemini <prompt> | /gpt4 <prompt> — Quick model shortcuts\n"
+            "• /claude <prompt> — Run Claude Code CLI in workspace\n"
+            "• /cancel — Stop the task/claude/exec command currently running\n"
+            "• /projects — List workspace repositories\n"
+            "• /newrepo <name> [desc] — Create new GitHub repository\n"
+            "• /clone <url> [name] — Clone git repository\n"
+            "• /addcmd <name> <template> — Create dynamic custom shortcuts\n"
+            "• /bind <project> | /unbind — Bind this chat to a project\n"
+            "• /status — Server CPU/RAM & tmux sessions\n"
+            "• /help — Full handbook\n\n"
+            "📤 Send any file/image directly to commit it into your bound project's repo."
+        )
+        await send_signal_message(sender, welcome)
 
-    if cmd in ("/start", "/help"):
+    elif cmd == "help":
         help_text = (
-            "🤖 OMV AI Orchestrator (Signal E2EE Relay)\n\n"
-            "Commands:\n"
-            "• /task <project> <instructions> - Run autonomous coding loop on git branch\n"
-            "• /chat <message> - Ask architecture & coding questions (Claude 3.7 / Gemini 3.7)\n"
-            "• /clone <url> [name] - Clone GitHub / GitLab / Bitbucket repo\n"
-            "• /pull <project> - Pull latest changes from remote\n"
-            "• /push <project> [branch] - Push local commits to remote\n"
-            "• /branch <project> [name] - List or switch branch\n"
-            "• /diff <project> - Inspect git changes & modified files\n"
-            "• /projects - List all projects in workspace\n"
-            "• /vault - View recent Obsidian notes\n"
-            "• /note <title> | <content> - Save note to Obsidian Inbox\n"
-            "• /models - Check active LiteLLM AI endpoints\n"
-            "• /status - Server CPU/RAM & active tmux sessions"
+            "📖 Agent Station Handbook & Command Reference\n\n"
+            "1. AI Models & Chat:\n"
+            "• /chat [-m model] <question>\n"
+            "• /gemini <prompt> | /gpt4 <prompt>\n"
+            "• /models | /modelhelp\n\n"
+            "2. Coding Agent & Execution:\n"
+            "• /task [project] <instructions>\n"
+            "• /claude <prompt> | /exec <cmd>\n"
+            "• /cancel — Stop the task/claude/exec command currently running\n\n"
+            "3. Git & Workspaces:\n"
+            "• /projects | /newrepo | /clone | /pull | /push | /branch | /diff\n\n"
+            "4. Notes & Vault:\n"
+            "• /note <Title> | <Content> | /vault\n\n"
+            "5. Custom Shortcuts:\n"
+            "• /addcmd <name> <template> | /delcmd <name> | /cmds\n\n"
+            "6. File Upload:\n"
+            "• Send any file/image to commit it to the bound project's repo\n"
+            "• Caption 'path/to/file.txt' sets the destination path (defaults to uploads/<filename>)\n"
+            "• Caption 'project: path/to/file.txt' targets a project without binding\n"
+            "• /bind <project> | /unbind — bind this chat to a project"
         )
         await send_signal_message(sender, help_text)
 
-    elif cmd == "/status":
-        try:
-            tmux_out = subprocess.check_output([TMUX_BIN, "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()  # nosec B603,B607
-        except Exception:
-            tmux_out = "No active tmux sessions."
-        try:
-            uptime_out = subprocess.check_output([UPTIME_BIN], text=True).strip()  # nosec B603,B607
-            df_out = subprocess.check_output([DF_BIN, "-h", "/data/workspace"], text=True).strip().splitlines()[-1]  # nosec B603,B607
-        except Exception:
-            uptime_out = "N/A"
-            df_out = "N/A"
-
-        status_text = (
-            f"🖥️ OMV Server Status\n\n"
-            f"⏱️ Uptime: {uptime_out}\n"
-            f"💾 Disk: {df_out}\n\n"
-            f"🧵 Active Agent Sessions:\n{tmux_out}"
-        )
-        await send_signal_message(sender, status_text)
-
-    elif cmd == "/models":
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"{LITELLM_BASE}/models", headers={"Authorization": f"Bearer {LITELLM_KEY}"})
-                if resp.status_code == 200:
-                    data = resp.json()
-                    models = [m.get("id") for m in data.get("data", [])]
-                    model_str = "\n".join([f"• {m}" for m in models])
-                    await send_signal_message(sender, f"✅ Active AI Endpoints:\n\n{model_str}\n\nRouters: coder-fast | coder-smart | reasoning-heavy")
-                else:
-                    await send_signal_message(sender, f"⚠️ LiteLLM HTTP {resp.status_code}")
-        except Exception as e:
-            await send_signal_message(sender, f"❌ Failed to reach LiteLLM: {e}")
-
-    elif cmd == "/projects":
-        if not WORKSPACE.exists():
-            await send_signal_message(sender, "📁 Workspace folder not mounted.")
-            return
-        projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")]
-        proj_str = "\n".join([f"📂 {p}" for p in projects]) if projects else "No projects found."
-        await send_signal_message(sender, f"📁 Workspace Projects:\n\n{proj_str}")
-
-    elif cmd == "/clone":
+    elif cmd == "chat":
         if not args:
-            await send_signal_message(sender, "Usage: /clone <git-url> [folder-name]")
+            await send_signal_message(sender, "Usage: /chat [-m model] <your question>")
             return
-        raw_url = args[0]
-        git_url = sanitize_git_url(raw_url)
-        if not git_url:
-            await send_signal_message(sender, "❌ Invalid git URL format.")
-            return
+        model = "coder-smart"
+        prompt = " ".join(args)
+        if len(args) > 2 and args[0] in ("-m", "--model"):
+            model = args[1]
+            prompt = " ".join(args[2:])
+        await send_signal_message(sender, f"⏳ Querying {model}...")
+        res = await query_ai_model(prompt, model=model)
+        ans = res["answer"] if res["success"] else f"❌ AI Query error: {res.get('error')}"
+        await send_signal_message(sender, ans)
 
-        folder = args[1] if len(args) > 1 else git_url.rstrip("/").split("/")[-1].replace(".git", "")
-        target = sanitize_project_path(WORKSPACE, folder)
-        if not target:
-            await send_signal_message(sender, "❌ Invalid folder name.")
+    elif cmd == "gemini":
+        if not args:
+            await send_signal_message(sender, "Usage: /gemini <prompt>")
             return
+        res = await query_ai_model(" ".join(args), model="gemini-3.6-flash")
+        ans = res["answer"] if res["success"] else f"❌ Error: {res.get('error')}"
+        await send_signal_message(sender, ans)
 
-        if target.exists():
-            await send_signal_message(sender, f"⚠️ Folder {folder} already exists.")
+    elif cmd == "gpt4":
+        if not args:
+            await send_signal_message(sender, "Usage: /gpt4 <prompt>")
             return
-        await send_signal_message(sender, f"⏳ Cloning {git_url} into {folder}...")
-        proc = await asyncio.create_subprocess_exec(GIT_BIN, "clone", "--", git_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-        _, stderr = await proc.communicate()
-        if proc.returncode == 0:
-            await send_signal_message(sender, f"✅ Successfully cloned {folder}!\nRun /task {folder} \"instructions\" to begin coding.")
+        res = await query_ai_model(" ".join(args), model="github-gpt-4o")
+        ans = res["answer"] if res["success"] else f"❌ Error: {res.get('error')}"
+        await send_signal_message(sender, ans)
+
+    elif cmd == "models":
+        models, live = await list_ai_models()
+        model_str = "\n".join([f"• {m}" for m in models])
+        label = "Active AI Models" if live else "⚠️ Fallback AI Models (LiteLLM gateway unreachable, list may be stale)"
+        await send_signal_message(sender, f"🤖 {label} ({len(models)}):\n\n{model_str}\n\nRouters: coder-smart, reasoning-heavy")
+
+    elif cmd in ("modelhelp", "aihelp"):
+        await send_signal_message(sender, get_modelhelp_markdown())
+
+    elif cmd == "projects":
+        projects = list_workspace_projects()
+        if not projects:
+            await send_signal_message(sender, "📁 No workspace projects found.")
+            return
+        proj_str = "\n".join([f"• {p}" for p in projects])
+        await send_signal_message(sender, f"📁 Workspace Projects ({len(projects)}):\n\n{proj_str}")
+
+    elif cmd == "clone":
+        if not args:
+            await send_signal_message(sender, "Usage: /clone <git-url> [custom-folder-name]")
+            return
+        git_url = args[0]
+        f_name = args[1] if len(args) > 1 else ""
+        await send_signal_message(sender, f"⏳ Cloning {git_url}...")
+        res = await clone_repository(git_url, f_name)
+        if res["success"]:
+            folder = res["folder_name"]
+            msg = (
+                f"✅ Repository Cloned & Registered as Active Project!\n\n"
+                f"📁 Project: {folder}\n"
+                f"💾 Path: /data/workspace/{folder}\n"
+                f"📓 Obsidian Spec: /data/obsidian/Projects/{folder}/\n\n"
+                f"Run tasks with: /task {folder} \"your instructions\""
+            )
+            await send_signal_message(sender, msg)
         else:
-            await send_signal_message(sender, f"❌ Git clone failed:\n{stderr.decode('utf-8', errors='replace')}")
+            await send_signal_message(sender, f"❌ Git clone failed: {res.get('error')}")
 
-    elif cmd == "/pull":
+    elif cmd in ("newrepo", "create"):
         if not args:
-            await send_signal_message(sender, "Usage: /pull <project-name>")
+            await send_signal_message(sender, "Usage: /newrepo <repo-name> [description]")
             return
-        pdir = sanitize_project_path(WORKSPACE, args[0])
-        if not pdir or not pdir.exists() or not (pdir / ".git").exists():
-            await send_signal_message(sender, f"❌ Invalid git repo: {args[0]}")
-            return
-        proc = await asyncio.create_subprocess_exec(GIT_BIN, "pull", "--rebase", cwd=str(pdir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-        stdout, _ = await proc.communicate()
-        await send_signal_message(sender, f"📥 Git Pull Result for {args[0]}:\n{stdout.decode('utf-8', errors='replace')}")
+        repo_name = args[0]
+        desc = " ".join(args[1:]) if len(args) > 1 else ""
+        await send_signal_message(sender, f"⏳ Creating GitHub repository {repo_name}...")
+        res = await create_new_repository(repo_name, desc)
+        if res["success"]:
+            msg = (
+                f"✅ New GitHub Repository Created!\n\n"
+                f"📁 Project: {res['repo_name']}\n"
+                f"🔗 URL: {res.get('html_url')}\n"
+                f"💾 Path: /data/workspace/{res['repo_name']}"
+            )
+            await send_signal_message(sender, msg)
+        else:
+            await send_signal_message(sender, f"❌ Failed to create repo: {res.get('error')}")
 
-    elif cmd == "/push":
-        if not args:
-            await send_signal_message(sender, "Usage: /push <project-name> [branch]")
+    elif cmd == "pull":
+        proj, _ = resolve_project_context_raw(sender, None, args, WORKSPACE)
+        if not proj:
+            await send_signal_message(sender, "Usage: /pull [project-name]")
             return
-        pdir = sanitize_project_path(WORKSPACE, args[0])
-        if not pdir or not pdir.exists() or not (pdir / ".git").exists():
-            await send_signal_message(sender, f"❌ Invalid git repo: {args[0]}")
+        await send_signal_message(sender, f"⏳ Pulling latest changes for {proj}...")
+        res = await git_pull_repo(proj)
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Git Pull ({proj}):\n{res['output']}")
+        else:
+            await send_signal_message(sender, f"❌ Git pull failed: {res.get('error')}")
+
+    elif cmd == "push":
+        proj, remaining = resolve_project_context_raw(sender, None, args, WORKSPACE)
+        if not proj:
+            await send_signal_message(sender, "Usage: /push [project-name] [branch]")
             return
-        branch = "HEAD"
-        if len(args) > 1:
-            valid_branch = sanitize_branch_name(args[1])
-            if not valid_branch:
+        branch = remaining[0] if remaining else "main"
+        await send_signal_message(sender, f"⏳ Pushing {proj} to {branch}...")
+        res = await git_push_repo(proj, branch)
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Git Push ({proj} -> {branch}):\n{res['output']}")
+        else:
+            await send_signal_message(sender, f"❌ Git push failed: {res.get('error')}")
+
+    elif cmd == "branch":
+        proj, remaining = resolve_project_context_raw(sender, None, args, WORKSPACE)
+        if not proj:
+            await send_signal_message(sender, "Usage: /branch [project-name] [new-branch]")
+            return
+        p_dir = sanitize_project_path(WORKSPACE, proj)
+        if not p_dir or not (p_dir / ".git").exists():
+            await send_signal_message(sender, f"❌ `{proj}` is not a valid git repository.")
+            return
+        if not remaining:
+            res = await run_shell_exec("git branch -a", cwd=p_dir)
+            await send_signal_message(sender, f"🌿 Branches for {proj}:\n{res['output']}")
+        else:
+            clean_b = sanitize_branch_name(remaining[0])
+            if not clean_b:
                 await send_signal_message(sender, "❌ Invalid branch name format.")
                 return
-            branch = valid_branch
-        proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "origin", "--", branch, cwd=str(pdir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-        stdout, stderr = await proc.communicate()
-        out = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
-        await send_signal_message(sender, f"🚀 Git Push Result:\n{out.strip()}")
+            res = await run_shell_exec(f"git checkout -B {clean_b}", cwd=p_dir)
+            if res["success"]:
+                await send_signal_message(sender, f"🌿 Switched to branch {clean_b} in project {proj}.")
+            else:
+                await send_signal_message(sender, f"❌ Branch checkout failed: {res.get('output')}")
 
-    elif cmd == "/diff":
+    elif cmd == "diff":
+        proj, _ = resolve_project_context_raw(sender, None, args, WORKSPACE)
+        if not proj:
+            await send_signal_message(sender, "Usage: /diff [project-name]")
+            return
+        res = await git_diff_repo(proj)
+        if res["success"]:
+            diff_text = res["diff"] or "(No uncommitted diff)"
+            await send_signal_message(sender, f"🔍 Git Diff ({proj}):\n{diff_text}")
+        else:
+            await send_signal_message(sender, f"❌ Error: {res.get('error')}")
+
+    elif cmd == "task":
         if not args:
-            await send_signal_message(sender, "Usage: /diff <project-name>")
+            await send_signal_message(sender, "Usage: /task [project-name] <coding instructions>")
             return
-        pdir = sanitize_project_path(WORKSPACE, args[0])
-        if not pdir or not pdir.exists() or not (pdir / ".git").exists():
-            await send_signal_message(sender, f"❌ Invalid git repo: {args[0]}")
+        proj, remaining = resolve_project_context_raw(sender, None, args, WORKSPACE)
+        if not proj or not remaining:
+            await send_signal_message(sender, "Usage: /task [project-name] <coding instructions>")
             return
-        p_stat = await asyncio.create_subprocess_exec(GIT_BIN, "status", "-s", cwd=str(pdir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        p_diff = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "--stat", cwd=str(pdir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-        o_stat, _ = await p_stat.communicate()
-        o_diff, _ = await p_diff.communicate()
-        await send_signal_message(sender, f"📊 Git Diff for {args[0]}:\n\nStatus:\n{o_stat.decode('utf-8', errors='replace')}\nDiff:\n{o_diff.decode('utf-8', errors='replace')}")
-
-    elif cmd == "/chat":
-        if not args:
-            await send_signal_message(sender, "Usage: /chat <your question>")
-            return
-        query = " ".join(args)
-        await send_signal_message(sender, "💭 Thinking...")
-        try:
-            res = ai_client.chat.completions.create(
-                model="coder-smart",
-                messages=[{"role": "user", "content": query}],
-                max_tokens=2048
-            )
-            await send_signal_message(sender, res.choices[0].message.content[:4000])
-        except Exception as e:
-            await send_signal_message(sender, f"❌ AI Generation Error: {e}")
-
-    elif cmd == "/task":
-        if len(args) < 2:
-            await send_signal_message(sender, "Usage: /task <project-name> <instructions>")
-            return
-        pname = args[0]
-        instructions = " ".join(args[1:])
-        pdir = sanitize_project_path(WORKSPACE, pname)
-        if not pdir or not pdir.exists():
-            await send_signal_message(sender, f"❌ Project {pname} does not exist.")
+        instructions = " ".join(remaining)
+        p_dir = sanitize_project_path(WORKSPACE, proj)
+        if not p_dir or not p_dir.exists():
+            await send_signal_message(sender, f"❌ Project directory `{proj}` not found in /data/workspace.")
             return
 
-        session_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_id = f"task_{timestamp}"
         task_branch = f"agent/{session_id}"
-        await send_signal_message(sender, f"🚀 Launching Agent Task ({session_id})\nProject: {pname}\nBranch: {task_branch}\nInstruction: {instructions}\n\nAgent is coding in background...")
 
-        asyncio.create_task(run_signal_agent_task(sender, pdir, instructions, session_id, task_branch))
+        await send_signal_message(sender, f"🚀 Launching Autonomous Agent Task for {proj} on {task_branch}...")
+        t = asyncio.create_task(run_task_background(sender, proj, p_dir, instructions, session_id, task_branch))
+        task_registry.start(sender, label=f"task: {instructions}", asyncio_task=t)
 
-async def run_signal_agent_task(sender: str, project_dir: Path, instructions: str, session_id: str, task_branch: str):
-    """Executes coding loop and streams results to Signal."""
+    elif cmd == "claude":
+        if not args:
+            await send_signal_message(sender, "Usage: /claude <instructions>")
+            return
+
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
+        prompt = " ".join(args)
+        await send_signal_message(sender, "🤖 Dispatching Claude Code CLI...")
+        t = asyncio.create_task(run_claude_background(sender, prompt))
+        task_registry.start(sender, label=f"claude: {prompt}", asyncio_task=t)
+
+    elif cmd == "exec":
+        if not args:
+            await send_signal_message(sender, "Usage: /exec <shell command>")
+            return
+
+        if task_registry.get(sender):
+            await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+            return
+
+        shell_cmd = " ".join(args)
+        await send_signal_message(sender, f"⏳ Executing: {shell_cmd}...")
+        t = asyncio.create_task(run_exec_background(sender, shell_cmd))
+        task_registry.start(sender, label=f"exec: {shell_cmd}", asyncio_task=t)
+
+    elif cmd in ("cancel", "stop"):
+        label = await task_registry.cancel(sender)
+        if label is None:
+            await send_signal_message(sender, "ℹ️ Nothing is currently running for you to cancel.")
+        else:
+            await send_signal_message(sender, f"🛑 Cancelling: {label}...")
+
+    elif cmd == "bind":
+        if not args:
+            current_bound = get_bound_project(sender, None)
+            status = f"Currently bound to: {current_bound}" if current_bound else "Not bound to any project."
+            await send_signal_message(sender, f"🧵 Binding Status\n\n• {status}\n\nTo bind: /bind <project-name>\nTo unbind: /unbind")
+            return
+        project_name = args[0]
+        p_dir = sanitize_project_path(WORKSPACE, project_name)
+        if not p_dir or not p_dir.exists():
+            await send_signal_message(sender, f"❌ Project {project_name} not found in /data/workspace.")
+            return
+        set_bound_project(sender, None, project_name)
+        await send_signal_message(sender, f"✅ Bound! All commands and file uploads now target project {project_name}.")
+
+    elif cmd == "unbind":
+        remove_bound_project(sender, None)
+        await send_signal_message(sender, "✅ Unbound project context.")
+
+    elif cmd == "status":
+        metrics = get_system_status()
+        await send_signal_message(
+            sender,
+            f"🖥️ OMV Server Status\n\n"
+            f"⏱️ Uptime: {metrics['uptime']}\n"
+            f"🧠 RAM: {metrics['ram']}\n"
+            f"💾 Disk Space: {metrics['disk']}\n\n"
+            f"🧵 Active Tmux Sessions:\n{metrics['tmux']}"
+        )
+
+    elif cmd == "note":
+        if not args:
+            await send_signal_message(sender, "Usage: /note <Title> | <Content>")
+            return
+        raw = " ".join(args)
+        if "|" in raw:
+            title, content = raw.split("|", 1)
+        else:
+            title = f"Quick Note {datetime.now().strftime('%Y-%m-%d %H%M')}"
+            content = raw
+        res = save_obsidian_note(title.strip(), content.strip())
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Note Saved to Obsidian: {res['path']}")
+        else:
+            await send_signal_message(sender, f"❌ Failed to save note: {res.get('error')}")
+
+    elif cmd == "vault":
+        res = list_vault_notes()
+        if res["success"]:
+            recent_str = "\n".join([f"• {f}" for f in res["recent"]]) if res["recent"] else "No notes found."
+            await send_signal_message(sender, f"📓 Obsidian Vault ({res['total_notes']} notes):\n\n{recent_str}")
+        else:
+            await send_signal_message(sender, f"❌ Error: {res.get('error')}")
+
+    elif cmd == "addcmd":
+        if len(args) < 2:
+            await send_signal_message(sender, "Usage: /addcmd <command-name> <command-template>")
+            return
+        name = args[0]
+        template = " ".join(args[1:])
+        san_name = sanitize_cmd_name(name)
+        if not san_name:
+            await send_signal_message(sender, "❌ Invalid command name format.")
+            return
+        cmds = load_custom_commands()
+        cmds[san_name] = template
+        save_custom_commands(cmds)
+        await send_signal_message(sender, f"✅ Custom Shortcut Registered: /{san_name} ➔ {template}")
+
+    elif cmd == "delcmd":
+        if not args:
+            await send_signal_message(sender, "Usage: /delcmd <command-name>")
+            return
+        san_name = sanitize_cmd_name(args[0])
+        if not san_name:
+            await send_signal_message(sender, "Usage: /delcmd <command-name>")
+            return
+        cmds = load_custom_commands()
+        if san_name in cmds:
+            del cmds[san_name]
+            save_custom_commands(cmds)
+            await send_signal_message(sender, f"✅ Deleted shortcut /{san_name}.")
+        else:
+            await send_signal_message(sender, f"⚠️ Shortcut /{san_name} not found.")
+
+    elif cmd in ("customcmds", "cmds", "aliases"):
+        cmds = load_custom_commands()
+        if not cmds:
+            await send_signal_message(sender, "📋 No custom shortcuts configured yet. Create one with /addcmd.")
+            return
+        lines = [f"• /{k} ➔ {v}" for k, v in sorted(cmds.items())]
+        await send_signal_message(sender, f"⚡ Custom Shortcuts ({len(cmds)}):\n\n" + "\n".join(lines))
+
+async def run_task_background(sender, proj, p_dir, instructions, session_id, task_branch):
+    """Runs the autonomous agent in the background so /cancel can stop it and
+    a second /task from the same sender can't race it on the same git dir."""
     try:
-        is_git = (project_dir / ".git").exists()
-        if is_git:
-            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
-
-        cmd = [
-            AIDER_BIN,
-            "--openai-api-base", f"{LITELLM_BASE}/v1",
-            "--openai-api-key", LITELLM_KEY,
-            "--model", "openai/coder-smart",
-            "--message", instructions,
-            "--auto-commits",
-            "--yes-always",
-            "--no-git-commit-prefix"
-        ]
-
-        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-            *cmd,
-            cwd=str(project_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+        res = await run_autonomous_task(
+            p_dir, instructions, session_id, task_branch,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
         )
-        stdout, _ = await proc.communicate()
-        out_text = stdout.decode("utf-8", errors="replace")
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Task Completed ({proj}):\n\n{res['summary']}")
+        else:
+            await send_signal_message(sender, f"❌ Task execution error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, f"🛑 Task Cancelled ({proj}, branch {task_branch})")
+        raise
+    finally:
+        task_registry.finish(sender)
 
-        push_status = ""
-        diff_summary = "No new commits."
-        if is_git:
-            d_proc = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "main..." + task_branch, "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-            d_out, _ = await d_proc.communicate()
-            diff_summary = d_out.decode("utf-8", errors="replace").strip() or "Changes committed."
-
-            try:
-                p_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", task_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-                await p_proc.communicate()
-                if p_proc.returncode == 0:
-                    push_status = f"🚀 Branch pushed to remote: {task_branch}\n"
-            except Exception as pe:
-                logger.info(f"Remote push skipped: {pe}")
-
-        summary = (
-            f"✅ Agent Task Completed! ({session_id})\n\n"
-            f"📁 Project: {project_dir.name}\n"
-            f"🌿 Branch: {task_branch}\n"
-            f"{push_status}"
-            f"📊 Git Diff Summary:\n{diff_summary[:800]}\n\n"
-            f"🔍 Excerpt:\n{out_text[-1000:] if out_text else 'Done.'}"
+async def run_claude_background(sender, prompt):
+    try:
+        res = await run_claude_cli(
+            WORKSPACE, prompt,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
         )
-        await send_signal_message(sender, summary)
+        if res["success"]:
+            await send_signal_message(sender, f"✅ Claude Code:\n\n{res['output']}")
+        else:
+            await send_signal_message(sender, f"❌ Claude error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, "🛑 Claude Code Cancelled")
+        raise
+    finally:
+        task_registry.finish(sender)
 
+async def run_exec_background(sender, shell_cmd):
+    try:
+        res = await run_shell_exec(
+            shell_cmd, cwd=WORKSPACE,
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
+        )
+        await send_signal_message(sender, f"🖥️ Output:\n{res['output']}")
+    except asyncio.CancelledError:
+        await send_signal_message(sender, f"🛑 Cancelled: {shell_cmd}")
+        raise
+    finally:
+        task_registry.finish(sender)
+
+async def download_signal_attachment(attachment_id: str) -> bytes:
+    """Downloads a received attachment's raw bytes from signal-cli's REST API."""
+    url = f"{SIGNAL_API_URL.rstrip('/')}/v1/attachments/{attachment_id}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.content
+
+async def handle_signal_upload(sender: str, attachment: dict, caption: str | None):
+    """Entry point: any incoming message with an attachment is treated as a repo upload."""
+    if not is_authorized(sender):
+        logger.warning(f"Unauthorized Signal upload attempt from sender: {sender}")
+        await send_signal_message(sender, "⛔ Unauthorized access. Configure your Signal Phone Number in OMV Agent Station settings.")
+        return
+
+    attachment_id = attachment.get("id")
+    if not attachment_id:
+        return
+    size = attachment.get("size") or 0
+    filename = attachment.get("filename") or f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    if size and size > MAX_UPLOAD_BYTES:
+        await send_signal_message(sender, f"❌ File is {size / 1024 / 1024:.1f} MB -- max upload size is {MAX_UPLOAD_BYTES // 1024 // 1024} MB.")
+        return
+
+    project_override, path_hint = parse_upload_caption(caption)
+    project_name = project_override or get_bound_project(sender, None)
+    if not project_name:
+        await send_signal_message(sender, "❌ No project bound. Use /bind <project> first, then resend the file.")
+        return
+
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists():
+        await send_signal_message(sender, f"❌ Project {project_name} does not exist in /data/workspace.")
+        return
+    if not (project_dir / ".git").exists():
+        await send_signal_message(sender, f"❌ Project {project_name} is not a git repository.")
+        return
+
+    relative_path_str = path_hint or f"uploads/{filename}"
+    target_path = sanitize_relative_path(project_dir, relative_path_str)
+    if not target_path:
+        await send_signal_message(sender, f"❌ Invalid target path {relative_path_str} -- must stay inside the project and can't touch .git/.")
+        return
+
+    if task_registry.get(sender):
+        await send_signal_message(sender, "⚠️ Another task is already running for you. Send /cancel to stop it first.")
+        return
+
+    await send_signal_message(
+        sender,
+        f"📤 Uploading to repository\n\n"
+        f"Project: {project_name}\n"
+        f"Path: {target_path.relative_to(project_dir)}\n\n"
+        f"⏳ Downloading from Signal..."
+    )
+    t = asyncio.create_task(run_signal_upload_background(sender, attachment_id, project_dir, target_path))
+    task_registry.start(sender, label=f"upload: {target_path.name}", asyncio_task=t)
+
+async def run_signal_upload_background(sender: str, attachment_id: str, project_dir: Path, target_path: Path):
+    try:
+        file_bytes = await download_signal_attachment(attachment_id)
+        res = await run_repo_upload(
+            project_dir, target_path, file_bytes,
+            f"chore(upload): add {target_path.relative_to(project_dir)} via Signal upload",
+            on_proc=lambda proc: task_registry.attach_proc(sender, proc=proc),
+        )
+        if not res["success"]:
+            await send_signal_message(sender, f"❌ {res['error']}")
+            return
+        reply = f"✅ File Uploaded\n\nPath: {res['relative_path']}\nBranch: {res['branch']}\n"
+        compare_url = build_compare_url(res["owner_repo"], res["base_branch"], res["branch"])
+        if compare_url:
+            reply += f"\n🔗 {compare_url}"
+        await send_signal_message(sender, reply)
+    except asyncio.CancelledError:
+        await send_signal_message(sender, f"🛑 Upload Cancelled\n\nPath: {target_path.name}")
+        raise
     except Exception as e:
-        logger.error(f"Signal agent task error: {e}", exc_info=True)
-        await send_signal_message(sender, f"❌ Task {session_id} failed: {e}")
+        logger.error(f"Error in Signal file upload: {e}", exc_info=True)
+        await send_signal_message(sender, f"❌ Upload error: {e}")
+    finally:
+        task_registry.finish(sender)
 
-async def listen_signal_websocket():
-    """Listens for incoming Signal messages over WebSocket."""
-    ws_url = f"{SIGNAL_API_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/v1/receive/{SIGNAL_PHONE_NUMBER}"
-    logger.info(f"Connecting to Signal WebSocket at {ws_url}...")
-
+async def signal_event_listener():
+    """Connects to signal-cli JSON-RPC WebSocket stream to listen for incoming messages."""
+    ws_url = SIGNAL_API_URL.replace("http://", "ws://").replace("https://", "wss://").rstrip("/") + "/v1/receive/" + SIGNAL_PHONE_NUMBER
+    logger.info(f"Connecting to Signal WebSocket stream: {ws_url}")
     while True:
         try:
             async with websockets.connect(ws_url) as ws:
-                logger.info("✅ Connected to Signal message stream.")
-                while True:
-                    raw_msg = await ws.recv()
-                    data = json.loads(raw_msg)
-                    envelope = data.get("envelope", {})
-                    sender = envelope.get("source") or envelope.get("sourceNumber")
-                    data_msg = envelope.get("dataMessage", {})
-                    text = data_msg.get("message")
-
-                    if not sender or not text:
-                        continue
-
-                    # Strict Authorization Check
-                    if SIGNAL_ALLOWED_NUMBER and sender != SIGNAL_ALLOWED_NUMBER:
-                        logger.warning(f"Unauthorized Signal message from {sender}")
-                        continue
-
-                    await handle_command(sender, text)
-
+                logger.info("Connected to Signal WebSocket stream.")
+                async for raw_msg in ws:
+                    try:
+                        data = json.loads(raw_msg)
+                        envelope = data.get("envelope", {})
+                        sender = envelope.get("source") or envelope.get("sourceNumber")
+                        data_msg = envelope.get("dataMessage", {})
+                        text = data_msg.get("message")
+                        attachments = data_msg.get("attachments") or []
+                        if sender and attachments:
+                            asyncio.create_task(handle_signal_upload(sender, attachments[0], text))
+                        elif sender and text:
+                            asyncio.create_task(handle_signal_command(sender, text))
+                    except Exception as parse_err:
+                        logger.warning(f"Error parsing Signal message payload: {parse_err}")
         except Exception as e:
-            logger.warning(f"Signal WebSocket disconnected: {e}. Reconnecting in 5s...")
+            logger.warning(f"Signal WebSocket disconnected: {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
 
-if __name__ == "__main__":
+def main():
+    init_git_credentials()
     if not SIGNAL_PHONE_NUMBER:
-        print("ERROR: SIGNAL_PHONE_NUMBER environment variable is required!", file=sys.stderr)
-        sys.exit(1)
+        print("ℹ️ SIGNAL_PHONE_NUMBER environment variable not set. Bot in standby mode.", file=sys.stderr)
+        import time
+        while True:
+            time.sleep(3600)
+    asyncio.run(signal_event_listener())
 
-    print(f"🔒 Signal Agent Relay Bot starting for {SIGNAL_PHONE_NUMBER}...")
-    asyncio.run(listen_signal_websocket())  # nosec B603
+if __name__ == "__main__":
+    main()

@@ -1,335 +1,700 @@
 #!/usr/bin/env python3
 """
-Discord Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8
+Discord Agent Relay Bot for OpenMediaVault & HP ProLiant Gen8.
 Provides remote command execution, autonomous coding agent dispatch (Aider/Claude Code),
 Git repository synchronization, Obsidian second-brain integration, and LiteLLM gateway telemetry over Discord.
+Powered by agent_station_core.
 """
 
 import os
 import sys
-import re
-import shutil
-import logging
-import asyncio
-import subprocess  # nosec B404
 from pathlib import Path
 from datetime import datetime
+
+# Auto-resolve agent_station_core in sys.path
+_bot_dir = Path(__file__).parent.resolve()
+_root_dir = _bot_dir.parent.resolve()
+for path_cand in [str(_bot_dir), str(_root_dir)]:
+    if path_cand not in sys.path:
+        sys.path.insert(0, path_cand)
+
+import asyncio
+
 import discord
 from discord.ext import commands
-import httpx
-from openai import OpenAI
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+from agent_station_core import task_registry
+from agent_station_core import (
+    WORKSPACE,
+    logger,
+    init_git_credentials,
+    sanitize_project_path,
+    sanitize_branch_name,
+    sanitize_cmd_name,
+    sanitize_relative_path,
+    clone_repository,
+    create_new_repository,
+    git_pull_repo,
+    git_push_repo,
+    git_diff_repo,
+    list_workspace_projects,
+    query_ai_model,
+    list_ai_models,
+    get_modelhelp_markdown,
+    run_autonomous_task,
+    run_claude_cli,
+    run_shell_exec,
+    get_system_status,
+    save_obsidian_note,
+    list_vault_notes,
+    load_custom_commands,
+    save_custom_commands,
+    expand_custom_command,
+    set_bound_project,
+    remove_bound_project,
+    get_bound_project,
+    resolve_project_context_raw,
+    MAX_UPLOAD_BYTES,
+    parse_upload_caption,
+    run_repo_upload,
+    build_compare_url,
 )
-logger = logging.getLogger("DiscordAgentBot")
 
 DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 ALLOWED_USER_ID = os.environ.get("DISCORD_ALLOWED_USER_ID")
-LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-omv-master-key")  # nosec B105
-OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/data/obsidian"))
-WORKSPACE = Path(os.environ.get("WORKSPACE_PATH", "/data/workspace"))
-
-# Git Configuration
-GIT_AUTHOR_NAME = os.environ.get("GIT_AUTHOR_NAME", "OMV AI Agent")
-GIT_AUTHOR_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL", "agent@omv-box.local")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
-BITBUCKET_USER = os.environ.get("BITBUCKET_USERNAME", "")
-BITBUCKET_PASS = os.environ.get("BITBUCKET_APP_PASSWORD", "")
-
-GIT_BIN = shutil.which("git") or "/usr/bin/git"
-TMUX_BIN = shutil.which("tmux") or "/usr/bin/tmux"
-UPTIME_BIN = shutil.which("uptime") or "/usr/bin/uptime"
-DF_BIN = shutil.which("df") or "/bin/df"
-AIDER_BIN = shutil.which("aider") or "aider"
-
-def init_git_credentials():
-    try:
-        subprocess.run([GIT_BIN, "config", "--global", "user.name", GIT_AUTHOR_NAME], check=True)  # nosec B603,B607
-        subprocess.run([GIT_BIN, "config", "--global", "user.email", GIT_AUTHOR_EMAIL], check=True)  # nosec B603,B607
-        subprocess.run([GIT_BIN, "config", "--global", "init.defaultBranch", "main"], check=True)  # nosec B603,B607
-
-        if GITHUB_TOKEN:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://x-access-token:{GITHUB_TOKEN}@github.com/.insteadOf",
-                "https://github.com/"
-            ], check=True)
-        if GITLAB_TOKEN:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://oauth2:{GITLAB_TOKEN}@gitlab.com/.insteadOf",
-                "https://gitlab.com/"
-            ], check=True)
-        if BITBUCKET_USER and BITBUCKET_PASS:
-            subprocess.run([  # nosec B603,B607
-                GIT_BIN, "config", "--global",
-                f"url.https://{BITBUCKET_USER}:{BITBUCKET_PASS}@bitbucket.org/.insteadOf",
-                "https://bitbucket.org/"
-            ], check=True)
-    except Exception as e:
-        logger.warning(f"Could not configure git credentials: {e}")
-
-def sanitize_git_url(url: str) -> str | None:
-    """Validates git URL to prevent command argument injection (e.g. leading dashes)."""
-    if not url:
-        return None
-    url = url.strip()
-    if url.startswith("-"):
-        return None
-    pattern = r"^(https?|git|ssh)://[^\s/$.?#].[^\s]*$|^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(\.git)?$"
-    if re.match(pattern, url):
-        return url
-    return None
-
-def sanitize_branch_name(branch: str) -> str | None:
-    """Validates git branch names to prevent argument injection."""
-    if not branch:
-        return None
-    branch = branch.strip()
-    if branch.startswith("-") or ".." in branch or "\\" in branch or "@{" in branch:
-        return None
-    if re.match(r"^[a-zA-Z0-9_./-]+$", branch):
-        return branch
-    return None
-
-def sanitize_project_path(workspace: Path, project_name: str) -> Path | None:
-    """Validates that project_name resolves strictly within the workspace root to prevent traversal."""
-    if not project_name or ".." in project_name or project_name.startswith(("/", "\\", "-")):
-        return None
-    try:
-        clean_name = project_name.strip().strip("./")
-        if not clean_name or clean_name.startswith("-"):
-            return None
-        target = (workspace / clean_name).resolve()
-        workspace_resolved = workspace.resolve()
-        if workspace_resolved in target.parents or target == workspace_resolved:
-            return target
-        return None
-    except Exception:
-        return None
-
-ai_client = OpenAI(
-    api_key=LITELLM_KEY,
-    base_url=f"{LITELLM_BASE}/v1"
-)
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix=["!", "/"], intents=intents)
+bot = commands.Bot(command_prefix="/", intents=intents, help_command=None)
 
-def is_authorized(ctx) -> bool:
+def is_authorized(ctx: commands.Context) -> bool:
+    """Verifies that the message sender matches DISCORD_ALLOWED_USER_ID."""
     if not ALLOWED_USER_ID:
         return True
-    if not hasattr(ctx, "author") or not ctx.author:
+    if not ctx.author:
         return False
     return str(ctx.author.id) == str(ALLOWED_USER_ID)
 
+async def check_auth(ctx: commands.Context) -> bool:
+    """Replies with an error if the user is unauthorized."""
+    if not is_authorized(ctx):
+        logger.warning(f"Unauthorized Discord access attempt from user ID: {ctx.author.id} ({ctx.author.name})")
+        await ctx.reply("⛔ **Unauthorized access.** Configure your numeric Discord User ID in OMV Agent Station settings.")
+        return False
+    return True
+
+def channel_scope(ctx: commands.Context) -> tuple[str, str | None]:
+    """Resolves the stable (channel_id, thread_id) binding key for a context.
+
+    A Discord Thread has its own stable id distinct from every message posted
+    in it -- using ctx.message.id here (as this used to) makes every message
+    look like a different thread, so a binding set by /bind can never be
+    found again by a later message.
+    """
+    if isinstance(ctx.channel, discord.Thread):
+        parent_id = ctx.channel.parent_id or ctx.channel.id
+        return str(parent_id), str(ctx.channel.id)
+    return str(ctx.channel.id), None
+
+def resolve_ctx_project(ctx: commands.Context, args: list[str]) -> tuple[str | None, list[str]]:
+    """Resolves project context based on thread ID or channel ID."""
+    channel_id, thread_id = channel_scope(ctx)
+    return resolve_project_context_raw(channel_id, thread_id, args, WORKSPACE)
+
+# ---------------------------------------------------------------------------
+# Discord Bot Commands (All 25 Shared Capabilities)
+# ---------------------------------------------------------------------------
+
 @bot.event
 async def on_ready():
-    logger.info(f"✅ Discord Agent Bot logged in as {bot.user} (ID: {bot.user.id})")
+    init_git_credentials()
+    logger.info(f"Discord Agent Bot logged in as {bot.user.name} (ID: {bot.user.id})")
 
-@bot.command(name="help_agent", aliases=["help"])
-async def cmd_help(ctx):
-    if not is_authorized(ctx):
+@bot.command(name="start")
+async def start_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
         return
-    embed = discord.Embed(
-        title="🤖 OMV AI Orchestrator (Discord Relay)",
-        description="24/7 autonomous software engineering & agent relay running on your OpenMediaVault server.",
-        color=discord.Color.blue()
+    await ctx.reply(
+        "🤖 **OMV AI Agent Station — Discord Relay Online**\n\n"
+        "24/7 AI-powered development server connected.\n\n"
+        "⚡ **Core Commands:**\n"
+        "• `/task [project] <prompt>` — Dispatch autonomous coding agent on branch\n"
+        "• `/chat <message>` — Ask questions via smart router\n"
+        "• `/gemini <prompt>` | `/gpt4 <prompt>` — Direct model shortcuts\n"
+        "• `/claude <prompt>` — Run Claude Code CLI in workspace\n"
+        "• `/cancel` — Stop the task/claude/exec command currently running\n"
+        "• `/projects` — List workspace repositories\n"
+        "• `/newrepo <name> [desc]` — Create new GitHub repo\n"
+        "• `/clone <url> [name]` — Clone git repository\n"
+        "• `/addcmd <name> <template>` — Create custom dynamic shortcuts\n"
+        "• `/status` — View server CPU/RAM & tmux sessions\n"
+        "• `/help` — Full handbook\n\n"
+        "📤 Send any file/image directly to a bound channel to commit it into the project's repo."
     )
-    embed.add_field(name="!task <project> <prompt>", value="Runs autonomous coding loop, creates branch & auto-pushes", inline=False)
-    embed.add_field(name="!chat <message>", value="Ask architecture & coding questions using Gemini 3.7 / Claude 3.7", inline=False)
-    embed.add_field(name="!clone <url> [name]", value="Clone GitHub / GitLab / Bitbucket repo into workspace", inline=False)
-    embed.add_field(name="!pull / !push / !branch / !diff", value="Manage git versioning & branch syncing", inline=False)
-    embed.add_field(name="!projects / !vault / !models / !status", value="Server status, Obsidian notes & active AI models", inline=False)
-    await ctx.send(embed=embed)
 
-@bot.command(name="status")
-async def cmd_status(ctx):
-    if not is_authorized(ctx):
+@bot.command(name="help")
+async def help_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
         return
-    try:
-        tmux_out = subprocess.check_output([TMUX_BIN, "list-sessions"], stderr=subprocess.STDOUT, text=True).strip()  # nosec B603,B607
-    except Exception:
-        tmux_out = "No active tmux sessions."
-    try:
-        uptime_out = subprocess.check_output([UPTIME_BIN], text=True).strip()  # nosec B603,B607
-        df_out = subprocess.check_output([DF_BIN, "-h", "/data/workspace"], text=True).strip().splitlines()[-1]  # nosec B603,B607
-    except Exception:
-        uptime_out = "N/A"
-        df_out = "N/A"
-
-    embed = discord.Embed(title="🖥️ OMV Server Status", color=discord.Color.green())
-    embed.add_field(name="⏱️ Uptime", value=f"`{uptime_out}`", inline=False)
-    embed.add_field(name="💾 Workspace Disk", value=f"`{df_out}`", inline=False)
-    embed.add_field(name="🧵 Active Agent Sessions", value=f"```\n{tmux_out}\n```", inline=False)
-    await ctx.send(embed=embed)
-
-@bot.command(name="models")
-async def cmd_models(ctx):
-    if not is_authorized(ctx):
-        return
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{LITELLM_BASE}/models", headers={"Authorization": f"Bearer {LITELLM_KEY}"})
-            if resp.status_code == 200:
-                data = resp.json()
-                models = [m.get("id") for m in data.get("data", [])]
-                model_str = "\n".join([f"• `{m}`" for m in models])
-                embed = discord.Embed(title="✅ Active AI Model Endpoints", description=f"{model_str}\n\n**Virtual Routers:** `coder-fast` | `coder-smart` | `reasoning-heavy`", color=discord.Color.purple())
-                await ctx.send(embed=embed)
-            else:
-                await ctx.send(f"⚠️ LiteLLM HTTP {resp.status_code}")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to query LiteLLM: {e}")
-
-@bot.command(name="projects")
-async def cmd_projects(ctx):
-    if not is_authorized(ctx):
-        return
-    if not WORKSPACE.exists():
-        await ctx.send("📁 Workspace directory not mounted.")
-        return
-    projects = [p.name for p in WORKSPACE.iterdir() if p.is_dir() and not p.name.startswith(".")]
-    proj_str = "\n".join([f"📁 `{p}`" for p in projects]) if projects else "No projects found."
-    await ctx.send(embed=discord.Embed(title="📂 Workspace Projects", description=proj_str, color=discord.Color.gold()))
-
-@bot.command(name="clone")
-async def cmd_clone(ctx, git_url: str, folder_name: str = None):
-    if not is_authorized(ctx):
-        return
-    valid_url = sanitize_git_url(git_url)
-    if not valid_url:
-        await ctx.send("❌ Invalid git URL format.")
-        return
-
-    folder = folder_name if folder_name else valid_url.rstrip("/").split("/")[-1].replace(".git", "")
-    target = sanitize_project_path(WORKSPACE, folder)
-    if not target:
-        await ctx.send("❌ Invalid folder name.")
-        return
-
-    if target.exists():
-        await ctx.send(f"⚠️ Folder `{folder}` already exists in workspace.")
-        return
-
-    msg = await ctx.send(f"⏳ Cloning `{valid_url}` into `{folder}`...")
-    proc = await asyncio.create_subprocess_exec(GIT_BIN, "clone", "--", valid_url, str(target), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-    _, stderr = await proc.communicate()
-    if proc.returncode == 0:
-        await msg.edit(content=f"✅ Successfully cloned `{folder}`!\nRun `!task {folder} <instructions>` to begin coding.")
-    else:
-        await msg.edit(content=f"❌ Git clone failed:\n```\n{stderr.decode('utf-8', errors='replace')}\n```")
+    await ctx.reply(
+        "📖 **Agent Station Handbook & Command Reference**\n\n"
+        "**1. AI Models & Chat:**\n"
+        "• `/chat [-m model] <question>` — Query smart router or specific model\n"
+        "• `/gemini <prompt>` — Google Gemini 3.6 Flash shortcut\n"
+        "• `/gpt4 <prompt>` — GitHub Models GPT-4o shortcut\n"
+        "• `/models` — List active model endpoints\n"
+        "• `/modelhelp` — Detailed capabilities & context sizes\n\n"
+        "**2. Coding Agent & Execution:**\n"
+        "• `/task [project] <instructions>` — Autonomous coding agent\n"
+        "• `/claude <prompt>` — Claude Code CLI execution\n"
+        "• `/exec <cmd>` — Sandboxed bash execution\n"
+        "• `/cancel` — Stop the task/claude/exec command currently running\n\n"
+        "**3. Git & Workspaces:**\n"
+        "• `/projects` | `/newrepo` | `/clone` | `/pull` | `/push` | `/branch` | `/diff`\n\n"
+        "**4. Notes & Vault:**\n"
+        "• `/note <Title> | <Content>` | `/vault`\n\n"
+        "**5. Custom Shortcuts:**\n"
+        "• `/addcmd <name> <template>` | `/delcmd <name>` | `/cmds`\n\n"
+        "**6. File Upload:**\n"
+        "• Send any file/image to a bound channel to commit it to the repo\n"
+        "• Caption `path/to/file.txt` sets the destination path (defaults to `uploads/<filename>`)\n"
+        "• Caption `project: path/to/file.txt` targets a project without binding\n"
+        "• `/bind <project>` | `/unbind` — bind this channel to a project"
+    )
 
 @bot.command(name="chat")
-async def cmd_chat(ctx, *, query: str):
-    if not is_authorized(ctx):
+async def chat_cmd(ctx: commands.Context, *, message: str = ""):
+    if not await check_auth(ctx):
         return
-    async with ctx.typing():
-        try:
-            res = ai_client.chat.completions.create(
-                model="coder-smart",
-                messages=[{"role": "user", "content": query}],
-                max_tokens=2048
-            )
-            reply = res.choices[0].message.content
-            if len(reply) > 1950:
-                reply = reply[:1950] + "\n\n*(Truncated for Discord)*"
-            await ctx.send(reply)
-        except Exception as e:
-            await ctx.send(f"❌ Error during AI generation: {e}")
+    if not message:
+        await ctx.reply("Usage: `/chat [-m model] <your question>`")
+        return
+
+    parts = message.split()
+    model = "coder-smart"
+    prompt = message
+    if parts and parts[0] in ("-m", "--model") and len(parts) > 2:
+        model = parts[1]
+        prompt = " ".join(parts[2:])
+
+    msg = await ctx.reply(f"⏳ Querying `{model}`...")
+    res = await query_ai_model(prompt, model=model)
+    if res["success"]:
+        ans = res["answer"]
+        if len(ans) > 1900:
+            ans = ans[:1900] + "\n...(truncated)"
+        await msg.edit(content=ans)
+    else:
+        await msg.edit(content=f"❌ AI Query error: {res.get('error', 'Unknown error')}")
+
+@bot.command(name="gemini")
+async def gemini_cmd(ctx: commands.Context, *, prompt: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not prompt:
+        await ctx.reply("Usage: `/gemini <your question>`")
+        return
+    await chat_cmd(ctx, message=f"-m gemini-3.6-flash {prompt}")
+
+@bot.command(name="gpt4")
+async def gpt4_cmd(ctx: commands.Context, *, prompt: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not prompt:
+        await ctx.reply("Usage: `/gpt4 <your question>`")
+        return
+    await chat_cmd(ctx, message=f"-m github-gpt-4o {prompt}")
+
+@bot.command(name="models")
+async def models_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    models, live = await list_ai_models()
+    model_str = "\n".join([f"• `{m}`" for m in models])
+    label = "Active AI Models" if live else "⚠️ Fallback AI Models (LiteLLM gateway unreachable, list may be stale)"
+    await ctx.reply(f"🤖 **{label} ({len(models)}):**\n\n{model_str}\n\n*Routers:* `coder-smart`, `reasoning-heavy`")
+
+@bot.command(name="modelhelp")
+async def modelhelp_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    text = get_modelhelp_markdown().replace("*", "**")
+    await ctx.reply(text)
+
+@bot.command(name="projects")
+async def projects_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    projects = list_workspace_projects()
+    if not projects:
+        await ctx.reply("📁 No workspace projects found.")
+        return
+    proj_str = "\n".join([f"• `📂 {p}`" for p in projects])
+    await ctx.reply(f"📁 **Workspace Projects ({len(projects)}):**\n\n{proj_str}")
+
+@bot.command(name="clone")
+async def clone_cmd(ctx: commands.Context, git_url: str = "", folder_name: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not git_url:
+        await ctx.reply("Usage: `/clone <git-url> [custom-folder-name]`")
+        return
+
+    msg = await ctx.reply(f"⏳ Cloning `{git_url}`...")
+    res = await clone_repository(git_url, folder_name)
+    if res["success"]:
+        f_name = res["folder_name"]
+        await msg.edit(content=(
+            f"✅ **Repository Cloned & Registered as Active Project!**\n\n"
+            f"📁 **Project:** `{f_name}`\n"
+            f"💾 **Path:** `/data/workspace/{f_name}`\n"
+            f"📓 **Obsidian Spec:** `/data/obsidian/Projects/{f_name}/`\n\n"
+            f"Run tasks with `/task {f_name} \"instructions\"`"
+        ))
+    else:
+        await msg.edit(content=f"❌ Git clone failed: {res.get('error')}")
+
+@bot.command(name="newrepo")
+async def newrepo_cmd(ctx: commands.Context, repo_name: str = "", *, description: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not repo_name:
+        await ctx.reply("Usage: `/newrepo <repo-name> [description]`")
+        return
+
+    msg = await ctx.reply(f"⏳ Creating remote GitHub repo `{repo_name}`...")
+    res = await create_new_repository(repo_name, description)
+    if res["success"]:
+        await msg.edit(content=(
+            f"✅ **New GitHub Repository Created!**\n\n"
+            f"📁 **Project:** `{res['repo_name']}`\n"
+            f"🔗 **URL:** {res.get('html_url')}\n"
+            f"💾 **Path:** `/data/workspace/{res['repo_name']}`"
+        ))
+    else:
+        await msg.edit(content=f"❌ Failed to create repo: {res.get('error')}")
+
+@bot.command(name="pull")
+async def pull_cmd(ctx: commands.Context, project_name: str = ""):
+    if not await check_auth(ctx):
+        return
+    proj, _ = resolve_ctx_project(ctx, [project_name] if project_name else [])
+    if not proj:
+        await ctx.reply("Usage: `/pull [project-name]`")
+        return
+    msg = await ctx.reply(f"⏳ Pulling latest changes for `{proj}`...")
+    res = await git_pull_repo(proj)
+    if res["success"]:
+        await msg.edit(content=f"✅ **Git Pull ({proj}):**\n```{res['output'][:1800]}```")
+    else:
+        await msg.edit(content=f"❌ Git pull failed: {res.get('error')}")
+
+@bot.command(name="push")
+async def push_cmd(ctx: commands.Context, project_name: str = "", branch: str = "main"):
+    if not await check_auth(ctx):
+        return
+    proj, remaining = resolve_ctx_project(ctx, [project_name] if project_name else [])
+    if not proj:
+        await ctx.reply("Usage: `/push [project-name] [branch]`")
+        return
+    target_branch = remaining[0] if remaining else branch
+    msg = await ctx.reply(f"⏳ Pushing `{proj}` to `{target_branch}`...")
+    res = await git_push_repo(proj, target_branch)
+    if res["success"]:
+        await msg.edit(content=f"✅ **Git Push ({proj} -> {target_branch}):**\n```{res['output'][:1800]}```")
+    else:
+        await msg.edit(content=f"❌ Git push failed: {res.get('error')}")
+
+@bot.command(name="branch")
+async def branch_cmd(ctx: commands.Context, project_name: str = "", branch_name: str = ""):
+    if not await check_auth(ctx):
+        return
+    proj, remaining = resolve_ctx_project(ctx, [project_name] if project_name else [])
+    if not proj:
+        await ctx.reply("Usage: `/branch [project-name] [new-branch-name]`")
+        return
+
+    p_dir = sanitize_project_path(WORKSPACE, proj)
+    if not p_dir or not (p_dir / ".git").exists():
+        await ctx.reply(f"❌ `{proj}` is not a valid git repository.")
+        return
+
+    new_b = remaining[0] if remaining else branch_name
+    if not new_b:
+        res = await run_shell_exec("git branch -a", cwd=p_dir)
+        await ctx.reply(f"🌿 **Branches for `{proj}`:**\n```{res['output'][:1800]}```")
+    else:
+        clean_b = sanitize_branch_name(new_b)
+        if not clean_b:
+            await ctx.reply("❌ Invalid branch name format.")
+            return
+        res = await run_shell_exec(f"git checkout -B {clean_b}", cwd=p_dir)
+        if res["success"]:
+            await ctx.reply(f"🌿 Switched to branch `{clean_b}` in project `{proj}`.")
+        else:
+            await ctx.reply(f"❌ Branch checkout failed: {res.get('output')}")
+
+@bot.command(name="diff")
+async def diff_cmd(ctx: commands.Context, project_name: str = ""):
+    if not await check_auth(ctx):
+        return
+    proj, _ = resolve_ctx_project(ctx, [project_name] if project_name else [])
+    if not proj:
+        await ctx.reply("Usage: `/diff [project-name]`")
+        return
+    res = await git_diff_repo(proj)
+    if res["success"]:
+        diff_text = res["diff"] or "(No uncommitted diff)"
+        if len(diff_text) > 1800:
+            diff_text = diff_text[:1800] + "\n...(truncated)"
+        await ctx.reply(f"🔍 **Git Diff (`{proj}`):**\n```diff\n{diff_text}\n```")
+    else:
+        await ctx.reply(f"❌ Error: {res.get('error')}")
 
 @bot.command(name="task")
-async def cmd_task(ctx, project_name: str, *, instructions: str):
-    if not is_authorized(ctx):
+async def task_cmd(ctx: commands.Context, *, args_str: str = ""):
+    if not await check_auth(ctx):
         return
-    project_dir = sanitize_project_path(WORKSPACE, project_name)
-    if not project_dir or not project_dir.exists():
-        await ctx.send(f"❌ Project `{project_name}` does not exist in `/data/workspace`.")
+    if not args_str:
+        await ctx.reply("Usage: `/task [project-name] <coding instructions>`")
+        return
+
+    raw_parts = args_str.split()
+    proj, remaining = resolve_ctx_project(ctx, raw_parts)
+    if not proj or not remaining:
+        await ctx.reply("Usage: `/task [project-name] <coding instructions>`")
+        return
+
+    instructions = " ".join(remaining)
+    p_dir = sanitize_project_path(WORKSPACE, proj)
+    if not p_dir or not p_dir.exists():
+        await ctx.reply(f"❌ Project directory `{proj}` not found in `/data/workspace`.")
+        return
+
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
         return
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_id = f"task_{timestamp}"
     task_branch = f"agent/{session_id}"
 
-    embed = discord.Embed(
-        title=f"🚀 Launching Autonomous Agent Task ({session_id})",
-        color=discord.Color.orange()
-    )
-    embed.add_field(name="Project", value=f"`{project_name}`", inline=True)
-    embed.add_field(name="Branch", value=f"`{task_branch}`", inline=True)
-    embed.add_field(name="Instruction", value=instructions, inline=False)
-    embed.set_footer(text="Agent is executing ReAct loop in background...")
-    status_msg = await ctx.send(embed=embed)
+    msg = await ctx.reply(f"🚀 **Launching Autonomous Agent Task** for `{proj}` on `{task_branch}`...")
+    t = asyncio.create_task(run_task_background(scope, msg, proj, p_dir, instructions, session_id, task_branch))
+    task_registry.start(*scope, label=f"task: {instructions}", asyncio_task=t)
 
-    asyncio.create_task(run_discord_agent_task(ctx, status_msg, project_dir, instructions, session_id, task_branch))
-
-async def run_discord_agent_task(ctx, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str):
+async def run_task_background(scope, msg, proj, p_dir, instructions, session_id, task_branch):
     try:
-        is_git = (project_dir / ".git").exists()
-        if is_git:
-            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
-
-        cmd = [
-            AIDER_BIN,
-            "--openai-api-base", f"{LITELLM_BASE}/v1",
-            "--openai-api-key", LITELLM_KEY,
-            "--model", "openai/coder-smart",
-            "--message", instructions,
-            "--auto-commits",
-            "--yes-always",
-            "--no-git-commit-prefix"
-        ]
-
-        proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
-            *cmd,
-            cwd=str(project_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+        res = await run_autonomous_task(
+            p_dir, instructions, session_id, task_branch,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
         )
-        stdout, _ = await proc.communicate()
-        out_text = stdout.decode("utf-8", errors="replace")
+        if res["success"]:
+            summary = res["summary"]
+            if len(summary) > 1800:
+                summary = summary[:1800] + "\n...(truncated)"
+            await msg.edit(content=f"✅ **Task Completed (`{proj}`):**\n```{summary}```")
+        else:
+            await msg.edit(content=f"❌ Task execution error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await msg.edit(content=f"🛑 **Task Cancelled** (`{proj}`, branch `{task_branch}`)")
+        raise
+    finally:
+        task_registry.finish(*scope)
 
-        push_status = "Local commit only."
-        diff_summary = "No new commits."
-        if is_git:
-            d_proc = await asyncio.create_subprocess_exec(GIT_BIN, "diff", "main..." + task_branch, "--stat", cwd=str(project_dir), stdout=asyncio.subprocess.PIPE)  # nosec B603,B607
-            d_out, _ = await d_proc.communicate()
-            diff_summary = d_out.decode("utf-8", errors="replace").strip() or "Changes committed."
+@bot.command(name="claude")
+async def claude_cmd(ctx: commands.Context, *, prompt: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not prompt:
+        await ctx.reply("Usage: `/claude <instructions>`")
+        return
 
-            try:
-                p_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", task_branch, cwd=str(project_dir), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)  # nosec B603,B607
-                await p_proc.communicate()
-                if p_proc.returncode == 0:
-                    push_status = f"✅ Branch pushed to remote: `{task_branch}`"
-            except Exception as pe:
-                logger.info(f"Remote push skipped: {pe}")
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
+        return
 
-        result_embed = discord.Embed(
-            title=f"✅ Agent Task Completed! ({session_id})",
-            color=discord.Color.green()
+    msg = await ctx.reply("🤖 **Dispatching Claude Code CLI...**")
+    t = asyncio.create_task(run_claude_background(scope, msg, prompt))
+    task_registry.start(*scope, label=f"claude: {prompt}", asyncio_task=t)
+
+async def run_claude_background(scope, msg, prompt):
+    try:
+        res = await run_claude_cli(
+            WORKSPACE, prompt,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
         )
-        result_embed.add_field(name="Project", value=f"`{project_dir.name}`", inline=True)
-        result_embed.add_field(name="Branch", value=f"`{task_branch}`", inline=True)
-        result_embed.add_field(name="Remote Push", value=push_status, inline=False)
-        result_embed.add_field(name="Git Changes", value=f"```\n{diff_summary[:800]}\n```", inline=False)
-        if out_text:
-            result_embed.add_field(name="Agent Log Excerpt", value=f"```\n{out_text[-900:]}\n```", inline=False)
+        if res["success"]:
+            out = res["output"]
+            if len(out) > 1900:
+                out = out[:1900] + "\n...(truncated)"
+            await msg.edit(content=f"✅ **Claude Code:**\n\n{out}")
+        else:
+            await msg.edit(content=f"❌ Claude error: {res.get('error')}")
+    except asyncio.CancelledError:
+        await msg.edit(content="🛑 **Claude Code Cancelled**")
+        raise
+    finally:
+        task_registry.finish(*scope)
 
-        await status_msg.edit(embed=result_embed)
+@bot.command(name="exec")
+async def exec_cmd(ctx: commands.Context, *, shell_cmd: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not shell_cmd:
+        await ctx.reply("Usage: `/exec <shell command>`")
+        return
 
+    scope = channel_scope(ctx)
+    if task_registry.get(*scope):
+        await ctx.reply("⚠️ Another task is already running in this channel. Use `/cancel` to stop it first.")
+        return
+
+    msg = await ctx.reply(f"⏳ Executing: `{shell_cmd}`...")
+    t = asyncio.create_task(run_exec_background(scope, msg, shell_cmd))
+    task_registry.start(*scope, label=f"exec: {shell_cmd}", asyncio_task=t)
+
+async def run_exec_background(scope, msg, shell_cmd):
+    try:
+        res = await run_shell_exec(
+            shell_cmd, cwd=WORKSPACE,
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
+        )
+        out = res["output"]
+        if len(out) > 1800:
+            out = out[:1800] + "\n...(truncated)"
+        await msg.edit(content=f"🖥️ **Output:**\n```{out}```")
+    except asyncio.CancelledError:
+        await msg.edit(content=f"🛑 **Cancelled:** `{shell_cmd}`")
+        raise
+    finally:
+        task_registry.finish(*scope)
+
+@bot.command(name="cancel", aliases=["stop"])
+async def cancel_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    scope = channel_scope(ctx)
+    label = await task_registry.cancel(*scope)
+    if label is None:
+        await ctx.reply("ℹ️ Nothing is currently running here to cancel.")
+        return
+    await ctx.reply(f"🛑 Cancelling: `{label}`...")
+
+@bot.command(name="status")
+async def status_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    metrics = get_system_status()
+    await ctx.reply(
+        f"🖥️ **OMV Server Status**\n\n"
+        f"⏱️ **Uptime:** `{metrics['uptime']}`\n"
+        f"🧠 **RAM:** `{metrics['ram']}`\n"
+        f"💾 **Disk Space:** `{metrics['disk']}`\n\n"
+        f"🧵 **Active Tmux Sessions:**\n```{metrics['tmux']}```"
+    )
+
+@bot.command(name="note")
+async def note_cmd(ctx: commands.Context, *, note_text: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not note_text:
+        await ctx.reply("Usage: `/note <Title> | <Content>`")
+        return
+    if "|" in note_text:
+        title, content = note_text.split("|", 1)
+    else:
+        title = f"Quick Note {datetime.now().strftime('%Y-%m-%d %H%M')}"
+        content = note_text
+    res = save_obsidian_note(title.strip(), content.strip())
+    if res["success"]:
+        await ctx.reply(f"✅ **Note Saved to Obsidian:** `{res['path']}`")
+    else:
+        await ctx.reply(f"❌ Failed to save note: {res.get('error')}")
+
+@bot.command(name="vault")
+async def vault_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    res = list_vault_notes()
+    if res["success"]:
+        recent_str = "\n".join([f"• `{f}`" for f in res["recent"]]) if res["recent"] else "No notes found."
+        await ctx.reply(f"📓 **Obsidian Vault ({res['total_notes']} notes):**\n\n{recent_str}")
+    else:
+        await ctx.reply(f"❌ Error: {res.get('error')}")
+
+@bot.command(name="addcmd")
+async def addcmd_cmd(ctx: commands.Context, name: str = "", *, template: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not name or not template:
+        await ctx.reply("Usage: `/addcmd <command-name> <command-template>`")
+        return
+    san_name = sanitize_cmd_name(name)
+    if not san_name:
+        await ctx.reply("❌ Invalid command name format.")
+        return
+    cmds = load_custom_commands()
+    cmds[san_name] = template
+    save_custom_commands(cmds)
+    await ctx.reply(f"✅ **Custom Shortcut Registered:** `/{san_name}` ➔ `{template}`")
+
+@bot.command(name="delcmd")
+async def delcmd_cmd(ctx: commands.Context, name: str = ""):
+    if not await check_auth(ctx):
+        return
+    san_name = sanitize_cmd_name(name)
+    if not san_name:
+        await ctx.reply("Usage: `/delcmd <command-name>`")
+        return
+    cmds = load_custom_commands()
+    if san_name in cmds:
+        del cmds[san_name]
+        save_custom_commands(cmds)
+        await ctx.reply(f"✅ Deleted shortcut `/{san_name}`.")
+    else:
+        await ctx.reply(f"⚠️ Shortcut `/{san_name}` not found.")
+
+@bot.command(name="cmds")
+async def customcmds_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    cmds = load_custom_commands()
+    if not cmds:
+        await ctx.reply("📋 No custom shortcuts configured yet. Create one with `/addcmd`.")
+        return
+    lines = [f"• `/{k}` ➔ `{v}`" for k, v in sorted(cmds.items())]
+    await ctx.reply(f"⚡ **Custom Shortcuts ({len(cmds)}):**\n\n" + "\n".join(lines))
+
+@bot.command(name="bind")
+async def bind_cmd(ctx: commands.Context, project_name: str = ""):
+    if not await check_auth(ctx):
+        return
+    if not project_name:
+        await ctx.reply("Usage: `/bind <project-name>`")
+        return
+    p_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not p_dir or not p_dir.exists():
+        await ctx.reply(f"❌ Project `{project_name}` not found in `/data/workspace`.")
+        return
+    channel_id, thread_id = channel_scope(ctx)
+    set_bound_project(channel_id, thread_id, project_name)
+    await ctx.reply(f"✅ Channel bound to project `{project_name}`. All tasks now target this repo.")
+
+@bot.command(name="unbind")
+async def unbind_cmd(ctx: commands.Context):
+    if not await check_auth(ctx):
+        return
+    channel_id, thread_id = channel_scope(ctx)
+    remove_bound_project(channel_id, thread_id)
+    await ctx.reply("✅ Unbound project context from this channel.")
+
+# ---------------------------------------------------------------------------
+# File Upload to GitHub (parity with Telegram's handlers/upload.py)
+# ---------------------------------------------------------------------------
+
+async def handle_discord_upload(message: discord.Message):
+    """Entry point: any message with an attachment is treated as a repo upload."""
+    if not is_authorized(message):
+        return
+
+    attachment = message.attachments[0]
+    if attachment.size > MAX_UPLOAD_BYTES:
+        await message.reply(f"❌ File is {attachment.size / 1024 / 1024:.1f} MB -- max upload size is {MAX_UPLOAD_BYTES // 1024 // 1024} MB.")
+        return
+
+    project_override, path_hint = parse_upload_caption(message.content)
+    channel_id, thread_id = channel_scope(message)
+    project_name = project_override or get_bound_project(channel_id, thread_id)
+    if not project_name:
+        await message.reply("❌ No project bound to this channel.\n\nUse `/bind <project>` first, then resend the file.")
+        return
+
+    project_dir = sanitize_project_path(WORKSPACE, project_name)
+    if not project_dir or not project_dir.exists():
+        await message.reply(f"❌ Project `{project_name}` does not exist in `/data/workspace`.")
+        return
+    if not (project_dir / ".git").exists():
+        await message.reply(f"❌ Project `{project_name}` is not a git repository.")
+        return
+
+    relative_path_str = path_hint or f"uploads/{attachment.filename}"
+    target_path = sanitize_relative_path(project_dir, relative_path_str)
+    if not target_path:
+        await message.reply(f"❌ Invalid target path `{relative_path_str}` -- must stay inside the project and can't touch `.git/`.")
+        return
+
+    scope = channel_scope(message)
+    if task_registry.get(*scope):
+        await message.reply("⚠️ Another task is already running here. Use `/cancel` to stop it first.")
+        return
+
+    status_msg = await message.reply(
+        f"📤 **Uploading to repository**\n\n"
+        f"📁 Project: `{project_name}`\n"
+        f"📄 Path: `{target_path.relative_to(project_dir)}`\n\n"
+        f"⏳ Downloading from Discord..."
+    )
+    t = asyncio.create_task(run_discord_upload_background(scope, status_msg, attachment, project_dir, target_path))
+    task_registry.start(*scope, label=f"upload: {target_path.name}", asyncio_task=t)
+
+async def run_discord_upload_background(scope, status_msg, attachment, project_dir: Path, target_path: Path):
+    try:
+        file_bytes = await attachment.read()
+        res = await run_repo_upload(
+            project_dir, target_path, file_bytes,
+            f"chore(upload): add {target_path.relative_to(project_dir)} via Discord upload",
+            on_proc=lambda proc: task_registry.attach_proc(*scope, proc=proc),
+        )
+        if not res["success"]:
+            await status_msg.edit(content=f"❌ {res['error']}")
+            return
+
+        reply = f"✅ **File Uploaded**\n\n📄 Path: `{res['relative_path']}`\n🌿 Branch: `{res['branch']}`\n"
+        compare_url = build_compare_url(res["owner_repo"], res["base_branch"], res["branch"])
+        if compare_url:
+            reply += f"\n🔗 [Open compare / create PR]({compare_url})"
+        await status_msg.edit(content=reply)
+    except asyncio.CancelledError:
+        await status_msg.edit(content=f"🛑 **Upload Cancelled**\n\n📄 Path: `{target_path.name}`")
+        raise
     except Exception as e:
-        logger.error(f"Error in Discord task: {e}", exc_info=True)
-        await ctx.send(f"❌ Task `{session_id}` failed: {e}")
+        logger.error(f"Error in Discord file upload: {e}", exc_info=True)
+        await status_msg.edit(content=f"❌ Upload error: {e}")
+    finally:
+        task_registry.finish(*scope)
+
+# Dynamic shortcut fallback
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+    if message.attachments:
+        await handle_discord_upload(message)
+        return
+    if message.content.startswith("/"):
+        parts = message.content.lstrip("/").split(maxsplit=1)
+        cmd_name = parts[0].lower()
+        passed_args = parts[1] if len(parts) > 1 else ""
+        expanded = expand_custom_command(cmd_name, passed_args)
+        if expanded and not bot.get_command(cmd_name):
+            ctx = await bot.get_context(message)
+            exp_parts = expanded.split()
+            target_cmd = bot.get_command(exp_parts[0].lstrip("/"))
+            if target_cmd:
+                await target_cmd(ctx, *exp_parts[1:])
+                return
+    await bot.process_commands(message)
+
+def main():
+    if not DISCORD_TOKEN:
+        print("ℹ️ DISCORD_BOT_TOKEN environment variable not set. Bot in standby mode.", file=sys.stderr)
+        import time
+        while True:
+            time.sleep(3600)
+    bot.run(DISCORD_TOKEN)
 
 if __name__ == "__main__":
-    if not DISCORD_TOKEN:
-        print("ERROR: DISCORD_BOT_TOKEN environment variable required!", file=sys.stderr)
-        sys.exit(1)
-
-    print("🤖 Discord Agent Relay Bot starting...")
-    bot.run(DISCORD_TOKEN)  # nosec B603
+    main()

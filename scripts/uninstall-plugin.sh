@@ -57,7 +57,7 @@ mkdir -p /var/cache/openmediavault/archives 2>/dev/null || true
 find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null || true
 
 if command -v omv-mkworkbench >/dev/null 2>&1; then
-    omv-mkworkbench all 2>/dev/null || true
+    omv-mkworkbench all || true
 fi
 
 # 5. Refresh OpenMediaVault daemons

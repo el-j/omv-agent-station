@@ -12,15 +12,27 @@
 
 model_list:
   # ----------------------------------------------------------------------------
-  # TIER 1: GOOGLE AI STUDIO (Gemini 3.7 & 2.5 Workhorse Models)
+  # TIER 1: GOOGLE AI STUDIO (Gemini 3.6, 3.7 & 2.5 Workhorse Models)
   # Docs: https://ai.google.dev/gemini-api/docs/models/gemini
   # ----------------------------------------------------------------------------
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 1000
+      tpm: 4000000
+
   - model_name: gemini-3.7-flash
     litellm_params:
       model: gemini/gemini-3.7-flash
       api_key: os.environ/GEMINI_API_KEY
       rpm: 1000
       tpm: 4000000
+
+  - model_name: gemini-flash-latest
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GEMINI_API_KEY
 
   - model_name: gemini-3.7-pro
     litellm_params:
@@ -114,16 +126,106 @@ model_list:
       api_key: os.environ/GITHUB_TOKEN
 
   # ----------------------------------------------------------------------------
+  # TIER 4: MISTRAL AI, DEEPSEEK & OPENROUTER / Z.AI
+  # ----------------------------------------------------------------------------
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: codestral
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: openrouter-auto
+    litellm_params:
+      model: openrouter/auto
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # ----------------------------------------------------------------------------
+  # TIER 4.5: OPENROUTER FREE-TIER MODELS ($0/token -- tried before paid providers
+  # in the virtual routers below). Snapshot of openrouter.ai/api/v1/models'
+  # zero-price entries as of 2026-08-26 -- OpenRouter's free catalog changes
+  # over time (models get added/retired), re-check periodically.
+  # ----------------------------------------------------------------------------
+  - model_name: openrouter-laguna-s-free
+    litellm_params:
+      model: openrouter/poolside/laguna-s-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-laguna-xs-free
+    litellm_params:
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-north-mini-code-free
+    litellm_params:
+      model: openrouter/cohere/north-mini-code:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-super-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-ultra-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-nemotron-lightning-free
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: openrouter-glm-free
+    litellm_params:
+      model: openrouter/z-ai/glm-5.2:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: custom-llm
+    litellm_params:
+      model: openai/custom-model
+      api_base: os.environ/CUSTOM_API_BASE
+      api_key: os.environ/CUSTOM_API_KEY
+
+  # ----------------------------------------------------------------------------
   # VIRTUAL SMART ROUTERS WITH AUTOMATIC FAILOVER & REDUNDANCY
   # ----------------------------------------------------------------------------
   # 1. Virtual Model: 'coder-fast' (Triage, repo mapping, quick single-file changes)
+  # Free OpenRouter deployments listed first: usage-based-routing prefers the
+  # least-used deployment in the group, so with no OPENROUTER_API_KEY set these
+  # calls simply fail fast and fall through to the paid deployments below.
+  - model_name: coder-fast
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-fast
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-fast
     litellm_params:
       model: gemini/gemini-3.7-flash
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-fast
     litellm_params:
-      model: gemini/gemini-2.5-flash
+      model: gemini/gemini-flash-latest
       api_key: os.environ/GEMINI_API_KEY
   - model_name: coder-fast
     litellm_params:
@@ -131,7 +233,35 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 
   # 2. Virtual Model: 'coder-smart' (Autonomous agentic loops, deep bug-fixing, refactoring)
-  # Direct Anthropic -> Vertex AI Claude -> Gemini 3.7 Pro -> Gemini 3.7 Flash -> GitHub Copilot
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/poolside/laguna-s-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/cohere/north-mini-code:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: gemini/gemini-3.7-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: coder-smart
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
   - model_name: coder-smart
     litellm_params:
       model: anthropic/claude-3-7-sonnet-20250219
@@ -143,38 +273,27 @@ model_list:
       vertex_project: os.environ/VERTEX_PROJECT_ID
       vertex_location: os.environ/VERTEX_LOCATION
       vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
-  - model_name: coder-smart
-    litellm_params:
-      model: gemini/gemini-3.7-pro
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: coder-smart
-    litellm_params:
-      model: gemini/gemini-3.7-flash
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: coder-smart
-    litellm_params:
-      model: openai/gpt-4o
-      api_base: https://models.inference.ai.azure.com
-      api_key: os.environ/GITHUB_TOKEN
 
   # 3. Virtual Model: 'reasoning-heavy' (Architecture design, math, deep analysis)
   - model_name: reasoning-heavy
     litellm_params:
-      model: anthropic/claude-3-7-sonnet-20250219
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: openrouter/z-ai/glm-5.2:free
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
-      model: vertex_ai/claude-3-7-sonnet@20250219
-      vertex_project: os.environ/VERTEX_PROJECT_ID
-      vertex_location: os.environ/VERTEX_LOCATION
-      vertex_credentials: os.environ/VERTEX_CREDENTIALS_PATH
+      model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
       model: gemini/gemini-3.7-pro
       api_key: os.environ/GEMINI_API_KEY
   - model_name: reasoning-heavy
     litellm_params:
-      model: openai/o1
+      model: openai/DeepSeek-R1
       api_base: https://models.inference.ai.azure.com
       api_key: os.environ/GITHUB_TOKEN
   - model_name: reasoning-heavy
@@ -184,9 +303,13 @@ model_list:
       api_key: os.environ/GITHUB_TOKEN
   - model_name: reasoning-heavy
     litellm_params:
-      model: openai/DeepSeek-R1
+      model: openai/o1
       api_base: https://models.inference.ai.azure.com
       api_key: os.environ/GITHUB_TOKEN
+  - model_name: reasoning-heavy
+    litellm_params:
+      model: anthropic/claude-3-7-sonnet-20250219
+      api_key: os.environ/ANTHROPIC_API_KEY
 
 # ==============================================================================
 # ROUTER & RATE LIMIT SHIELD SETTINGS
@@ -200,10 +323,13 @@ router_settings:
   cooldown_time: 30 # Cooldown provider for 30s when a 429 occurs
   allowed_fails: 2
   fallbacks:
-    - claude-3-7-sonnet-direct: ["claude-3-7-sonnet-vertex", "gemini-3.7-pro", "github-gpt-4o"]
-    - claude-3-7-sonnet-vertex: ["claude-3-7-sonnet-direct", "gemini-3.7-pro", "github-gpt-4o"]
-    - gemini-3.7-pro: ["claude-3-7-sonnet-vertex", "claude-3-7-sonnet-direct", "github-gpt-4o"]
-    - gemini-3.7-flash: ["gemini-2.5-flash", "claude-3-5-haiku"]
+    - coder-smart: ["gemini-3.7-pro", "gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - coder-fast: ["gemini-3.7-flash", "gemini-2.5-flash", "github-gpt-4o"]
+    - reasoning-heavy: ["gemini-3.7-pro", "github-deepseek-r1", "github-o3-mini", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-direct: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-vertex: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - gemini-3.7-pro: ["gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - gemini-3.7-flash: ["gemini-2.5-flash", "github-gpt-4o"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

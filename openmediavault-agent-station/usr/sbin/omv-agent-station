@@ -5,10 +5,14 @@
 
 set -e
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 if [ -f "/etc/openmediavault-agent-station.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
-else
+elif [ -f "/etc/openmediavault-ai-orchestrator.json" ]; then
     DEFAULT_CONFIG="/etc/openmediavault-ai-orchestrator.json"
+else
+    DEFAULT_CONFIG="/etc/openmediavault-agent-station.json"
 fi
 
 if [ -d "/usr/share/openmediavault/agent-station" ]; then
@@ -19,81 +23,201 @@ fi
 
 CONFIG_FILE="${CONFIG_FILE:-$DEFAULT_CONFIG}"
 STACK_DIR="${STACK_DIR:-$DEFAULT_STACK}"
+LOG_FILE="${LOG_FILE:-/var/log/omv-agent-station.log}"
+CLI_BIN="/usr/sbin/omv-agent-station"
 
-apply_config() {
+# Robust Docker Compose command runner with automatic binary fallback
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    elif command -v podman-compose >/dev/null 2>&1; then
+        podman-compose "$@"
+    else
+        echo "⚠️ Warning: Neither 'docker compose' nor 'docker-compose' binary found in PATH ($PATH)." >&2
+        return 0
+    fi
+}
+
+write_env_file() {
+    # Check if primary config is missing or empty, but persistent storage backup exists
+    if [ ! -s "$CONFIG_FILE" ] && [ -s "/srv/dev-data/config/agent-station.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/srv/dev-data/config/agent-station.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    elif [ ! -s "$CONFIG_FILE" ] && [ -s "/etc/openmediavault-ai-orchestrator.json" ]; then
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cp -f "/etc/openmediavault-ai-orchestrator.json" "$CONFIG_FILE" 2>/dev/null || true
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "Configuration file $CONFIG_FILE does not exist."
-        exit 0
+        mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null || true
+        cat <<'EOF' > "$CONFIG_FILE"
+{
+  "enable": false,
+  "data_dir": "/srv/dev-data",
+  "enable_aimodels": true,
+  "enable_gemini": true,
+  "enable_anthropic": true,
+  "enable_github_models": true,
+  "enable_git": true,
+  "enable_chat": true,
+  "enable_telegram": true,
+  "enable_security": true
+}
+EOF
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
     fi
 
     # Read config with python
-    ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))")
-    DATA_DIR=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('data_dir', '/srv/dev-data'))")
-    GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))")
-    ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))")
-    GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))")
-    GIT_NAME=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_name', 'OMV AI Agent'))")
-    GIT_EMAIL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_email', 'agent@omv-box.local'))")
-    GITLAB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gitlab_token', ''))")
-    BITBUCKET_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_username', ''))")
-    BITBUCKET_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_app_password', ''))")
-    CHAT_SERVICE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('chat_service', 'telegram'))")
-    TELEGRAM_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_bot_token', ''))")
-    TELEGRAM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_allowed_user_id', ''))")
-    SIGNAL_PHONE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_phone_number', ''))")
-    SIGNAL_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_allowed_phone_number', ''))")
-    DISCORD_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_bot_token', ''))")
-    DISCORD_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_allowed_user_id', ''))")
-    MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-master-key'))")
-    TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))")
-    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'omvsecurepass'))")
+    ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))" 2>/dev/null || echo "False")
+    DATA_DIR=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('data_dir', '/srv/dev-data'))" 2>/dev/null || echo "/srv/dev-data")
+    
+    # AI Models
+    ENABLE_AIMODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_aimodels', True))" 2>/dev/null || echo "True")
+    ENABLE_GEMINI=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_gemini', True))" 2>/dev/null || echo "True")
+    GEMINI_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gemini_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_ANTHROPIC=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_anthropic', False))" 2>/dev/null || echo "False")
+    ANTHROPIC_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('anthropic_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_GH_MODELS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_github_models', True))" 2>/dev/null || echo "True")
+    GITHUB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_token', ''))" 2>/dev/null || echo "")
+    ENABLE_MISTRAL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_mistral', False))" 2>/dev/null || echo "False")
+    MISTRAL_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('mistral_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_OPENROUTER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_openrouter', False))" 2>/dev/null || echo "False")
+    OPENROUTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('openrouter_api_key', ''))" 2>/dev/null || echo "")
+    ENABLE_DEEPSEEK=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_deepseek', False))" 2>/dev/null || echo "False")
+    DEEPSEEK_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('deepseek_api_key', ''))" 2>/dev/null || echo "")
+    
+    # Git
+    ENABLE_GIT=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_git', True))" 2>/dev/null || echo "True")
+    GIT_NAME=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_name', 'OMV AI Agent'))" 2>/dev/null || echo "OMV AI Agent")
+    GIT_EMAIL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_email', 'agent@omv-box.local'))" 2>/dev/null || echo "agent@omv-box.local")
+    ENABLE_GITHUB=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_github', True))" 2>/dev/null || echo "True")
+    GITHUB_GIT_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_git_user', ''))" 2>/dev/null || echo "")
+    GITHUB_GIT_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('github_git_token', ''))" 2>/dev/null || echo "")
+    ENABLE_GITLAB=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_gitlab', False))" 2>/dev/null || echo "False")
+    GITLAB_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('gitlab_token', ''))" 2>/dev/null || echo "")
+    ENABLE_BITBUCKET=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_bitbucket', False))" 2>/dev/null || echo "False")
+    BITBUCKET_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_username', ''))" 2>/dev/null || echo "")
+    BITBUCKET_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('bitbucket_app_password', ''))" 2>/dev/null || echo "")
+    
+    # Chat
+    ENABLE_CHAT=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_chat', True))" 2>/dev/null || echo "True")
+    CHAT_SERVICE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('chat_service', 'telegram'))" 2>/dev/null || echo "telegram")
+    ENABLE_TELEGRAM=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_telegram', True))" 2>/dev/null || echo "True")
+    TELEGRAM_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_bot_token', ''))" 2>/dev/null || echo "")
+    TELEGRAM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('telegram_allowed_user_id', ''))" 2>/dev/null || echo "")
+    ENABLE_SIGNAL=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_signal', False))" 2>/dev/null || echo "False")
+    SIGNAL_PHONE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_phone_number', ''))" 2>/dev/null || echo "")
+    SIGNAL_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('signal_allowed_phone_number', ''))" 2>/dev/null || echo "")
+    ENABLE_DISCORD=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_discord', False))" 2>/dev/null || echo "False")
+    DISCORD_TOKEN=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_bot_token', ''))" 2>/dev/null || echo "")
+    DISCORD_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('discord_allowed_user_id', ''))" 2>/dev/null || echo "")
+    
+    # Security
+    ENABLE_SECURITY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_security', True))" 2>/dev/null || echo "True")
+    MASTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('litellm_master_key', 'sk-omv-secret-master-key'))" 2>/dev/null || echo "sk-omv-secret-master-key")
+    TERM_USER=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_user', 'admin'))" 2>/dev/null || echo "admin")
+    TERM_PASS=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('terminal_pass', 'omvsecurepass'))" 2>/dev/null || echo "omvsecurepass")
 
     # Create directories
-    mkdir -p "$DATA_DIR/obsidian"
-    mkdir -p "$DATA_DIR/workspace"
-    mkdir -p "$DATA_DIR/ssh"
-    mkdir -p "$STACK_DIR/credentials"
-    mkdir -p "$STACK_DIR/ssh"
-    mkdir -p "$STACK_DIR/signal-data"
-    mkdir -p "$STACK_DIR/syncthing/config"
+    mkdir -p "$DATA_DIR/obsidian" 2>/dev/null || true
+    mkdir -p "$DATA_DIR/workspace" 2>/dev/null || true
+    mkdir -p "$DATA_DIR/.agent-auth" 2>/dev/null || true
+    mkdir -p "$DATA_DIR/ssh" 2>/dev/null || true
+    mkdir -p "$STACK_DIR/credentials" 2>/dev/null || true
+    mkdir -p "$STACK_DIR/ssh" 2>/dev/null || true
+    mkdir -p "$STACK_DIR/signal-data" 2>/dev/null || true
+    mkdir -p "$STACK_DIR/syncthing/config" 2>/dev/null || true
 
     # Write .env file
     cat <<EOF > "$STACK_DIR/.env"
 DATA_DIR=$DATA_DIR
 TZ=$(cat /etc/timezone 2>/dev/null || echo "Europe/Berlin")
 LITELLM_MASTER_KEY=$MASTER_KEY
+ENABLE_AIMODELS=$ENABLE_AIMODELS
+ENABLE_GEMINI=$ENABLE_GEMINI
 GEMINI_API_KEY=$GEMINI_KEY
+ENABLE_ANTHROPIC=$ENABLE_ANTHROPIC
 ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+ENABLE_GITHUB_MODELS=$ENABLE_GH_MODELS
 GITHUB_TOKEN=$GITHUB_TOKEN
+ENABLE_MISTRAL=$ENABLE_MISTRAL
+MISTRAL_API_KEY=$MISTRAL_KEY
+ENABLE_OPENROUTER=$ENABLE_OPENROUTER
+OPENROUTER_API_KEY=$OPENROUTER_KEY
+ENABLE_DEEPSEEK=$ENABLE_DEEPSEEK
+DEEPSEEK_API_KEY=$DEEPSEEK_KEY
+ENABLE_GIT=$ENABLE_GIT
 GIT_AUTHOR_NAME=$GIT_NAME
 GIT_AUTHOR_EMAIL=$GIT_EMAIL
+ENABLE_GITHUB=$ENABLE_GITHUB
+GITHUB_GIT_USER=$GITHUB_GIT_USER
+GITHUB_GIT_TOKEN=$GITHUB_GIT_TOKEN
+ENABLE_GITLAB=$ENABLE_GITLAB
 GITLAB_TOKEN=$GITLAB_TOKEN
+ENABLE_BITBUCKET=$ENABLE_BITBUCKET
 BITBUCKET_USERNAME=$BITBUCKET_USER
 BITBUCKET_APP_PASSWORD=$BITBUCKET_PASS
+ENABLE_CHAT=$ENABLE_CHAT
 CHAT_SERVICE=$CHAT_SERVICE
+ENABLE_TELEGRAM=$ENABLE_TELEGRAM
 TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN
 TELEGRAM_ALLOWED_USER_ID=$TELEGRAM_USER
+ENABLE_SIGNAL=$ENABLE_SIGNAL
 SIGNAL_PHONE_NUMBER=$SIGNAL_PHONE
 SIGNAL_ALLOWED_PHONE_NUMBER=$SIGNAL_USER
+ENABLE_DISCORD=$ENABLE_DISCORD
 DISCORD_BOT_TOKEN=$DISCORD_TOKEN
 DISCORD_ALLOWED_USER_ID=$DISCORD_USER
+ENABLE_SECURITY=$ENABLE_SECURITY
 TERMINAL_USER=$TERM_USER
 TERMINAL_PASSWORD=$TERM_PASS
 EOF
-    chmod 600 "$STACK_DIR/.env"
+    chmod 600 "$STACK_DIR/.env" 2>/dev/null || true
+}
+
+apply_sync() {
+    write_env_file
+    ENABLE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable', False))" 2>/dev/null || echo "False")
 
     if [ "$ENABLE" = "True" ] || [ "$ENABLE" = "true" ]; then
-        echo "Starting Agent Station stack..."
-        cd "$STACK_DIR" && docker compose --env-file .env up -d
+        echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Starting Agent Station Stack Provisioning..." >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📦 Pulling Docker container images (LiteLLM, Syncthing)..." >> "$LOG_FILE" 2>/dev/null || true
+        if [ -d "$STACK_DIR" ]; then
+            (cd "$STACK_DIR" && (run_compose --env-file .env pull --ignore-buildable || run_compose --env-file .env pull) >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🐳 Building and starting containers in background..." >> "$LOG_FILE" 2>/dev/null || true
+            (cd "$STACK_DIR" && run_compose --env-file .env up -d --build --remove-orphans >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Agent Station stack is up and active!" >> "$LOG_FILE" 2>/dev/null || true
+        fi
     else
-        echo "Agent Station is disabled in settings. Stopping stack..."
-        cd "$STACK_DIR" && docker compose --env-file .env down || true
+        echo "==========================================================" >> "$LOG_FILE" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🛑 Stopping Agent Station stack..." >> "$LOG_FILE" 2>/dev/null || true
+        if [ -d "$STACK_DIR" ]; then
+            (cd "$STACK_DIR" && run_compose --env-file .env down >> "$LOG_FILE" 2>&1 || true)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏹️ Agent Station stack stopped." >> "$LOG_FILE" 2>/dev/null || true
+        fi
     fi
+}
+
+apply_async() {
+    write_env_file
+    # Locate executable binary
+    BIN="$CLI_BIN"
+    if [ ! -x "$BIN" ]; then
+        BIN="$0"
+    fi
+    # Detach to background so WebGUI RPC returns immediately without 504 timeout
+    nohup "$BIN" apply >> "$LOG_FILE" 2>&1 &
+    echo "Configuration written. Background container synchronization dispatched."
 }
 
 get_performance() {
     python3 - <<'PYEOF'
-import json, os, subprocess
+import json, os, re, subprocess
 
 def check_cmd(cmd):
     try:
@@ -101,6 +225,29 @@ def check_cmd(cmd):
         return res.returncode == 0
     except Exception:
         return False
+
+def get_container_info(filter_names):
+    for name in filter_names:
+        try:
+            res = subprocess.run(["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+            status = res.stdout.strip()
+            if status:
+                running = status.startswith("Up")
+                state = "running"
+                if running:
+                    state = "running"
+                else:
+                    exit_match = re.match(r"^Exited \((\d+)\)", status)
+                    if exit_match:
+                        state = "exited_clean" if exit_match.group(1) == "0" else "exited_error"
+                    else:
+                        # e.g. "Created", "Restarting (1) 2 seconds ago" -- not yet up, not a
+                        # confirmed crash either.
+                        state = "starting"
+                return {"running": running, "status": status, "state": state}
+        except Exception:
+            pass
+    return {"running": False, "status": "Not created", "state": "not_created"}
 
 # Collect host metrics
 load1, load5, load15 = 0.0, 0.0, 0.0
@@ -142,14 +289,22 @@ try:
 except Exception:
     pass
 
-# Active container statuses
+container_details = {
+    "LiteLLM Gateway": get_container_info(["litellm-proxy", "litellm"]),
+    "Syncthing": get_container_info(["syncthing"]),
+    "Web Terminal": get_container_info(["omv-agent-terminal", "web-terminal"]),
+    "Telegram Bot": get_container_info(["telegram-agent-bot", "telegram-bot"]),
+    "Signal Bot": get_container_info(["signal-agent-bot", "signal-bot"]),
+    "Discord Bot": get_container_info(["discord-agent-bot", "discord-bot"])
+}
+
 containers = {
-    "litellm": check_cmd(["docker", "ps", "-q", "-f", "name=litellm"]),
-    "syncthing": check_cmd(["docker", "ps", "-q", "-f", "name=syncthing"]),
-    "web_terminal": check_cmd(["docker", "ps", "-q", "-f", "name=web-terminal"]),
-    "telegram_bot": check_cmd(["docker", "ps", "-q", "-f", "name=telegram-agent-bot"]),
-    "signal_bot": check_cmd(["docker", "ps", "-q", "-f", "name=signal-agent-bot"]),
-    "discord_bot": check_cmd(["docker", "ps", "-q", "-f", "name=discord-agent-bot"])
+    "litellm": container_details["LiteLLM Gateway"]["running"],
+    "syncthing": container_details["Syncthing"]["running"],
+    "web_terminal": container_details["Web Terminal"]["running"],
+    "telegram_bot": container_details["Telegram Bot"]["running"],
+    "signal_bot": container_details["Signal Bot"]["running"],
+    "discord_bot": container_details["Discord Bot"]["running"]
 }
 
 data = {
@@ -169,51 +324,199 @@ data = {
         "used_gb": max(0, disk_total_gb - disk_avail_gb)
     },
     "tmux_sessions": tmux_sessions,
-    "containers": containers
+    "containers": containers,
+    "container_details": container_details
 }
 
 print(json.dumps(data, indent=2))
 PYEOF
 }
 
+check_update() {
+    CURRENT_VERSION=$(dpkg-query -W -f='${Version}' openmediavault-agent-station 2>/dev/null || echo "unknown")
+    RELEASE_JSON=$(curl -fsSL --max-time 10 "https://api.github.com/repos/el-j/omv-agent-station/releases/latest" 2>/dev/null || echo "")
+
+    if [ -z "$RELEASE_JSON" ]; then
+        python3 -c "import json,sys; print(json.dumps({'current_version': sys.argv[1], 'error': 'Could not reach GitHub. Check network connectivity.'}))" "$CURRENT_VERSION"
+        return
+    fi
+
+    LATEST_VERSION=$(printf '%s' "$RELEASE_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('tag_name', '').lstrip('v'))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+    UPDATE_AVAILABLE="false"
+    if [ -n "$LATEST_VERSION" ] && [ "$CURRENT_VERSION" != "unknown" ]; then
+        if dpkg --compare-versions "$CURRENT_VERSION" lt "$LATEST_VERSION" 2>/dev/null; then
+            UPDATE_AVAILABLE="true"
+        fi
+    fi
+
+    printf '%s' "$RELEASE_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print(json.dumps({'current_version': sys.argv[1], 'error': 'Could not parse GitHub release response.'}))
+    sys.exit(0)
+asset_url = ''
+for a in data.get('assets', []):
+    if a.get('name', '').endswith('.deb'):
+        asset_url = a.get('browser_download_url', '')
+        break
+print(json.dumps({
+    'current_version': sys.argv[1],
+    'latest_version': data.get('tag_name', '').lstrip('v'),
+    'update_available': sys.argv[2] == 'true',
+    'release_url': data.get('html_url', ''),
+    'asset_url': asset_url,
+    'published_at': data.get('published_at', ''),
+}))
+" "$CURRENT_VERSION" "$UPDATE_AVAILABLE"
+}
+
+update_plugin() {
+    echo "=========================================================="
+    echo "🔄 Checking for Agent Station updates..."
+    echo "=========================================================="
+    UPDATE_JSON=$(check_update)
+    echo "$UPDATE_JSON"
+
+    UPDATE_AVAILABLE=$(printf '%s' "$UPDATE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('update_available', False))" 2>/dev/null || echo "False")
+    ASSET_URL=$(printf '%s' "$UPDATE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('asset_url', ''))" 2>/dev/null || echo "")
+
+    if [ "$UPDATE_AVAILABLE" != "True" ]; then
+        echo ""
+        echo "✅ Already running the latest version. Nothing to do."
+        exit 0
+    fi
+
+    if [ -z "$ASSET_URL" ]; then
+        echo ""
+        echo "❌ Latest release has no .deb asset attached. Cannot auto-update -- install manually from the GitHub release page."
+        exit 1
+    fi
+
+    case "$ASSET_URL" in
+        https://github.com/*) ;;
+        *)
+            echo "❌ Refusing to download from untrusted host: $ASSET_URL"
+            exit 1
+            ;;
+    esac
+
+    TMP_DIR=$(mktemp -d)
+    TMP_DEB="$TMP_DIR/update.deb"
+    echo ""
+    echo "⬇️  Downloading $ASSET_URL ..."
+    if ! curl -fsSL --max-time 120 -o "$TMP_DEB" "$ASSET_URL"; then
+        echo "❌ Download failed."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+
+    if ! dpkg-deb --info "$TMP_DEB" >/dev/null 2>&1; then
+        echo "❌ Downloaded file is not a valid .deb package."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+
+    echo "📦 Installing update via apt (pulls any new dependencies automatically)..."
+    if apt-get install -y "$TMP_DEB"; then
+        echo ""
+        echo "✅ Update installed successfully! The workbench menu will refresh automatically within a few seconds."
+    else
+        echo "❌ Package installation failed. Check the apt output above."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    rm -rf "$TMP_DIR"
+}
+
 case "$1" in
     apply)
-        apply_config
+        apply_sync
+        ;;
+    apply-bg)
+        apply_async
         ;;
     start)
-        cd "$STACK_DIR" && docker compose --env-file .env up -d
+        cd "$STACK_DIR" && run_compose --env-file .env up -d
         ;;
     stop|down)
-        cd "$STACK_DIR" && docker compose --env-file .env down
+        cd "$STACK_DIR" && run_compose --env-file .env down
         ;;
     restart)
-        cd "$STACK_DIR" && docker compose --env-file .env restart
+        cd "$STACK_DIR" && run_compose --env-file .env restart
         ;;
     status)
-        cd "$STACK_DIR" && docker compose --env-file .env ps
+        cd "$STACK_DIR" && run_compose --env-file .env ps
         ;;
     performance)
         get_performance
         ;;
     logs)
         SERVICE=${2:-litellm}
-        cd "$STACK_DIR" && docker compose --env-file .env logs --tail=100 "$SERVICE"
+        if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "install" ] || [ "$SERVICE" = "diagnostics" ]; then
+            if [ -f "$LOG_FILE" ]; then
+                tail -n 120 "$LOG_FILE"
+            else
+                echo "Log file $LOG_FILE has not been created yet."
+                echo "Enable the Agent Station engine in the Overview tab to begin container provisioning."
+            fi
+        else
+            cd "$STACK_DIR" && run_compose --env-file .env logs --tail=100 "$SERVICE"
+        fi
+        ;;
+    install-claude-cli)
+        echo "=========================================================="
+        echo "📦 Installing Claude Code CLI on OpenMediaVault..."
+        echo "=========================================================="
+        if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+            echo "📦 Installing Node.js and NPM runtime..."
+            apt-get update -qq && apt-get install -y -qq nodejs npm || true
+        fi
+        echo "📦 Installing @anthropic-ai/claude-code via npm..."
+        npm install -g @anthropic-ai/claude-code
+        echo ""
+        if command -v claude >/dev/null 2>&1 || [ -x /usr/local/bin/claude ]; then
+            echo "=========================================================="
+            echo "✅ Claude Code CLI successfully installed!"
+            echo "👉 Location: $(which claude || echo '/usr/local/bin/claude')"
+            echo "👉 Usage: Open Web Terminal (Port 7681) and run 'claude'"
+            echo "👉 Log in with your active claude.ai subscription via browser!"
+            echo "=========================================================="
+        else
+            echo "⚠️ Installation completed, binary at /usr/local/bin/claude"
+        fi
+        ;;
+    check-update)
+        check_update
+        ;;
+    update-plugin)
+        update_plugin
         ;;
     uninstall)
         echo "🛑 Stopping Agent Station stack..."
-        cd "$STACK_DIR" 2>/dev/null && docker compose --env-file .env down 2>/dev/null || true
+        cd "$STACK_DIR" 2>/dev/null && run_compose --env-file .env down 2>/dev/null || true
         echo "🧹 Removing package and assets..."
         apt-get purge -y openmediavault-agent-station openmediavault-ai-orchestrator 2>/dev/null || dpkg -P openmediavault-agent-station openmediavault-ai-orchestrator 2>/dev/null || true
-        systemctl restart omv-engined 2>/dev/null || true
-        omv-salt deploy run workbench 2>/dev/null || true
+        if command -v omv-mkworkbench >/dev/null 2>&1; then
+            omv-mkworkbench all 2>/dev/null || true
+        fi
         echo "✅ Uninstallation complete."
         ;;
     help|-h|--help)
-        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|install-claude-cli|check-update|update-plugin|uninstall}"
         exit 0
         ;;
     *)
-        echo "Usage: $0 {apply|start|stop|down|restart|status|performance|logs [service]|uninstall}"
+        echo "Usage: $0 {apply|apply-bg|start|stop|down|restart|status|performance|logs [service]|check-update|update-plugin|uninstall}"
         exit 1
         ;;
 esac

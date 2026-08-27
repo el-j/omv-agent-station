@@ -1,0 +1,8 @@
+version: "1.0"
+type: route
+data:
+  url: "/agentstation/aimodels"
+  title: _("AI Models")
+  editing: true
+  notificationTitle: _("AI model settings saved.")
+  component: omv-services-agentstation-aimodels-form-page

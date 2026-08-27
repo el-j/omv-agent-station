@@ -5,7 +5,7 @@ data:
   text: _("Chat & Messenger")
   position: 40
   icon: "mdi:chat-processing-outline"
-  url: "/services/agentstation/chat"
+  url: "/agentstation/chat"
   permissions:
     role:
       - admin

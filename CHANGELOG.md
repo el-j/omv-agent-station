@@ -2,23 +2,21 @@
 
 All notable changes to the OpenMediaVault Agent Station plugin will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [0.0.1] - 2026-08-22
+## [0.0.2-beta.2] - 2026-08-25
 
 ### Added
-- **Top-Level Root Navigation**: Dedicated "Agent Station" left sidebar menu container (position 60) with 5 dedicated submenus:
-  - `Overview`: General status, Master Engine enable toggle, and direct web endpoints
-  - `AI Models`: Provider API keys (Gemini 3.7 Pro, Claude 3.7 Sonnet, Copilot Pro / GitHub Models)
-  - `Git Providers`: Author identity, GitLab PAT, and Bitbucket App Password
-  - `Chat & Messenger`: Multi-relay configuration for Telegram, Signal, and Discord bots
-  - `Security & Web Access`: LiteLLM Proxy auth and Web Terminal credentials
-- **Granular Enable/Disable Toggles**: Each configuration section can be enabled or disabled independently via form checkboxes.
-- **Home Dashboard Grid Widget**: Dedicated `type: grid` widget monitoring engine state, AI model routing, git sync, messenger relay, and security.
-- **dpkg Triggers Architecture**: Integrated `debian/triggers` (`activate update-workbench` and `activate restart-engined`) for clean, async daemon reloading without breaking active RPC sessions.
+- Multi-messenger single source of truth library `agent_station_core` powering Telegram, Discord, and Signal.
+- Comprehensive 11-page static documentation website built with Astro under `/docs/*`.
+- Automated GitFlow PR validation workflow (`pr-target-guard.yml`) enforcing `feature/*` / `fix/*` ➔ `develop` ➔ `main`.
+- Automated GitHub Release publisher workflow (`release.yml`) attaching compiled Debian `.deb` packages and SHA256 checksums.
+- Automatic Forum Topic / Sub-channel creation and project context binding (`/createtopic`, `/bind`, `/unbind`).
+- User-defined dynamic custom command shortcuts (`/addcmd`, `/delcmd`, `/cmds`) with `{args}` interpolation.
+- GitHub repository creation (`/newrepo`) and automated PAT-authenticated cloning (`/clone`).
+- Obsidian second-brain note capture (`/note`, `/vault`) and automated project spec provisioning.
 
 ### Fixed
-- **RPC 500 Connection Reset Error**: Resolved socket drops during plugin installation by removing synchronous daemon restarts from `postinst` and leveraging dpkg trigger queues.
-- **Workbench UI Discovery**: Corrected YAML schemas across `navigation.d/`, `route.d/`, `dashboard.d/`, and `component.d/` conforming to OpenMediaVault 6, 7 & 8 specs.
-- **Partial Form Save Corruption**: Updated `AgentStation::setSettings` to merge section parameters, preserving existing configuration across multiple tabs.
+- Fixed Telegram Forum Topic creation permission feedback when bot lacks Manage Topics permission.
+- Fixed multi-page Astro static documentation compilation and routing.
+- Fixed 504 Gateway Timeout on Engine startup by switching to asynchronous stack lifecycle management.
+- Fixed exit code 127 during 'omv-agent-station apply' with multi-binary compose fallback detection.
+- Clean root-level sidebar navigation for OpenMediaVault Workbench.

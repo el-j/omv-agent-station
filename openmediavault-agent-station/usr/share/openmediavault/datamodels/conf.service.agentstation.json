@@ -16,14 +16,47 @@
       "type": "boolean",
       "default": true
     },
+    "enable_gemini": {
+      "type": "boolean",
+      "default": true
+    },
     "gemini_api_key": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_anthropic": {
+      "type": "boolean",
+      "default": false
     },
     "anthropic_api_key": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_github_models": {
+      "type": "boolean",
+      "default": true
     },
     "github_token": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_mistral": {
+      "type": "boolean",
+      "default": false
+    },
+    "mistral_api_key": {
+      "type": ["string", "null"]
+    },
+    "enable_openrouter": {
+      "type": "boolean",
+      "default": false
+    },
+    "openrouter_api_key": {
+      "type": ["string", "null"]
+    },
+    "enable_deepseek": {
+      "type": "boolean",
+      "default": false
+    },
+    "deepseek_api_key": {
+      "type": ["string", "null"]
     },
     "enable_git": {
       "type": "boolean",
@@ -37,14 +70,32 @@
       "type": "string",
       "default": "agent@omv-box.local"
     },
+    "enable_github": {
+      "type": "boolean",
+      "default": true
+    },
+    "github_git_user": {
+      "type": ["string", "null"]
+    },
+    "github_git_token": {
+      "type": ["string", "null"]
+    },
+    "enable_gitlab": {
+      "type": "boolean",
+      "default": false
+    },
     "gitlab_token": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_bitbucket": {
+      "type": "boolean",
+      "default": false
     },
     "bitbucket_username": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "bitbucket_app_password": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "enable_chat": {
       "type": "boolean",
@@ -54,23 +105,35 @@
       "type": "string",
       "default": "telegram"
     },
+    "enable_telegram": {
+      "type": "boolean",
+      "default": true
+    },
     "telegram_bot_token": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "telegram_allowed_user_id": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_signal": {
+      "type": "boolean",
+      "default": false
     },
     "signal_phone_number": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "signal_allowed_phone_number": {
-      "type": "string"
+      "type": ["string", "null"]
+    },
+    "enable_discord": {
+      "type": "boolean",
+      "default": false
     },
     "discord_bot_token": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "discord_allowed_user_id": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "enable_security": {
       "type": "boolean",

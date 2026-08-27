@@ -5,7 +5,7 @@ data:
   text: _("Security & Web Access")
   position: 50
   icon: "mdi:shield-lock-outline"
-  url: "/services/agentstation/security"
+  url: "/agentstation/security"
   permissions:
     role:
       - admin
