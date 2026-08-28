@@ -1,7 +1,7 @@
 version: "1.0"
 type: route
 data:
-  url: "/agentstation/overview"
+  url: "/services/agentstation/overview"
   title: _("Overview")
   editing: true
   notificationTitle: _("Agent Station settings saved.")

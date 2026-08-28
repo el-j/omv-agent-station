@@ -5,7 +5,7 @@ data:
   text: _("Git Providers")
   position: 30
   icon: "mdi:git"
-  url: "/agentstation/git"
+  url: "/services/agentstation/git"
   permissions:
     role:
       - admin

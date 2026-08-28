@@ -5,7 +5,7 @@ data:
   text: _("Overview")
   position: 10
   icon: "mdi:view-dashboard-outline"
-  url: "/agentstation/overview"
+  url: "/services/agentstation/overview"
   permissions:
     role:
       - admin

@@ -5,7 +5,7 @@ data:
   text: _("Diagnostics & Logs")
   position: 60
   icon: "mdi:stethoscope"
-  url: "/agentstation/diagnostics"
+  url: "/services/agentstation/diagnostics"
   permissions:
     role:
       - admin

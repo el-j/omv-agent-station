@@ -358,20 +358,18 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
         deb_script = ROOT_DIR / "build-deb.sh"
         self.assertTrue(deb_script.exists())
 
-        # Read the version build-deb.sh will actually stamp on the artifact,
-        # rather than hardcoding it, so this test can't silently go stale
-        # (drift between this literal and VERSION= previously made this test
-        # pass locally only by accident, off a leftover .deb from an older
-        # build, while failing on every fresh CI checkout).
-        version_match = re.search(r'^VERSION="([^"]+)"', deb_script.read_text(encoding="utf-8"), re.MULTILINE)
-        self.assertIsNotNone(version_match, "Could not find VERSION= in build-deb.sh")
-        version = version_match.group(1)
+        # Force a deterministic version so we can assert the exact artifact
+        # path even when build-deb.sh resolves VERSION dynamically.
+        version = "0.0.2-ci.1"
+        deb_file = ROOT_DIR / f"openmediavault-agent-station_{version}_all.deb"
+        deb_file.unlink(missing_ok=True)
 
         # Build deb in isolated environment
-        res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603,B607
+        env = os.environ.copy()
+        env["AGENT_STATION_VERSION"] = version
+        res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603,B607
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
 
-        deb_file = ROOT_DIR / f"openmediavault-agent-station_{version}_all.deb"
         self.assertTrue(deb_file.exists(), "Debian package must exist after build")
         self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
 

@@ -4,10 +4,12 @@
 # Works on Debian/Ubuntu and macOS/BSD without requiring dpkg-deb installed.
 # ==============================================================================
 
-set -e
+set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="0.0.2-beta.2"
+VERSION="${AGENT_STATION_VERSION:-${VERSION_TAG:-${VERSION:-$(bash "$ROOT_DIR/scripts/resolve-version.sh")}}}"
+VERSION="${VERSION#v}"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"
@@ -34,6 +36,13 @@ cp openmediavault-agent-station/debian/triggers "$BUILD_DIR/DEBIAN/" 2>/dev/null
 cp openmediavault-agent-station/debian/postinst "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/prerm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
 cp openmediavault-agent-station/debian/postrm "$BUILD_DIR/DEBIAN/" 2>/dev/null || true
+
+# Ensure package metadata version matches requested build version.
+if grep -q '^Version:' "$BUILD_DIR/DEBIAN/control"; then
+    sed -i.bak -E "s/^Version:.*/Version: ${VERSION}/" "$BUILD_DIR/DEBIAN/control"
+    rm -f "$BUILD_DIR/DEBIAN/control.bak"
+fi
+
 chmod 755 "$BUILD_DIR/DEBIAN/"* 2>/dev/null || true
 chmod 644 "$BUILD_DIR/DEBIAN/control" "$BUILD_DIR/DEBIAN/triggers" 2>/dev/null || true
 
