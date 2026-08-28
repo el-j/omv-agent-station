@@ -45,8 +45,7 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertTrue(cli_helper.exists())
         self.assertTrue(dash_file.exists())
 
-        # Check navigation files (root-level 'Agent Station' menu, not buried
-        # under Services -- see issue #4)
+        # Check navigation files
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         for nav_name in [
             "agentstation",
@@ -59,9 +58,10 @@ class TestBotsAndPackaging(unittest.TestCase):
         ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
-        # The root nav item is a container only (no url), so it has no route
+        # Route files include all subpages and the parent Services route.
         route_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
         for route_name in [
+            "services.agentstation",
             "agentstation.overview",
             "agentstation.aimodels",
             "agentstation.git",
@@ -83,27 +83,27 @@ class TestBotsAndPackaging(unittest.TestCase):
         ]:
             self.assertTrue((comp_dir / f"{comp_name}.yaml").exists(), f"Missing component file: {comp_name}.yaml")
 
-    def test_agentstation_is_a_root_level_menu_not_buried_under_services(self):
-        """Regression coverage for issue #4: 'Agent Station' must be a root
-        sidebar item alongside System/Storage/Services, not nested under the
-        Services submenu."""
+    def test_agentstation_is_nested_under_services_routes(self):
+        """Regression coverage: Agent Station URLs must remain under
+        /services/agentstation for OMV workbench compatibility."""
         nav_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
+        route_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
 
-        # No leftover navigation entries nested under Services.
-        self.assertEqual(list(nav_dir.glob("services.agentstation*.yaml")), [])
-
-        # OMV's navigation-item schema requires a url on every entry (verified
-        # against a real install: omv-mkworkbench rejects one without it with
-        # "Missing required attribute 'data.url'"), so the root item points
-        # at the Overview page rather than being a true url-less container.
         root_text = (nav_dir / "agentstation.yaml").read_text(encoding="utf-8")
         self.assertIn('path: "agentstation"', root_text)
-        self.assertIn('url: "/agentstation/overview"', root_text)
+        self.assertIn('url: "/services/agentstation"', root_text)
+
+        root_route = (route_dir / "services.agentstation.yaml").read_text(encoding="utf-8")
+        self.assertIn('url: "/services/agentstation"', root_route)
+        self.assertIn('component: omv-services-agentstation-overview-page', root_route)
 
         for sub in ["overview", "aimodels", "git", "chat", "security", "diagnostics"]:
             sub_text = (nav_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
             self.assertIn(f'path: "agentstation.{sub}"', sub_text)
-            self.assertIn(f'url: "/agentstation/{sub}"', sub_text)
+            self.assertIn(f'url: "/services/agentstation/{sub}"', sub_text)
+
+            route_text = (route_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
+            self.assertIn(f'url: "/services/agentstation/{sub}"', route_text)
 
 if __name__ == "__main__":
     unittest.main()

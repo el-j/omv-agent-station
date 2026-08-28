@@ -1,7 +1,7 @@
 version: "1.0"
 type: route
 data:
-  url: "/agentstation/aimodels"
+  url: "/services/agentstation/aimodels"
   title: _("AI Models")
   editing: true
   notificationTitle: _("AI model settings saved.")

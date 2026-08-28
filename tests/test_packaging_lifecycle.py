@@ -72,6 +72,7 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         self.assertNotIn('VERSION="0.0.2-beta.2"', build_script)
         self.assertIn("resolve-version.sh", build_script)
         self.assertIn("AGENT_STATION_VERSION", build_script)
+        self.assertIn('sed -i.bak -E "s/^Version:.*/Version: ${VERSION}/"', build_script)
 
     def test_install_script_supports_explicit_version_tags(self):
         install_script = (ROOT_DIR / "scripts" / "install-plugin.sh").read_text(encoding="utf-8")

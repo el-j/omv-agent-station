@@ -21,6 +21,11 @@ BRANCH="${BRANCH:-${REQUESTED_REF:-develop}}"
 REQUESTED_VERSION="${REQUESTED_REF#v}"
 INSTALL_DIR="/srv/dev-data/omv-agent-station"
 
+if [ -d "$INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR/.git" ]; then
+    echo "🧹 Removing stale non-git checkout at $INSTALL_DIR before installing requested ref: $REQUESTED_REF"
+    rm -rf "$INSTALL_DIR"
+fi
+
 # If the request is a branch name rather than a version, resolve to the
 # correct package SemVer before building the .deb artifact.
 if [[ "${REQUESTED_VERSION}" =~ ^[A-Za-z0-9._/-]+$ ]] && ! [[ "${REQUESTED_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
@@ -78,7 +83,7 @@ fi
 
 cd "$INSTALL_DIR"
 
-echo "🔨 Building Debian package for version $REQUESTED_VERSION..."
+echo "🔨 Building Debian package for explicit version/ref $REQUESTED_REF -> $REQUESTED_VERSION..."
 AGENT_STATION_VERSION="$REQUESTED_VERSION" bash build-deb.sh
 
 # Full cleanup of any previous broken install artifacts from all workbench dirs
@@ -148,6 +153,6 @@ find /var/cache/openmediavault/ -maxdepth 1 -name "cache.*" -delete 2>/dev/null 
 echo "=========================================================="
 echo "✅ Agent Station Plugin successfully installed on your OMV Server!"
 echo "👉 1. Refresh your OMV WebGUI browser tab (Cmd+R / F5)"
-echo "👉 2. Open 'Agent Station' in the root sidebar menu"
+echo "👉 2. Open Services -> Agent Station in the sidebar"
 echo "👉 3. Configure your AI models, git sync, and messenger bots"
 echo "=========================================================="

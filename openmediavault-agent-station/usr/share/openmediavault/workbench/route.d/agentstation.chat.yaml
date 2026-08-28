@@ -1,7 +1,7 @@
 version: "1.0"
 type: route
 data:
-  url: "/agentstation/chat"
+  url: "/services/agentstation/chat"
   title: _("Chat & Messenger")
   editing: true
   notificationTitle: _("Chat & messenger settings saved.")

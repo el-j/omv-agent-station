@@ -5,7 +5,7 @@ data:
   text: _("AI Models")
   position: 20
   icon: "mdi:brain"
-  url: "/agentstation/aimodels"
+  url: "/services/agentstation/aimodels"
   permissions:
     role:
       - admin
