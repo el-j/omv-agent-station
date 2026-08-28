@@ -4,10 +4,12 @@
 # Works on Debian/Ubuntu and macOS/BSD without requiring dpkg-deb installed.
 # ==============================================================================
 
-set -e
+set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="0.0.2-beta.2"
+VERSION="${AGENT_STATION_VERSION:-${VERSION_TAG:-${VERSION:-$(bash "$ROOT_DIR/scripts/resolve-version.sh")}}}"
+VERSION="${VERSION#v}"
 ARCH="all"
 DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 BUILD_DIR="./build-pkg"

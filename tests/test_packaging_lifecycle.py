@@ -67,6 +67,19 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         depends_line = next(line for line in control.splitlines() if line.startswith("Depends:"))
         self.assertIn("docker-ce-cli", depends_line)
 
+    def test_build_script_uses_dynamic_version_resolution(self):
+        build_script = (ROOT_DIR / "build-deb.sh").read_text(encoding="utf-8")
+        self.assertNotIn('VERSION="0.0.2-beta.2"', build_script)
+        self.assertIn("resolve-version.sh", build_script)
+        self.assertIn("AGENT_STATION_VERSION", build_script)
+
+    def test_install_script_supports_explicit_version_tags(self):
+        install_script = (ROOT_DIR / "scripts" / "install-plugin.sh").read_text(encoding="utf-8")
+        self.assertIn("VERSION_TAG", install_script)
+        self.assertIn("REQUESTED_VERSION", install_script)
+        self.assertIn("fetch --tags", install_script)
+        self.assertIn("dpkg -i", install_script)
+
 
 if __name__ == "__main__":
     unittest.main()
