@@ -11,6 +11,7 @@ call driving it) has finished.
 """
 
 import unittest
+import shutil
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -87,21 +88,22 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         import re
         import subprocess
         script = ROOT_DIR / "scripts" / "resolve-version.sh"
+        bash_exe = shutil.which("bash") or "/bin/bash"
 
         # Explicit SemVer tag with leading 'v'
-        out = subprocess.check_output(["bash", str(script)], env={"VERSION_TAG": "v0.0.1"}, text=True).strip()
+        out = subprocess.check_output([bash_exe, str(script)], env={"VERSION_TAG": "v0.0.1"}, text=True).strip()  # nosec B603
         self.assertEqual(out, "0.0.1")
 
         # Explicit SemVer tag without leading 'v'
-        out = subprocess.check_output(["bash", str(script)], env={"AGENT_STATION_VERSION": "0.0.2-beta.2"}, text=True).strip()
+        out = subprocess.check_output([bash_exe, str(script)], env={"AGENT_STATION_VERSION": "0.0.2-beta.2"}, text=True).strip()  # nosec B603
         self.assertEqual(out, "0.0.2-beta.2")
 
         # Branch name 'develop' must resolve to a SemVer starting with a digit, NOT literal string 'develop'
-        out = subprocess.check_output(["bash", str(script)], env={"BRANCH": "develop", "AGENT_STATION_VERSION": "develop"}, text=True).strip()
+        out = subprocess.check_output([bash_exe, str(script)], env={"BRANCH": "develop", "AGENT_STATION_VERSION": "develop"}, text=True).strip()  # nosec B603
         self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
 
         # Branch name 'main' must resolve to a valid SemVer
-        out = subprocess.check_output(["bash", str(script)], env={"BRANCH": "main", "AGENT_STATION_VERSION": "main"}, text=True).strip()
+        out = subprocess.check_output([bash_exe, str(script)], env={"BRANCH": "main", "AGENT_STATION_VERSION": "main"}, text=True).strip()  # nosec B603
         self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
 
 
