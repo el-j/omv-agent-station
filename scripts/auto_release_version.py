@@ -9,7 +9,7 @@ import argparse
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -17,9 +17,11 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 def _resolve_git_executable() -> str:
-    """Resolve an absolute git executable path when available."""
+    """Resolve an absolute git executable path or fail fast."""
     git_exe = shutil.which("git")
-    return git_exe if git_exe else "git"
+    if not git_exe:
+        raise OSError("git executable not found")
+    return git_exe
 
 
 def get_latest_git_tag() -> str:
