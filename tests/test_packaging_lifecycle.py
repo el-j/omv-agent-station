@@ -84,7 +84,8 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         self.assertIn("dpkg -i", install_script)
 
     def test_resolve_version_handles_branch_and_tag_inputs(self):
-        import subprocess, re
+        import re
+        import subprocess
         script = ROOT_DIR / "scripts" / "resolve-version.sh"
 
         # Explicit SemVer tag with leading 'v'
