@@ -48,26 +48,26 @@ class TestBotsAndPackaging(unittest.TestCase):
         # Check navigation files
         nav_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         for nav_name in [
-            "agentstation",
-            "agentstation.overview",
-            "agentstation.aimodels",
-            "agentstation.git",
-            "agentstation.chat",
-            "agentstation.security",
-            "agentstation.diagnostics"
+            "services.agentstation",
+            "services.agentstation.overview",
+            "services.agentstation.aimodels",
+            "services.agentstation.git",
+            "services.agentstation.chat",
+            "services.agentstation.security",
+            "services.agentstation.diagnostics"
         ]:
             self.assertTrue((nav_dir / f"{nav_name}.yaml").exists(), f"Missing nav file: {nav_name}.yaml")
 
-        # Route files include all subpages and the parent Services route.
+        # Route files include all subpages under Services.
         route_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
         for route_name in [
             "services.agentstation",
-            "agentstation.overview",
-            "agentstation.aimodels",
-            "agentstation.git",
-            "agentstation.chat",
-            "agentstation.security",
-            "agentstation.diagnostics"
+            "services.agentstation.overview",
+            "services.agentstation.aimodels",
+            "services.agentstation.git",
+            "services.agentstation.chat",
+            "services.agentstation.security",
+            "services.agentstation.diagnostics"
         ]:
             self.assertTrue((route_dir / f"{route_name}.yaml").exists(), f"Missing route file: {route_name}.yaml")
 
@@ -84,13 +84,13 @@ class TestBotsAndPackaging(unittest.TestCase):
             self.assertTrue((comp_dir / f"{comp_name}.yaml").exists(), f"Missing component file: {comp_name}.yaml")
 
     def test_agentstation_is_nested_under_services_routes(self):
-        """Regression coverage: Agent Station URLs must remain under
-        /services/agentstation for OMV workbench compatibility."""
+        """Regression coverage: Agent Station must be nested under Services
+        navigation and routes for proper sidebar switching and OMV compatibility."""
         nav_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "navigation.d"
         route_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "workbench" / "route.d"
 
-        root_text = (nav_dir / "agentstation.yaml").read_text(encoding="utf-8")
-        self.assertIn('path: "agentstation"', root_text)
+        root_text = (nav_dir / "services.agentstation.yaml").read_text(encoding="utf-8")
+        self.assertIn('path: "services.agentstation"', root_text)
         self.assertIn('url: "/services/agentstation"', root_text)
 
         root_route = (route_dir / "services.agentstation.yaml").read_text(encoding="utf-8")
@@ -98,12 +98,13 @@ class TestBotsAndPackaging(unittest.TestCase):
         self.assertIn('component: omv-services-agentstation-overview-page', root_route)
 
         for sub in ["overview", "aimodels", "git", "chat", "security", "diagnostics"]:
-            sub_text = (nav_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
-            self.assertIn(f'path: "agentstation.{sub}"', sub_text)
+            sub_text = (nav_dir / f"services.agentstation.{sub}.yaml").read_text(encoding="utf-8")
+            self.assertIn(f'path: "services.agentstation.{sub}"', sub_text)
             self.assertIn(f'url: "/services/agentstation/{sub}"', sub_text)
 
-            route_text = (route_dir / f"agentstation.{sub}.yaml").read_text(encoding="utf-8")
+            route_text = (route_dir / f"services.agentstation.{sub}.yaml").read_text(encoding="utf-8")
             self.assertIn(f'url: "/services/agentstation/{sub}"', route_text)
+
 
 if __name__ == "__main__":
     unittest.main()

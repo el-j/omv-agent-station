@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 
 # Load test isolation stubs
-ROOT_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(Path(__file__).parent))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import stubs  # noqa: F401
 
 class TestBlackboxSecurityAndSanitization(unittest.TestCase):
@@ -370,7 +370,7 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
         res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603,B607
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
 
-        self.assertTrue(deb_file.exists(), "Debian package must exist after build")
+        self.assertTrue(deb_file.exists(), f"Debian package {deb_file} must exist after build")
         self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
 
     def test_cli_helper_missing_config_behavior(self):

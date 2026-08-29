@@ -1,7 +1,7 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation.diagnostics"
+  path: "services.agentstation.diagnostics"
   text: _("Diagnostics & Logs")
   position: 60
   icon: "mdi:stethoscope"

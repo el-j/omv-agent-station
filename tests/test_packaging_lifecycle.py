@@ -79,7 +79,29 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         self.assertIn("VERSION_TAG", install_script)
         self.assertIn("REQUESTED_VERSION", install_script)
         self.assertIn("fetch --tags", install_script)
+        self.assertIn("refs/tags/${REQUESTED_REF}", install_script)
+        self.assertIn("refs/tags/v${REQUESTED_REF#v}", install_script)
         self.assertIn("dpkg -i", install_script)
+
+    def test_resolve_version_handles_branch_and_tag_inputs(self):
+        import subprocess, re
+        script = ROOT_DIR / "scripts" / "resolve-version.sh"
+
+        # Explicit SemVer tag with leading 'v'
+        out = subprocess.check_output(["bash", str(script)], env={"VERSION_TAG": "v0.0.1"}, text=True).strip()
+        self.assertEqual(out, "0.0.1")
+
+        # Explicit SemVer tag without leading 'v'
+        out = subprocess.check_output(["bash", str(script)], env={"AGENT_STATION_VERSION": "0.0.2-beta.2"}, text=True).strip()
+        self.assertEqual(out, "0.0.2-beta.2")
+
+        # Branch name 'develop' must resolve to a SemVer starting with a digit, NOT literal string 'develop'
+        out = subprocess.check_output(["bash", str(script)], env={"BRANCH": "develop", "AGENT_STATION_VERSION": "develop"}, text=True).strip()
+        self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
+
+        # Branch name 'main' must resolve to a valid SemVer
+        out = subprocess.check_output(["bash", str(script)], env={"BRANCH": "main", "AGENT_STATION_VERSION": "main"}, text=True).strip()
+        self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
 
 
 if __name__ == "__main__":

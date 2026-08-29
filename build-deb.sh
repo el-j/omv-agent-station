@@ -8,11 +8,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="openmediavault-agent-station"
-VERSION="${AGENT_STATION_VERSION:-${VERSION_TAG:-${VERSION:-$(bash "$ROOT_DIR/scripts/resolve-version.sh")}}}"
+VERSION="${AGENT_STATION_VERSION:-${VERSION_TAG:-${VERSION:-}}}"
+if [ -z "$VERSION" ] || ! [[ "${VERSION#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    VERSION="$(bash "$ROOT_DIR/scripts/resolve-version.sh")"
+fi
 VERSION="${VERSION#v}"
 ARCH="all"
-DEB_FILE="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
-BUILD_DIR="./build-pkg"
+DEB_FILE="${ROOT_DIR}/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
+BUILD_DIR="${ROOT_DIR}/build-pkg"
 
 echo "=========================================================="
 echo "📦 Building $DEB_FILE for OpenMediaVault 6, 7 & 8"

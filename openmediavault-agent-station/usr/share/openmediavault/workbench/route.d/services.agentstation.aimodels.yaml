@@ -4,5 +4,5 @@ data:
   url: "/services/agentstation/aimodels"
   title: _("AI Models")
   editing: true
-  notificationTitle: _("AI model settings saved.")
+  notificationTitle: _("AI Models configuration saved.")
   component: omv-services-agentstation-aimodels-form-page

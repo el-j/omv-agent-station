@@ -18,21 +18,12 @@ fi
 # exact tags (v0.0.2-beta.2), or a raw version (0.0.2-beta.2).
 REQUESTED_REF="${VERSION_TAG:-${AGENT_STATION_VERSION:-${VERSION:-${BRANCH:-develop}}}}"
 BRANCH="${BRANCH:-${REQUESTED_REF:-develop}}"
-REQUESTED_VERSION="${REQUESTED_REF#v}"
 INSTALL_DIR="/srv/dev-data/omv-agent-station"
+git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 if [ -d "$INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR/.git" ]; then
     echo "🧹 Removing stale non-git checkout at $INSTALL_DIR before installing requested ref: $REQUESTED_REF"
     rm -rf "$INSTALL_DIR"
-fi
-
-# If the request is a branch name rather than a version, resolve to the
-# correct package SemVer before building the .deb artifact.
-if [[ "${REQUESTED_VERSION}" =~ ^[A-Za-z0-9._/-]+$ ]] && ! [[ "${REQUESTED_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-    RESOLVED_VERSION="$(GITHUB_REF_NAME="$BRANCH" BRANCH="$BRANCH" bash "$INSTALL_DIR/scripts/resolve-version.sh" 2>/dev/null || true)"
-    if [ -n "${RESOLVED_VERSION:-}" ] && [[ "${RESOLVED_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        REQUESTED_VERSION="$RESOLVED_VERSION"
-    fi
 fi
 
 # Ensure required OMV system directories exist before running apt
@@ -55,12 +46,15 @@ if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev
 fi
 
 mkdir -p "$INSTALL_DIR"
+git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 if [ -d "$INSTALL_DIR/.git" ]; then
     echo "🔄 Updating repository checkout to requested ref: $REQUESTED_REF"
     git -C "$INSTALL_DIR" fetch --tags --force --prune origin || true
-    if git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/${REQUESTED_REF#v}" >/dev/null; then
-        git -C "$INSTALL_DIR" checkout -f "${REQUESTED_REF#v}" 2>/dev/null || git -C "$INSTALL_DIR" checkout -f "tags/${REQUESTED_REF#v}" 2>/dev/null || true
+    if git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/${REQUESTED_REF}" >/dev/null; then
+        git -C "$INSTALL_DIR" checkout -f "${REQUESTED_REF}"
+    elif git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/v${REQUESTED_REF#v}" >/dev/null; then
+        git -C "$INSTALL_DIR" checkout -f "v${REQUESTED_REF#v}"
     elif git -C "$INSTALL_DIR" rev-parse --verify --quiet "origin/${REQUESTED_REF}" >/dev/null; then
         git -C "$INSTALL_DIR" checkout -B "$REQUESTED_REF" "origin/$REQUESTED_REF" 2>/dev/null || git -C "$INSTALL_DIR" checkout -B "$REQUESTED_REF" "$REQUESTED_REF" 2>/dev/null || true
     else
@@ -72,8 +66,10 @@ else
     echo "📥 Cloning omv-agent-station repository and selecting ref: $REQUESTED_REF"
     git clone https://github.com/el-j/omv-agent-station.git "$INSTALL_DIR"
     git -C "$INSTALL_DIR" fetch --tags --force --prune origin || true
-    if git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/${REQUESTED_REF#v}" >/dev/null; then
-        git -C "$INSTALL_DIR" checkout -f "${REQUESTED_REF#v}" 2>/dev/null || git -C "$INSTALL_DIR" checkout -f "tags/${REQUESTED_REF#v}" 2>/dev/null || true
+    if git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/${REQUESTED_REF}" >/dev/null; then
+        git -C "$INSTALL_DIR" checkout -f "${REQUESTED_REF}"
+    elif git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/v${REQUESTED_REF#v}" >/dev/null; then
+        git -C "$INSTALL_DIR" checkout -f "v${REQUESTED_REF#v}"
     elif git -C "$INSTALL_DIR" rev-parse --verify --quiet "origin/${REQUESTED_REF}" >/dev/null; then
         git -C "$INSTALL_DIR" checkout -B "$REQUESTED_REF" "origin/$REQUESTED_REF" || true
     else
@@ -82,6 +78,13 @@ else
 fi
 
 cd "$INSTALL_DIR"
+
+# Resolve the package SemVer version from the checked-out repository
+if [[ "${REQUESTED_REF#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    REQUESTED_VERSION="${REQUESTED_REF#v}"
+else
+    REQUESTED_VERSION="$(BRANCH="$BRANCH" bash "$INSTALL_DIR/scripts/resolve-version.sh")"
+fi
 
 echo "🔨 Building Debian package for explicit version/ref $REQUESTED_REF -> $REQUESTED_VERSION..."
 AGENT_STATION_VERSION="$REQUESTED_VERSION" bash build-deb.sh
@@ -120,7 +123,7 @@ if [ -z "${TARGET_DEB:-}" ] || [ ! -f "$TARGET_DEB" ]; then
     exit 1
 fi
 
-if ! apt-get install -y --reinstall "./$TARGET_DEB"; then
+if ! apt-get install -y --allow-downgrades --reinstall "./$TARGET_DEB"; then
     echo "⚠️ Apt direct install encountered a dependency preference issue; applying with dpkg + fix-broken..."
     dpkg -i --force-depends "./$TARGET_DEB" || true
     apt-get install -f -y || true

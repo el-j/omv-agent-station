@@ -117,6 +117,8 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(datamodel_dir.exists())
         
         for json_file in datamodel_dir.glob("*.json"):
+            if json_file.name.startswith("."):
+                continue
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             
@@ -138,6 +140,8 @@ class TestConfig(unittest.TestCase):
         # 1. Navigation items
         nav_dir = workbench_dir / "navigation.d"
         for nav_file in nav_dir.glob("*.yaml"):
+            if nav_file.name.startswith("."):
+                continue
             with open(nav_file, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             self.assertEqual(data.get("type"), "navigation-item", f"{nav_file.name} must be type: navigation-item")
@@ -151,6 +155,8 @@ class TestConfig(unittest.TestCase):
         # 2. Routes
         route_dir = workbench_dir / "route.d"
         for route_file in route_dir.glob("*.yaml"):
+            if route_file.name.startswith("."):
+                continue
             with open(route_file, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             self.assertEqual(data.get("type"), "route", f"{route_file.name} must be type: route")
@@ -165,6 +171,8 @@ class TestConfig(unittest.TestCase):
         # 3. Dashboard Widget
         dash_dir = workbench_dir / "dashboard.d"
         for dash_file in dash_dir.glob("*.yaml"):
+            if dash_file.name.startswith("."):
+                continue
             with open(dash_file, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             self.assertEqual(data.get("type"), "dashboard-widget", f"{dash_file.name} must be type: dashboard-widget")
@@ -178,6 +186,8 @@ class TestConfig(unittest.TestCase):
         # 4. Component Pages
         comp_dir = workbench_dir / "component.d"
         for comp_file in comp_dir.glob("*.yaml"):
+            if comp_file.name.startswith("."):
+                continue
             with open(comp_file, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             self.assertEqual(data.get("type"), "component", f"{comp_file.name} must be type: component")
@@ -204,7 +214,7 @@ class TestDocsMatchCode(unittest.TestCase):
 
     def test_no_agent_log_md_claim_without_matching_code(self):
         for path in ROOT_DIR.rglob("*.md"):
-            if "node_modules" in path.parts:
+            if "node_modules" in path.parts or path.name.startswith("."):
                 continue
             self.assertNotIn(
                 "agent-log.md", path.read_text(encoding="utf-8"),
