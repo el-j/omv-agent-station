@@ -8,6 +8,7 @@ to determine the next release version (major, minor, or patch).
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,16 +16,23 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
+def _resolve_git_executable() -> str:
+    """Resolve an absolute git executable path when available."""
+    git_exe = shutil.which("git")
+    return git_exe if git_exe else "git"
+
+
 def get_latest_git_tag() -> str:
     """Fetch and return the highest existing SemVer tag (e.g. 'v0.1.0')."""
+    git_exe = _resolve_git_executable()
     try:
         res = subprocess.run(
-            ["git", "tag", "-l", "v*"],
+            [git_exe, "tag", "-l", "v*"],
             cwd=str(ROOT_DIR),
             capture_output=True,
             text=True,
             check=True
-        )
+        )  # nosec B603
         tags = [t.strip() for t in res.stdout.splitlines() if t.strip()]
         semver_tags = []
         for t in tags:
@@ -34,8 +42,9 @@ def get_latest_git_tag() -> str:
         if semver_tags:
             semver_tags.sort(key=lambda x: (x[0], x[1], x[2]))
             return semver_tags[-1][3]
-    except Exception:
-        pass
+    except (subprocess.CalledProcessError, OSError):
+        # Fall back to the repository baseline when git metadata is unavailable.
+        return "v0.0.0"
     return "v0.0.0"
 
 
