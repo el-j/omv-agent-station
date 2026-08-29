@@ -86,7 +86,7 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
 
     def test_resolve_version_handles_branch_and_tag_inputs(self):
         import re
-        import subprocess
+        import subprocess  # nosec B404
         script = ROOT_DIR / "scripts" / "resolve-version.sh"
         bash_exe = shutil.which("bash") or "/bin/bash"
 

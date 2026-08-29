@@ -5,6 +5,7 @@ Treats all scripts, packaging tools, and security barriers as black-box systems.
 
 import os
 import re
+import shutil
 import sys
 import json
 import subprocess  # nosec B404
@@ -357,6 +358,7 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
     def test_debian_package_structure_and_permissions(self):
         deb_script = ROOT_DIR / "build-deb.sh"
         self.assertTrue(deb_script.exists())
+        deb_script_path = str(deb_script.resolve())
 
         # Force a deterministic version so we can assert the exact artifact
         # path even when build-deb.sh resolves VERSION dynamically.
@@ -367,7 +369,7 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
         # Build deb in isolated environment
         env = os.environ.copy()
         env["AGENT_STATION_VERSION"] = version
-        res = subprocess.run([str(deb_script)], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603,B607
+        res = subprocess.run([deb_script_path], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603
         self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
 
         self.assertTrue(deb_file.exists(), f"Debian package {deb_file} must exist after build")
@@ -376,9 +378,10 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
     def test_cli_helper_missing_config_behavior(self):
         cli_bin = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
         self.assertTrue(cli_bin.exists())
+        cli_bin_path = str(cli_bin.resolve())
         
         # Test help command
-        res = subprocess.run([str(cli_bin), "help"], capture_output=True, text=True)  # nosec B603,B607
+        res = subprocess.run([cli_bin_path, "help"], capture_output=True, text=True)  # nosec B603
         self.assertEqual(res.returncode, 0)
         self.assertIn("Usage:", res.stdout)
 
@@ -405,12 +408,14 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
             config_file.write_text(json.dumps(test_config), encoding="utf-8")
             
             cli_bin = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
+            cli_bin_path = str(cli_bin.resolve())
+            bash_exe = shutil.which("bash") or "/bin/bash"
             
             env = os.environ.copy()
             env["CONFIG_FILE"] = str(config_file)
             env["STACK_DIR"] = str(stack_dir)
             
-            res = subprocess.run(["bash", str(cli_bin), "apply"], env=env, cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603,B607
+            res = subprocess.run([bash_exe, cli_bin_path, "apply"], env=env, cwd=str(ROOT_DIR), capture_output=True, text=True)  # nosec B603
             self.assertEqual(res.returncode, 0)
             
             # Verify directories were created
