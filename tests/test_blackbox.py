@@ -365,15 +365,17 @@ class TestBlackboxCLIAndPackaging(unittest.TestCase):
         version = "0.0.2-ci.1"
         deb_file = ROOT_DIR / f"openmediavault-agent-station_{version}_all.deb"
         deb_file.unlink(missing_ok=True)
+        try:
+            # Build deb in isolated environment
+            env = os.environ.copy()
+            env["AGENT_STATION_VERSION"] = version
+            res = subprocess.run([deb_script_path], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603
+            self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
 
-        # Build deb in isolated environment
-        env = os.environ.copy()
-        env["AGENT_STATION_VERSION"] = version
-        res = subprocess.run([deb_script_path], cwd=str(ROOT_DIR), env=env, capture_output=True, text=True)  # nosec B603
-        self.assertEqual(res.returncode, 0, f"build-deb.sh failed: {res.stderr}")
-
-        self.assertTrue(deb_file.exists(), f"Debian package {deb_file} must exist after build")
-        self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
+            self.assertTrue(deb_file.exists(), f"Debian package {deb_file} must exist after build")
+            self.assertGreater(deb_file.stat().st_size, 5000, "Package size should be substantial")
+        finally:
+            deb_file.unlink(missing_ok=True)
 
     def test_cli_helper_missing_config_behavior(self):
         cli_bin = ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
