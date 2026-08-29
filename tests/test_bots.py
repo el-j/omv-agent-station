@@ -74,6 +74,7 @@ class TestBotsAndPackaging(unittest.TestCase):
         # Check component files
         comp_dir = base_dir / "usr" / "share" / "openmediavault" / "workbench" / "component.d"
         for comp_name in [
+            "omv-services-agentstation-navigation-page",
             "omv-services-agentstation-overview-page",
             "omv-services-agentstation-aimodels-form-page",
             "omv-services-agentstation-git-form-page",
@@ -95,7 +96,7 @@ class TestBotsAndPackaging(unittest.TestCase):
 
         root_route = (route_dir / "services.agentstation.yaml").read_text(encoding="utf-8")
         self.assertIn('url: "/services/agentstation"', root_route)
-        self.assertIn('component: omv-services-agentstation-overview-page', root_route)
+        self.assertIn('component: omv-services-agentstation-navigation-page', root_route)
 
         for sub in ["overview", "aimodels", "git", "chat", "security", "diagnostics"]:
             sub_text = (nav_dir / f"services.agentstation.{sub}.yaml").read_text(encoding="utf-8")
