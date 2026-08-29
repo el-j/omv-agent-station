@@ -1,8 +1,8 @@
 version: "1.0"
 type: route
 data:
-  url: "/agentstation/git"
+  url: "/services/agentstation/git"
   title: _("Git Providers")
   editing: true
-  notificationTitle: _("Git provider settings saved.")
+  notificationTitle: _("Git configuration saved.")
   component: omv-services-agentstation-git-form-page

@@ -2,7 +2,21 @@
 
 All notable changes to the OpenMediaVault Agent Station plugin will be documented in this file.
 
-## [0.0.2-beta.2] - 2026-08-25
+## [0.1.0] - 2026-08-29
+
+### Added
+- First official stable release for OpenMediaVault (OMV 6, 7 & 8).
+- Dedicated `navigationPage` container component for `Services -> Agent Station` displaying all 6 sub-menu cards (*Overview*, *AI Models*, *Git Providers*, *Chat & Messenger*, *Security & Web Access*, *Diagnostics & Logs*).
+- Dynamic SemVer packaging resolution (`resolve-version.sh`) with support for branch names, release tags (`v*`), and packaging fallbacks.
+- Comprehensive RPC PHPUnit test suite for `AgentStation` RPC service and schema validations.
+- Automated Debian package generation in GitHub Actions release publisher workflow.
+
+### Fixed
+- Fixed Workbench navigation lock where users were unable to switch out of Agent Station without a full page refresh.
+- Fixed root-level menu collision by properly nesting Agent Station under `Services` (`services.agentstation.*`).
+- Fixed dpkg parsing error `Version field value does not start with digit` during branch builds.
+- Fixed git tag checkout logic in installer script to match both `refs/tags/${TAG}` and `refs/tags/v${TAG}`.
+- Added `--allow-downgrades` flag during apt package installation to support switching between versions and branches.
 
 ### Added
 - Multi-messenger single source of truth library `agent_station_core` powering Telegram, Discord, and Signal.

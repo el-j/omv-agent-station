@@ -2,8 +2,16 @@ name: Release & Debian Package Publisher
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional manual release version override (e.g. 0.1.0 or 1.0.0)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -14,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -29,9 +39,52 @@ jobs:
         run: |
           bash scripts/test.sh
 
+      - name: Determine Release Version & Tag
+        id: versioning
+        run: |
+          git fetch --tags --force origin || true
+
+          # If triggered by a tag push, extract version directly from the tag
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RAW_TAG="${{ github.ref_name }}"
+            VERSION="${RAW_TAG#v}"
+            TAG_NAME="$RAW_TAG"
+          else
+            # Extract merge commit message and merged branch
+            COMMIT_MSG="$(git log -1 --pretty=%B)"
+            MERGED_BRANCH=""
+            if [[ "$COMMIT_MSG" =~ Merge\ pull\ request\ #[0-9]+\ from\ [^/]+/([^[:space:]]+) ]]; then
+              MERGED_BRANCH="${BASH_REMATCH[1]}"
+            fi
+
+            VERSION=$(python3 scripts/auto_release_version.py \
+              --branch "$MERGED_BRANCH" \
+              --commit-msg "$COMMIT_MSG" \
+              --override "${{ inputs.version }}")
+            TAG_NAME="v${VERSION}"
+          fi
+
+          echo "Target Version: ${VERSION}"
+          echo "Target Tag: ${TAG_NAME}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and Push Git Tag
+        run: |
+          TAG="${{ steps.versioning.outputs.tag_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "🏷️ Tagging commit ${{ github.sha }} with $TAG..."
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          else
+            echo "ℹ️ Tag $TAG already exists."
+          fi
+
       - name: Build Debian Package
         run: |
-          bash build-deb.sh
+          AGENT_STATION_VERSION="${{ steps.versioning.outputs.version }}" bash build-deb.sh
 
       - name: Generate Checksums
         run: |
@@ -41,6 +94,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.versioning.outputs.tag_name }}
+          name: ${{ steps.versioning.outputs.tag_name }}
           files: |
             openmediavault-agent-station_*.deb
             CHECKSUMS.txt

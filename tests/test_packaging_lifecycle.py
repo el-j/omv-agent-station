@@ -11,6 +11,7 @@ call driving it) has finished.
 """
 
 import unittest
+import shutil
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -66,6 +67,44 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         control = (DEBIAN_DIR / "control").read_text(encoding="utf-8")
         depends_line = next(line for line in control.splitlines() if line.startswith("Depends:"))
         self.assertIn("docker-ce-cli", depends_line)
+
+    def test_build_script_uses_dynamic_version_resolution(self):
+        build_script = (ROOT_DIR / "build-deb.sh").read_text(encoding="utf-8")
+        self.assertNotIn('VERSION="0.0.2-beta.2"', build_script)
+        self.assertIn("resolve-version.sh", build_script)
+        self.assertIn("AGENT_STATION_VERSION", build_script)
+        self.assertIn('sed -i.bak -E "s/^Version:.*/Version: ${VERSION}/"', build_script)
+
+    def test_install_script_supports_explicit_version_tags(self):
+        install_script = (ROOT_DIR / "scripts" / "install-plugin.sh").read_text(encoding="utf-8")
+        self.assertIn("VERSION_TAG", install_script)
+        self.assertIn("REQUESTED_VERSION", install_script)
+        self.assertIn("fetch --tags", install_script)
+        self.assertIn("refs/tags/${REQUESTED_REF}", install_script)
+        self.assertIn("refs/tags/v${REQUESTED_REF#v}", install_script)
+        self.assertIn("dpkg -i", install_script)
+
+    def test_resolve_version_handles_branch_and_tag_inputs(self):
+        import re
+        import subprocess  # nosec B404
+        script = ROOT_DIR / "scripts" / "resolve-version.sh"
+        bash_exe = shutil.which("bash") or "/bin/bash"
+
+        # Explicit SemVer tag with leading 'v'
+        out = subprocess.check_output([bash_exe, str(script)], env={"VERSION_TAG": "v0.0.1"}, text=True).strip()  # nosec B603
+        self.assertEqual(out, "0.0.1")
+
+        # Explicit SemVer tag without leading 'v'
+        out = subprocess.check_output([bash_exe, str(script)], env={"AGENT_STATION_VERSION": "0.0.2-beta.2"}, text=True).strip()  # nosec B603
+        self.assertEqual(out, "0.0.2-beta.2")
+
+        # Branch name 'develop' must resolve to a SemVer starting with a digit, NOT literal string 'develop'
+        out = subprocess.check_output([bash_exe, str(script)], env={"BRANCH": "develop", "AGENT_STATION_VERSION": "develop"}, text=True).strip()  # nosec B603
+        self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
+
+        # Branch name 'main' must resolve to a valid SemVer
+        out = subprocess.check_output([bash_exe, str(script)], env={"BRANCH": "main", "AGENT_STATION_VERSION": "main"}, text=True).strip()  # nosec B603
+        self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
 
 
 if __name__ == "__main__":

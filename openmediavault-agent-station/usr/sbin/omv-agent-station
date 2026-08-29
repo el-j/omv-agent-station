@@ -445,6 +445,9 @@ case "$1" in
     apply-bg)
         apply_async
         ;;
+    write-env)
+        write_env_file
+        ;;
     start)
         cd "$STACK_DIR" && run_compose --env-file .env up -d
         ;;

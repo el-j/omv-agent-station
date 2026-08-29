@@ -1,11 +1,11 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation.chat"
+  path: "services.agentstation.chat"
   text: _("Chat & Messenger")
   position: 40
   icon: "mdi:chat-processing-outline"
-  url: "/agentstation/chat"
+  url: "/services/agentstation/chat"
   permissions:
     role:
       - admin

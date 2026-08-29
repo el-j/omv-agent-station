@@ -1,11 +1,11 @@
 version: "1.0"
 type: navigation-item
 data:
-  path: "agentstation.aimodels"
+  path: "services.agentstation.aimodels"
   text: _("AI Models")
   position: 20
   icon: "mdi:brain"
-  url: "/agentstation/aimodels"
+  url: "/services/agentstation/aimodels"
   permissions:
     role:
       - admin
