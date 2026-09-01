@@ -75,3 +75,75 @@ jobs:
       - name: Run AgentStation RPC Tests
         working-directory: tests/php
         run: php vendor/bin/phpunit
+
+  # Verifies the 4 custom-built images (bots + web-terminal) actually compile for
+  # arm64 -- Raspberry Pi and other ARM-based Debian systems -- without needing
+  # physical Pi hardware in CI. Build-only: no --load/push, just catch arch breakage
+  # (e.g. a pip/npm package with no arm64 wheel) early.
+  arm64-build-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - telegram-agent-bot
+          - discord-agent-bot
+          - signal-agent-bot
+          - agent-workspace
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.target }} for linux/arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.target }}
+          platforms: linux/arm64
+          push: false
+
+  # Proves the stack builds and starts on a plain, non-OpenMediaVault Debian-family
+  # Linux box -- ubuntu-latest runners have Docker preinstalled and no OMV present,
+  # which is exactly the target environment for the standalone (non-plugin) install path.
+  standalone-install-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare placeholder .env
+        run: cp env.example .env
+
+      - name: Run setup.sh (standalone install path, no OMV involved)
+        run: bash setup.sh
+
+      - name: Verify core services reached a running state
+        run: |
+          docker compose ps
+          for svc in litellm syncthing; do
+            status=$(docker compose ps --format '{{.Service}} {{.State}}' | awk -v s="$svc" '$1==s{print $2}')
+            echo "$svc: $status"
+            if [ "$status" != "running" ]; then
+              echo "❌ Expected '$svc' to be running, got '$status'"
+              docker compose logs "$svc"
+              exit 1
+            fi
+          done
+          # telegram-bot uses a placeholder token so it may crash-loop on auth --
+          # only assert the container was actually created (proves build+compose wiring worked).
+          if ! docker compose ps -a --format '{{.Service}}' | grep -qx "telegram-bot"; then
+            echo "❌ Expected 'telegram-bot' container to have been created"
+            exit 1
+          fi
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

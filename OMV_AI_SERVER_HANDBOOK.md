@@ -1,5 +1,7 @@
 # Complete Handbook: 24/7 Autonomous AI Agent Stack on HP ProLiant Gen8 (OMV)
 
+> This handbook documents the reference setup: an HP ProLiant Gen8 running OpenMediaVault. The underlying stack has no OMV dependency, though, and runs the same way on any Debian-based Linux — including a Raspberry Pi 4/5 (64-bit OS). See the README's [Installation: OpenMediaVault or Any Debian-Based Linux](README.md#-installation-openmediavault-or-any-debian-based-linux) section for that path.
+
 ---
 
 ## 1. System Architecture Overview

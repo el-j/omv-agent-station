@@ -8,11 +8,15 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
   description="Step-by-step installation on OpenMediaVault 6, 7 & 8 using the native 1-click script or Debian .deb package."
   category="Getting Started"
   prevPage={{ title: "Architecture & Overview", href: `${baseUrl}/docs` }}
-  nextPage={{ title: "AI Models & Multi-Tier Routing", href: `${baseUrl}/docs/ai-models` }}
+  nextPage={{ title: "Standalone / Raspberry Pi Install", href: `${baseUrl}/docs/standalone-install` }}
 >
   <div class="docs-callout docs-callout-success">
     <strong>✅ Supported Systems:</strong><br />
     OpenMediaVault 6 (Debian 11 Bullseye), OpenMediaVault 7 (Debian 12 Bookworm), and OpenMediaVault 8 on x86_64 and ARM64 (Raspberry Pi 4/5).
+  </div>
+
+  <div class="docs-callout docs-callout-info">
+    <strong>Not running OpenMediaVault?</strong> This page covers the native OMV plugin. For Debian, Ubuntu, or a standalone Raspberry Pi (no OMV), see <a href={`${baseUrl}/docs/standalone-install`}>Standalone / Raspberry Pi Install</a> instead — same stack, managed directly with <code>docker compose</code>.
   </div>
 
   <h2>⚡ Method 1: 1-Click Automated Script (Recommended)</h2>

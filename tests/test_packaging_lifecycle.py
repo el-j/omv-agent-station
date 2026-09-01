@@ -107,5 +107,34 @@ class TestPackagingLifecycleTriggers(unittest.TestCase):
         self.assertTrue(re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$", out), f"Resolved version '{out}' is not valid SemVer")
 
 
+class TestNoVendoredStackDuplicate(unittest.TestCase):
+    """Guards against the stale duplicate stack tree (GitHub issue #71) coming back.
+
+    build-deb.sh copies the packaged stack fresh from the top-level
+    telegram-agent-bot/, discord-agent-bot/, signal-agent-bot/, agent_station_core/,
+    agent-workspace/, docker-compose.yml, and litellm/config.yaml into build-pkg/
+    (gitignored) at build time -- nothing should ever commit a second, manually
+    maintained copy of any of them under openmediavault-agent-station/.
+    """
+
+    def test_omv_share_dir_has_no_vendored_stack_copies(self):
+        share_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "agent-station"
+        forbidden = [
+            "telegram-agent-bot",
+            "discord-agent-bot",
+            "signal-agent-bot",
+            "agent_station_core",
+            "agent-workspace",
+            "docker-compose.yml",
+            "litellm",
+        ]
+        for name in forbidden:
+            self.assertFalse(
+                (share_dir / name).exists(),
+                f"{share_dir / name} should not exist -- it's a stale vendored copy; "
+                "build-deb.sh copies from the top-level source directories at build time instead.",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
