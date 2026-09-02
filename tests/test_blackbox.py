@@ -16,13 +16,14 @@ from pathlib import Path
 # Load test isolation stubs
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import stubs  # noqa: F401
+import stubs
 
 class TestBlackboxSecurityAndSanitization(unittest.TestCase):
     """Black-box security, injection, and path traversal tests."""
 
     def test_path_traversal_attacks_prevented(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         try:
             import bot
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -53,9 +54,11 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_telegram_authorization_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         try:
             import bot
             
@@ -76,12 +79,15 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_discord_authorization_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         try:
             import discord_bot
-            
+            import core.security as core_security
+
             class DummyAuthor:
                 def __init__(self, uid):
                     self.id = uid
@@ -90,16 +96,18 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
                 def __init__(self, uid):
                     self.author = DummyAuthor(uid) if uid is not None else None
 
-            discord_bot.ALLOWED_USER_ID = "555666777"
+            core_security.ALLOWED_USER_ID = "555666777"
             self.assertTrue(discord_bot.is_authorized(DummyContext("555666777")))
             self.assertFalse(discord_bot.is_authorized(DummyContext("999999999")))
             self.assertFalse(discord_bot.is_authorized(DummyContext(None)))
         finally:
             if str(ROOT_DIR / "discord-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_repo_name_sanitization_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         try:
             import bot
             valid_names = ["my-cool-app", "backend_api", "service.v2", "omv-agent-123"]
@@ -122,9 +130,11 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_telegram_topic_binding_and_context_resolution(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         try:
             import bot
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -180,6 +190,7 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_discord_channel_scope_uses_stable_thread_id_not_message_id(self):
         """channel_scope() must key a Discord Thread by the thread's own stable id,
@@ -187,8 +198,10 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
         set on one message could never be found again by a later message in the
         same thread if message id were used as the thread key."""
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         try:
             import discord_bot
+            import core.security as core_security
 
             class FakeThread:
                 def __init__(self, thread_id, parent_id):
@@ -210,8 +223,8 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
 
             thread = FakeThread(thread_id=999, parent_id=100)
 
-            first_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=111))
-            second_message_scope = discord_bot.channel_scope(FakeCtx(thread, message_id=222))
+            first_message_scope = core_security.channel_scope(FakeCtx(thread, message_id=111))
+            second_message_scope = core_security.channel_scope(FakeCtx(thread, message_id=222))
 
             self.assertEqual(first_message_scope, second_message_scope)
             self.assertEqual(first_message_scope, ("100", "999"))
@@ -220,14 +233,16 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
                 def __init__(self, cid):
                     self.id = cid
 
-            plain_channel_scope = discord_bot.channel_scope(FakeCtx(FakeChannel(555), message_id=333))
+            plain_channel_scope = core_security.channel_scope(FakeCtx(FakeChannel(555), message_id=333))
             self.assertEqual(plain_channel_scope, ("555", None))
         finally:
             if str(ROOT_DIR / "discord-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_custom_commands_lifecycle_and_expansion_blackbox(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         try:
             import bot
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -274,11 +289,12 @@ class TestBlackboxSecurityAndSanitization(unittest.TestCase):
                 self.assertEqual(expanded_b, "/exec pytest -v -k auth")
 
                 # 4. Built-in command collision defense
-                for builtin in ["start", "help", "task", "status", "exec", "newrepo", "bind"]:
+                for builtin in ["start", "help", "task", "status", "exec", "newrepo", "bind", "cancel", "stop"]:
                     self.assertIn(builtin, bot.BUILTIN_COMMANDS)
         finally:
             if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                 sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_credentials_multi_tier_persistence_and_file_permissions_blackbox(self):
         """Validates that credentials survive partial saves, upgrades, and are protected with 0600 permissions."""

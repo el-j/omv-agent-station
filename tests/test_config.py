@@ -239,8 +239,8 @@ class TestDocsMatchCode(unittest.TestCase):
 
         for bot_file, marker in (
             ("telegram-agent-bot/handlers/system.py", "upload it into the bound project's repo"),
-            ("discord-agent-bot/discord_bot.py", "destination path"),
-            ("signal-agent-bot/signal_bot.py", "destination path"),
+            ("discord-agent-bot/handlers/system.py", "destination path"),
+            ("signal-agent-bot/handlers/system.py", "destination path"),
         ):
             text = (ROOT_DIR / bot_file).read_text(encoding="utf-8")
             self.assertIn(marker, text, f"{bot_file} doesn't mention the file-upload feature in its help text")

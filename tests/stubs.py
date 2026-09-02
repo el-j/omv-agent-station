@@ -63,3 +63,23 @@ if _mocked_commands_module:
     # point the parent's .commands attribute at the same module we just
     # configured so both import styles see the identical object.
     sys.modules["discord.ext"].commands = sys.modules["discord.ext.commands"]
+
+
+def purge_bot_modules(*module_names):
+    """Evicts the given top-level module names (and any dotted submodules
+    under them) from sys.modules.
+
+    discord-agent-bot/, signal-agent-bot/, and telegram-agent-bot/ each ship
+    their own `core`/`handlers` packages with the SAME import names (by
+    design -- issue #22 mirrors Telegram's structure onto Discord/Signal).
+    Each bot runs as its own isolated process in production, so this never
+    collides for real, but the test suite imports all three into one shared
+    interpreter via sys.path tricks -- so whichever bot's `core`/`handlers`
+    happened to be imported first would otherwise "win" for the rest of the
+    process. Call this in setUp (before importing) and tearDown (after
+    removing the bot dir from sys.path) so every test starts and ends with
+    a clean slate regardless of run order.
+    """
+    for name in list(sys.modules):
+        if any(name == m or name.startswith(m + ".") for m in module_names):
+            del sys.modules[name]
