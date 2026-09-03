@@ -1,0 +1,22 @@
+[tool.bandit]
+# Issue #57: the previous bare-YAML `.bandit` file was never actually parsed --
+# bandit's project-level discovery expects INI with a [bandit] section, so it
+# logged "Unable to parse config file" and every skip/exclude below was inert.
+# bandit reads [tool.bandit] out of pyproject.toml natively, which is both the
+# documented format and the one that cannot silently no-op.
+exclude_dirs = [
+    "tests",
+    "website",
+    "build-pkg",
+    ".github",
+    "node_modules",
+    ".venv",
+    "venv",
+]
+skips = [
+    "B101",  # assert statements in tests
+    "B102",  # exec in test sandbox
+    "B404",  # import subprocess (managed via strict list arguments and binary resolution)
+    "B603",  # subprocess without shell=True
+    "B607",  # subprocess partial path (resolved via shutil.which)
+]

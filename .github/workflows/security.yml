@@ -31,4 +31,4 @@ jobs:
           path: "."
           level: "medium"
           confidence: "medium"
-          arguments: "-c .bandit"
+          arguments: "-c pyproject.toml"
