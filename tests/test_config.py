@@ -246,5 +246,64 @@ class TestDocsMatchCode(unittest.TestCase):
             self.assertIn(marker, text, f"{bot_file} doesn't mention the file-upload feature in its help text")
 
 
+class TestCustomLlmEndpointReachable(unittest.TestCase):
+    """Regression coverage for issue #74: litellm/config.yaml's "custom-llm"
+    model reads os.environ/CUSTOM_API_BASE and os.environ/CUSTOM_API_KEY, and
+    env.example documents both as a self-hosted OpenAI-compatible endpoint --
+    but neither compose file previously forwarded them into the litellm
+    container, and the plugin's write_env_file()/WebGUI never set them. Every
+    install path must actually be able to populate these two variables."""
+
+    def test_docker_compose_forwards_custom_llm_vars_to_litellm(self):
+        compose_path = ROOT_DIR / "docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        litellm_env = data["services"]["litellm"]["environment"]
+        joined = "\n".join(litellm_env)
+        self.assertIn("CUSTOM_API_BASE", joined)
+        self.assertIn("CUSTOM_API_KEY", joined)
+
+    def test_omv_compose_template_forwards_custom_llm_vars_to_litellm(self):
+        template_path = ROOT_DIR / "omv-compose-template.yaml"
+        with open(template_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        litellm_env = data["services"]["litellm"]["environment"]
+        joined = "\n".join(litellm_env)
+        self.assertIn("CUSTOM_API_BASE", joined)
+        self.assertIn("CUSTOM_API_KEY", joined)
+
+    def test_write_env_file_emits_custom_llm_vars(self):
+        script_text = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
+        ).read_text(encoding="utf-8")
+        self.assertIn("custom_api_base", script_text)
+        self.assertIn("custom_api_key", script_text)
+        self.assertIn("CUSTOM_API_BASE=", script_text)
+        self.assertIn("CUSTOM_API_KEY=", script_text)
+
+    def test_webgui_has_custom_llm_form_fields(self):
+        form_path = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault"
+            / "workbench" / "component.d" / "omv-services-agentstation-aimodels-form-page.yaml"
+        )
+        with open(form_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        field_names = {f.get("name") for f in data["data"]["config"]["fields"] if isinstance(f, dict)}
+        self.assertIn("custom_api_base", field_names)
+        self.assertIn("custom_api_key", field_names)
+
+    def test_setsettings_datamodel_accepts_custom_llm_fields(self):
+        import json
+        datamodel_path = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault"
+            / "datamodels" / "rpc.agentstation.setsettings.json"
+        )
+        with open(datamodel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        properties = data["params"]["properties"]
+        self.assertIn("custom_api_base", properties)
+        self.assertIn("custom_api_key", properties)
+
+
 if __name__ == "__main__":
     unittest.main()

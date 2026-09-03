@@ -133,7 +133,7 @@ class AgentStation extends ServiceAbstract
         $booleanFields = [
             "enable", "enable_aimodels", "enable_gemini", "enable_anthropic",
             "enable_github_models", "enable_mistral", "enable_openrouter",
-            "enable_deepseek", "enable_git", "enable_github", "enable_gitlab",
+            "enable_deepseek", "enable_custom", "enable_git", "enable_github", "enable_gitlab",
             "enable_bitbucket", "enable_chat", "enable_telegram", "enable_signal",
             "enable_discord", "enable_security"
         ];
@@ -142,7 +142,7 @@ class AgentStation extends ServiceAbstract
         $secretFields = [
             "gemini_api_key", "anthropic_api_key", "github_token", "github_git_token",
             "gitlab_token", "bitbucket_app_password", "mistral_api_key", "openrouter_api_key",
-            "deepseek_api_key", "telegram_bot_token", "discord_bot_token", "litellm_master_key",
+            "deepseek_api_key", "custom_api_key", "telegram_bot_token", "discord_bot_token", "litellm_master_key",
             "terminal_pass"
         ];
 
