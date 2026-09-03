@@ -55,6 +55,47 @@ jobs:
           name: openmediavault-agent-station-deb-${{ matrix.python-version }}
           path: openmediavault-agent-station_*.deb
 
+  # The tests from the "Genuine End-to-End Test Coverage" milestone that need
+  # more than the default toolchain: a real litellm proxy, and the real
+  # signal-cli / web-terminal images. They self-skip when those are missing, so
+  # this job is what actually makes them run -- without it the suite above would
+  # report green while silently skipping every container-backed test.
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml httpx websockets "litellm[proxy]"
+
+      - name: Prepare placeholder .env
+        run: cp env.example .env
+
+      - name: Pull signal-cli bridge image
+        run: docker pull bbernhard/signal-cli-rest-api:latest
+
+      - name: Build web-terminal image
+        run: docker compose build web-terminal
+
+      - name: Run LiteLLM failover, signal-cli bridge and web-terminal auth tests
+        run: |
+          python -m pytest -v \
+            tests/test_litellm_failover.py \
+            tests/test_signal_cli_bridge.py \
+            tests/test_web_terminal_auth.py
+
+      - name: Run real-git integration tests
+        run: python -m pytest -v tests/test_git_integration.py
+
   test-php:
     runs-on: ubuntu-latest
 
