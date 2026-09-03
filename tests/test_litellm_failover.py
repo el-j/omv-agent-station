@@ -125,10 +125,21 @@ class TestLiteLLMConfigStaticAssertions(unittest.TestCase):
                     self.assertIn(sec, all_models, f"Fallback target '{sec}' for '{primary}' not in model_list!")
 
     def test_modelhelp_text_matches_config_fallbacks(self):
-        """Regression coverage for issue #13: /modelhelp's described fallback
-        chains must match litellm/config.yaml's real router_settings.fallbacks,
-        in both the agent_station_core copy (Discord/Signal) and Telegram's
-        independent copy in handlers/ai_chat.py."""
+        """Regression coverage for issue #13 and #68: /modelhelp's described
+        fallback chains must match litellm/config.yaml's real
+        router_settings.fallbacks. It's now generated live from config.yaml
+        (issue #68) rather than hand-maintained -- so the chain is checked in
+        its raw model_name form (exactly what the generator emits) instead of
+        a separately hand-maintained human-label mapping that could itself
+        drift.
+
+        Telegram keeps its own independent copy of the generator function
+        (telegram-agent-bot/core/ai_service.py) rather than importing the
+        shared agent_station_core package -- Telegram deliberately doesn't
+        depend on agent_station_core at all (issue #72), unlike Discord/Signal
+        which do. Both copies are generated from the same litellm/config.yaml
+        at runtime, so this test checks both independently rather than
+        assuming one delegates to the other."""
         import yaml
         config_path = ROOT_DIR / "litellm" / "config.yaml"
         with open(config_path, "r", encoding="utf-8") as f:
@@ -136,17 +147,6 @@ class TestLiteLLMConfigStaticAssertions(unittest.TestCase):
         fallbacks = {}
         for fb in data["router_settings"]["fallbacks"]:
             fallbacks.update(fb)
-
-        # Human-readable labels used in the doc text for each model_name that
-        # appears in a fallback chain /modelhelp documents.
-        label = {
-            "gemini-3.7-pro": "Gemini 3.7 Pro",
-            "gemini-3.7-flash": "Gemini 3.7 Flash",
-            "gemini-2.5-flash": "Gemini 2.5 Flash",
-            "github-gpt-4o": "GPT-4o",
-            "github-deepseek-r1": "DeepSeek-R1",
-            "github-o3-mini": "o3-mini",
-        }
 
         sys.path.insert(0, str(ROOT_DIR))
         try:
@@ -156,13 +156,25 @@ class TestLiteLLMConfigStaticAssertions(unittest.TestCase):
             if str(ROOT_DIR) in sys.path:
                 sys.path.remove(str(ROOT_DIR))
 
-        telegram_text = (ROOT_DIR / "telegram-agent-bot" / "handlers" / "ai_chat.py").read_text(encoding="utf-8")
+        sys.path.insert(0, str(ROOT_DIR / "tests"))
+        import stubs
+        telegram_dir = ROOT_DIR / "telegram-agent-bot"
+        sys.path.insert(0, str(telegram_dir))
+        try:
+            import core.ai_service as telegram_ai_service
+            telegram_text = telegram_ai_service.get_modelhelp_markdown()
+        finally:
+            sys.path.remove(str(telegram_dir))
+            stubs.purge_bot_modules("core")
 
-        for router in ("coder-smart", "reasoning-heavy"):
+        for router in ("coder-fast", "coder-smart", "reasoning-heavy"):
             chain = fallbacks[router]
-            expected = " ➔ ".join(label[m] for m in chain)
+            expected = " ➔ ".join(f"`{m}`" for m in chain)
             self.assertIn(expected, shared_text, f"agent_station_core modelhelp text out of sync with {router}'s real fallback chain")
-            self.assertIn(expected, telegram_text, f"Telegram modelhelp text out of sync with {router}'s real fallback chain")
+            self.assertIn(
+                expected, telegram_text,
+                f"Telegram's independent /modelhelp generator is out of sync with {router}'s real fallback chain",
+            )
 
 
 @unittest.skipIf(LITELLM_BIN is None, "litellm CLI not installed (pip install 'litellm[proxy]')")

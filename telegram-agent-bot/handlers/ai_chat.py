@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 from core.config import LITELLM_BASE, LITELLM_KEY, logger
 from core.security import check_auth
 from core.git_auth import ai_client
+from core.ai_service import get_modelhelp_markdown
 
 async def chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Queries AI model with support for custom model flags or smart routers."""
@@ -109,34 +110,16 @@ async def gpt4_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await chat_cmd(update, context)
 
 async def modelhelp_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Provides an in-depth guide on available AI models, strengths, speed, and usage tips."""
+    """Provides an in-depth guide on available AI models, strengths, speed, and usage tips.
+
+    Generated live from litellm/config.yaml (same generation logic as the
+    Discord/Signal agent_station_core.ai_service, kept independently here
+    since Telegram uses its own core/ package) instead of a hand-maintained
+    string, so it can't go stale the way it repeatedly has (issue #13, #68)."""
     if not await check_auth(update):
         return
 
-    help_text = (
-        "📖 *OMV Agent Station — AI Models Guide*\n\n"
-        "Here is the breakdown of available models and router targets:\n\n"
-        "⚡ *`gemini-3.6-flash`* (Google Gemini 2.0 Flash)\n"
-        "• *Context:* 1,048,576 tokens\n"
-        "• *Speed:* Ultra fast (~80 tokens/sec)\n"
-        "• *Best for:* Quick questions, code explanation, regex, and large repository scans.\n"
-        "• *Shortcut:* `/gemini <question>`\n\n"
-        "🚀 *`coder-smart`* (Multi-Tier Router)\n"
-        "• *Primary:* Gemini 3.7 Pro ➔ Gemini 3.7 Flash ➔ GPT-4o ➔ Gemini 2.5 Flash\n"
-        "• *Best for:* Autonomous coding agent loops, bug fixing, test suite generation.\n"
-        "• *Command:* `/chat <question>` or `/task <project> <prompt>`\n\n"
-        "🧠 *`reasoning-heavy`* (Deep Chain-of-Thought)\n"
-        "• *Primary:* Gemini 3.7 Pro ➔ DeepSeek-R1 ➔ o3-mini ➔ Gemini 3.7 Flash\n"
-        "• *Best for:* Math, system architecture, database optimization, algorithms.\n"
-        "• *Command:* `/chat -m reasoning-heavy <prompt>`\n\n"
-        "🤖 *`github-gpt-4o`* (GitHub Marketplace)\n"
-        "• *Context:* 128,000 tokens\n"
-        "• *Best for:* General multi-step logic & code review.\n"
-        "• *Shortcut:* `/gpt4 <question>`\n\n"
-        "🛠️ *`claude`* (Claude Code CLI)\n"
-        "• *Best for:* Multi-file workspace edits & automated git workflows.\n"
-        "• *Command:* `/claude <prompt>`"
-    )
+    help_text = get_modelhelp_markdown()
 
     keyboard = [
         [
@@ -193,21 +176,20 @@ async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await msg.edit_text(
                 "ℹ️ *Active Gateway Configuration:*\n\n"
-                "• `coder-smart` (Google Gemini 3.6 Flash / Claude 3.7 / DeepSeek-R1)\n"
-                "• `coder-fast` (Google Gemini 3.6 Flash)\n"
-                "• `reasoning-heavy` (DeepSeek-R1 / Gemini Pro)\n"
-                "• `github-gpt-4o` (GitHub Models GPT-4o)\n"
-                "• `claude` (Anthropic Claude Code CLI)",
+                "• `coder-fast`, `coder-smart`, `reasoning-heavy` — smart multi-tier routers\n"
+                "• `github-gpt-4o` — GitHub Models GPT-4o\n"
+                "• `claude` (Anthropic Claude Code CLI)\n\n"
+                "Run `/modelhelp` for the live per-router model breakdown.",
                 parse_mode="Markdown"
             )
     except Exception as e:
         logger.error(f"Failed to query LiteLLM models: {e}")
         await msg.edit_text(
             f"⚠️ *Fallback AI Routers (LiteLLM gateway unreachable, list may be stale):*\n\n"
-            f"• `coder-smart` — Auto-fallback coding chain\n"
+            f"• `coder-fast`, `coder-smart`, `reasoning-heavy` — Auto-fallback coding chains\n"
             f"• `gemini-3.6-flash` — High speed Gemini Flash\n"
-            f"• `github-gpt-4o` — GitHub Models GPT-4o\n"
-            f"• `reasoning-heavy` — Deep logic & math\n\n"
+            f"• `github-gpt-4o` — GitHub Models GPT-4o\n\n"
+            f"Run `/modelhelp` for the live per-router model breakdown.\n\n"
             f"*(LiteLLM Gateway starting up or endpoint unreachable: {e})*",
             parse_mode="Markdown"
         )

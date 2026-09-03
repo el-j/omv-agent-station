@@ -186,5 +186,55 @@ class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
         self.assertTrue(any("Active AI Models" in r and "Fallback" not in r for r in ctx.replies))
 
 
+class TestGetModelhelpMarkdown(unittest.TestCase):
+    """Regression coverage for issue #68: /modelhelp used to be a hand-maintained
+    string that went stale every time litellm/config.yaml changed (this already
+    happened once, per issue #13). It's now generated live from the config, so
+    these tests mostly guard against the generator throwing or silently
+    producing something that doesn't reflect the real file."""
+
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.ai_service as ai_service
+        self.ai_service = ai_service
+
+    def tearDown(self):
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    def test_generation_does_not_throw_and_covers_every_model_group(self):
+        import yaml
+        config = yaml.safe_load((ROOT_DIR / "litellm" / "config.yaml").read_text(encoding="utf-8"))
+        model_names = {d["model_name"] for d in config["model_list"]}
+
+        text = self.ai_service.get_modelhelp_markdown()
+
+        self.assertIsInstance(text, str)
+        for name in model_names:
+            self.assertIn(name, text, f"/modelhelp output is missing model_name group '{name}'")
+
+    def test_generation_reflects_concrete_real_values(self):
+        """A couple of hand-checked assertions so a generator that silently
+        produces garbage (e.g. empty pools everywhere) can't pass the
+        group-coverage check above vacuously."""
+        text = self.ai_service.get_modelhelp_markdown()
+        self.assertIn("coder-smart", text)
+        self.assertIn("openrouter/poolside/laguna-s-2.1:free", text)
+        self.assertIn("anthropic/claude-3-7-sonnet-20250219", text)
+        # Router-level fallback chain for coder-smart, read straight out of
+        # router_settings.fallbacks -- not hand-maintained anywhere.
+        self.assertIn("gemini-3.7-pro", text)
+
+    def test_missing_config_file_falls_back_gracefully(self):
+        orig = self.ai_service._find_litellm_config_path
+        self.ai_service._find_litellm_config_path = lambda: None
+        try:
+            text = self.ai_service.get_modelhelp_markdown()
+            self.assertIsInstance(text, str)
+            self.assertGreater(len(text), 0)
+        finally:
+            self.ai_service._find_litellm_config_path = orig
+
+
 if __name__ == "__main__":
     unittest.main()
