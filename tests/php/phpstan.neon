@@ -1,0 +1,27 @@
+parameters:
+    # Issue #56: no PHP static analysis existed at all. Level 5 is the highest
+    # that passes clean today; level 6 adds 63 errors, and essentially all of
+    # them are missing parameter/return annotations on the OMV framework
+    # boundary -- the real \OMV\Rpc\ServiceAbstract and \OMV\System\Process
+    # aren't installable outside an OMV box (see stubs/OmvStubs.php), so
+    # annotating our hand-written stand-ins to satisfy level 6 would be
+    # inventing types for someone else's API. Raise this when the stubs grow
+    # closer to the real classes.
+    level: 5
+
+    paths:
+        - ../../openmediavault-agent-station/usr/share/openmediavault/engined/rpc/agentstation.inc
+        - AgentStationTest.php
+        - stubs/OmvStubs.php
+        - bootstrap.php
+
+    bootstrapFiles:
+        - stubs/OmvStubs.php
+
+    # .inc is the OMV convention for RPC service classes; without this phpstan
+    # simply skips the one file that matters most here.
+    fileExtensions:
+        - php
+        - inc
+
+    treatPhpDocTypesAsCertain: false

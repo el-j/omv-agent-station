@@ -104,7 +104,7 @@ namespace OMV\Rpc {
          * This intentionally accepts anything -- these tests exercise
          * setSettings/getStatus's own logic, not OMV's schema validator.
          */
-        final protected function validateMethodParams($params, $schema)
+        final protected function validateMethodParams($params, $schema): void
         {
         }
 
@@ -164,11 +164,11 @@ namespace OMV\System {
             $this->args = $args;
         }
 
-        public function setRedirectOutput($flag)
+        public function setRedirectOutput($flag): void
         {
         }
 
-        public function setAsync($flag)
+        public function setAsync($flag): void
         {
         }
 

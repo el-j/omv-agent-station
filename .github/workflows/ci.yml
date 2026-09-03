@@ -118,9 +118,13 @@ jobs:
           php-version: "8.3"
           coverage: none
 
-      - name: Install PHPUnit
+      - name: Install PHPUnit & PHPStan
         working-directory: tests/php
         run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPStan Static Analysis
+        working-directory: tests/php
+        run: php vendor/bin/phpstan analyse -c phpstan.neon --no-progress
 
       - name: Run AgentStation RPC Tests
         working-directory: tests/php

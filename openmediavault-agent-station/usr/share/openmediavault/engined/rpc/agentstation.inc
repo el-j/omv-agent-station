@@ -17,7 +17,6 @@ class AgentStation extends ServiceAbstract
 {
     private const CONFIG_PATH = "/etc/openmediavault-agent-station.json";
     private const DEFAULT_DATA_DIR = "/srv/dev-data";
-    private const STACK_DIR = "/usr/share/openmediavault/agent-station";
     private const CLI_PATH = "/usr/sbin/omv-agent-station";
 
     public function getName(): string

@@ -109,6 +109,23 @@ directory** because all three ship same-named `core`/`handlers` packages (each
 runs as its own container) and mypy refuses to run when two files map to one
 module name.
 
+### 6. PHP checks
+
+The OpenMediaVault RPC service (`engined/rpc/agentstation.inc`) has its own
+harness under `tests/php/`, run by CI's `test-php` job:
+
+```bash
+cd tests/php
+composer install
+composer check     # phpstan analyse, then phpunit
+```
+
+PHPStan runs at **level 5** (`tests/php/phpstan.neon`). Level 6 is not yet
+reachable: it reports ~63 missing parameter/return annotations, essentially all
+on the OMV framework boundary that `tests/php/stubs/OmvStubs.php` stands in for,
+and the real classes aren't installable off an OMV box. Raise the level as those
+stubs grow closer to the real API.
+
 ---
 
 ## 🔀 Pull Request Process
