@@ -18,6 +18,7 @@ class AgentStation extends ServiceAbstract
     private const CONFIG_PATH = "/etc/openmediavault-agent-station.json";
     private const DEFAULT_DATA_DIR = "/srv/dev-data";
     private const STACK_DIR = "/usr/share/openmediavault/agent-station";
+    private const CLI_PATH = "/usr/sbin/omv-agent-station";
 
     public function getName(): string
     {
@@ -50,6 +51,32 @@ class AgentStation extends ServiceAbstract
         return $override !== false ? $override : self::CONFIG_PATH;
     }
 
+    /**
+     * Resolves the omv-agent-station CLI helper path. Always self::CLI_PATH in
+     * production; overridable via AGENTSTATION_TEST_CLI_PATH for the same
+     * reason getConfigPath() is -- without it the PHPUnit harness can only
+     * ever reach the "helper not installed" half of every method that shells
+     * out, since /usr/sbin isn't writable from a test.
+     */
+    private function getCliPath(): string
+    {
+        $override = getenv("AGENTSTATION_TEST_CLI_PATH");
+        return $override !== false ? $override : self::CLI_PATH;
+    }
+
+    /**
+     * Resolves the persistent-storage root used as the settings default and as
+     * the config backup location. Overridable via AGENTSTATION_TEST_DATA_DIR
+     * so the PHPUnit harness never reads or writes the real /srv path (which
+     * on a developer box exists but is root-owned, producing a
+     * "Permission denied" warning from the fallback read below).
+     */
+    private function getDefaultDataDir(): string
+    {
+        $override = getenv("AGENTSTATION_TEST_DATA_DIR");
+        return $override !== false ? $override : self::DEFAULT_DATA_DIR;
+    }
+
     public function getSettings($params, $context): array
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
@@ -59,8 +86,8 @@ class AgentStation extends ServiceAbstract
             $data = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
         // Fallback to persistent storage backup if primary config is empty/missing
-        if (empty($data) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
-            $data = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
+        if (empty($data) && file_exists($this->getDefaultDataDir() . "/config/agent-station.json")) {
+            $data = json_decode(file_get_contents($this->getDefaultDataDir() . "/config/agent-station.json"), true) ?: [];
         }
         // Legacy migration fallback
         if (empty($data) && file_exists("/etc/openmediavault-ai-orchestrator.json")) {
@@ -69,7 +96,7 @@ class AgentStation extends ServiceAbstract
 
         return [
             "enable" => (bool)($data["enable"] ?? false),
-            "data_dir" => (string)($data["data_dir"] ?? self::DEFAULT_DATA_DIR),
+            "data_dir" => (string)($data["data_dir"] ?? $this->getDefaultDataDir()),
             "enable_aimodels" => (bool)($data["enable_aimodels"] ?? true),
             "enable_gemini" => (bool)($data["enable_gemini"] ?? true),
             "gemini_api_key" => (string)($data["gemini_api_key"] ?? ""),
@@ -122,8 +149,8 @@ class AgentStation extends ServiceAbstract
         if (file_exists($this->getConfigPath())) {
             $existing = json_decode(file_get_contents($this->getConfigPath()), true) ?: [];
         }
-        if (empty($existing) && file_exists(self::DEFAULT_DATA_DIR . "/config/agent-station.json")) {
-            $existing = json_decode(file_get_contents(self::DEFAULT_DATA_DIR . "/config/agent-station.json"), true) ?: [];
+        if (empty($existing) && file_exists($this->getDefaultDataDir() . "/config/agent-station.json")) {
+            $existing = json_decode(file_get_contents($this->getDefaultDataDir() . "/config/agent-station.json"), true) ?: [];
         }
         if (empty($existing) && file_exists("/etc/openmediavault-ai-orchestrator.json")) {
             $existing = json_decode(file_get_contents("/etc/openmediavault-ai-orchestrator.json"), true) ?: [];
@@ -168,7 +195,7 @@ class AgentStation extends ServiceAbstract
         @chmod($this->getConfigPath(), 0600);
 
         // Persistent storage backup
-        $dataDir = (string)($config["data_dir"] ?? self::DEFAULT_DATA_DIR);
+        $dataDir = (string)($config["data_dir"] ?? $this->getDefaultDataDir());
         if (!empty($dataDir)) {
             @mkdir($dataDir . "/config", 0755, true);
             @file_put_contents($dataDir . "/config/agent-station.json", json_encode($config, JSON_PRETTY_PRINT));
@@ -176,7 +203,7 @@ class AgentStation extends ServiceAbstract
         }
 
         // Call omv-agent-station apply-bg asynchronously so response returns immediately (<50ms)
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["apply-bg"]);
             $cmd->execute();
         }
@@ -327,7 +354,7 @@ class AgentStation extends ServiceAbstract
 
         // 4. Live execution logs
         $statusText = "";
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["logs", "all"]);
             $cmd->execute($output);
             $cleanLines = [];
@@ -373,7 +400,7 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["performance"]);
             $cmd->execute($output);
             $json_str = implode("", $output);
@@ -387,7 +414,7 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["restart"]);
             $cmd->execute();
         }
@@ -398,7 +425,7 @@ class AgentStation extends ServiceAbstract
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
         $service = $params["service"] ?? "litellm";
 
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["logs", $service]);
             $cmd->execute($output);
             return [
@@ -428,7 +455,7 @@ class AgentStation extends ServiceAbstract
     {
         $this->validateMethodContext($context, ["role" => OMV_ROLE_ADMINISTRATOR]);
 
-        if (file_exists("/usr/sbin/omv-agent-station")) {
+        if (file_exists($this->getCliPath())) {
             $cmd = new Process("omv-agent-station", ["check-update"]);
             $cmd->execute($output);
             $data = json_decode(implode("", $output), true);

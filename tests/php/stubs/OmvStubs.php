@@ -138,6 +138,23 @@ namespace OMV\System {
         /** @var array<int, array<int, string>> Every command this stub was asked to run, for assertions. */
         public static $log = [];
 
+        /**
+         * Canned stdout, keyed by the full space-joined command line
+         * (e.g. "omv-agent-station performance"), as an array of lines --
+         * matching the real Process::execute()'s by-reference $output.
+         * Lets a test drive the JSON-parsing branches of getPerformance()
+         * and checkForUpdate() without a real CLI helper on disk.
+         *
+         * @var array<string, array<int, string>>
+         */
+        public static $responses = [];
+
+        public static function reset(): void
+        {
+            self::$log = [];
+            self::$responses = [];
+        }
+
         private $command;
         private $args;
 
@@ -157,8 +174,9 @@ namespace OMV\System {
 
         public function execute(&$output = null)
         {
-            self::$log[] = array_merge([$this->command], $this->args);
-            $output = [];
+            $argv = array_merge([$this->command], $this->args);
+            self::$log[] = $argv;
+            $output = self::$responses[implode(" ", $argv)] ?? [];
             return 0;
         }
     }
