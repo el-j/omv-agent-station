@@ -56,7 +56,8 @@ async def upload_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     msg = update.effective_message
     document = msg.document
     photo = msg.photo[-1] if msg.photo else None
-    if not document and not photo:
+    media = document or photo
+    if media is None:
         return
 
     chat_id = update.effective_chat.id if update.effective_chat else 0
@@ -80,8 +81,8 @@ async def upload_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await msg.reply_text(f"❌ Project `{project_name}` is not a git repository.", parse_mode="Markdown")
         return
 
-    file_id = document.file_id if document else photo.file_id
-    file_size = (document.file_size if document else photo.file_size) or 0
+    file_id = media.file_id
+    file_size = media.file_size or 0
     if file_size > MAX_UPLOAD_BYTES:
         await msg.reply_text(
             f"❌ File is {file_size / 1024 / 1024:.1f} MB -- Telegram bots can only download files up to 20 MB.",

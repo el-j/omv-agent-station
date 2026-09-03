@@ -37,14 +37,18 @@ def get_bound_project(chat_id: int | str, thread_id: int | str | None) -> str | 
     key = f"{chat_id}:{thread_id}"
     return bindings.get(key)
 
-def set_bound_project(chat_id: int | str, thread_id: int | str, project_name: str):
-    """Binds a project folder name to a given (chat_id, thread_id) pair."""
+def set_bound_project(chat_id: int | str, thread_id: int | str | None, project_name: str):
+    """Binds a project folder name to a given (chat_id, thread_id) pair.
+
+    thread_id is Optional for the same reason get_bound_project's is: Discord
+    channels outside a Thread, and every Signal sender, bind with None.
+    """
     bindings = load_topic_bindings()
     key = f"{chat_id}:{thread_id}"
     bindings[key] = project_name
     save_topic_bindings(bindings)
 
-def remove_bound_project(chat_id: int | str, thread_id: int | str):
+def remove_bound_project(chat_id: int | str, thread_id: int | str | None):
     """Removes the project binding for a given (chat_id, thread_id) pair."""
     bindings = load_topic_bindings()
     key = f"{chat_id}:{thread_id}"
