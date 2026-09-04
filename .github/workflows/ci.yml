@@ -161,7 +161,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare placeholder .env
-        run: cp env.example .env
+        run: |
+          cp env.example .env
+          # /srv is root-owned on the ubuntu-latest runner and this job doesn't
+          # use sudo -- override DATA_DIR so setup.sh/docker compose write
+          # somewhere the runner user can actually create. Exported via
+          # GITHUB_ENV so it's visible to every later step in this job, not
+          # just this one's shell.
+          echo "DATA_DIR=${RUNNER_TEMP}/agent-station-dev-data" >> "$GITHUB_ENV"
 
       - name: Run setup.sh (standalone install path, no OMV involved)
         run: bash setup.sh
