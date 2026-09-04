@@ -278,7 +278,8 @@ class TestDiscordHandlers(unittest.TestCase):
         self.assertTrue(any("1 day" in r for r in ctx.replies))
 
     def test_note_cmd_saves_note(self):
-        self.patch(self.vault, "save_obsidian_note", lambda title, content: {"success": True, "path": "Inbox/Test.md"})
+        self.patch(self.vault, "save_obsidian_note", lambda title, content, extra_tags=None: {"success": True, "path": "Inbox/Test.md"})
+        self.patch(self.vault, "suggest_tags", AsyncMock(return_value=[]))
         ctx = DummyCtx()
         self.arun(self.vault.note_cmd(ctx, note_text="Test Note | some content"))
         self.assertTrue(any("Saved" in r for r in ctx.replies))

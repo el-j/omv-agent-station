@@ -4,7 +4,7 @@ Obsidian Second-Brain Note-Taking Handlers.
 
 from datetime import datetime
 
-from agent_station_core import save_obsidian_note, list_vault_notes
+from agent_station_core import save_obsidian_note, list_vault_notes, suggest_tags
 from core.messaging import send_signal_message
 
 
@@ -19,7 +19,8 @@ async def note(sender: str, args: list[str]):
     else:
         title = f"Quick Note {datetime.now().strftime('%Y-%m-%d %H%M')}"
         content = raw
-    res = save_obsidian_note(title.strip(), content.strip())
+    tags = await suggest_tags(content.strip())
+    res = save_obsidian_note(title.strip(), content.strip(), extra_tags=tags)
     if res["success"]:
         await send_signal_message(sender, f"✅ Note Saved to Obsidian: {res['path']}")
     else:

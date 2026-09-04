@@ -122,6 +122,48 @@ class TestQueryAiModel(unittest.TestCase):
         self.assertEqual(res["model"], "reasoning-heavy")
 
 
+class TestSuggestTags(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.ai_service as ai_service
+        self.ai_service = ai_service
+        self._orig_create = ai_service.ai_client.chat.completions.create
+
+    def tearDown(self):
+        self.ai_service.ai_client.chat.completions.create = self._orig_create
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    def test_empty_text_returns_empty_list_without_calling_the_model(self):
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(side_effect=AssertionError("should not be called"))
+        self.assertEqual(asyncio.run(self.ai_service.suggest_tags("   ")), [])
+
+    def test_success_parses_comma_separated_tags(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="Docker, Home Server, Backups"))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        tags = asyncio.run(self.ai_service.suggest_tags("Set up nightly backups for the OMV Docker stack."))
+
+        self.assertEqual(tags, ["docker", "home-server", "backups"])
+
+    def test_result_is_capped_at_max_tags(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="a, b, c, d, e, f, g"))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        tags = asyncio.run(self.ai_service.suggest_tags("some text", max_tags=3))
+
+        self.assertEqual(tags, ["a", "b", "c"])
+
+    def test_failure_returns_empty_list_not_an_exception(self):
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(side_effect=ConnectionError("gateway down"))
+
+        tags = asyncio.run(self.ai_service.suggest_tags("some text"))
+
+        self.assertEqual(tags, [])
+
+
 class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
