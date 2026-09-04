@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class FakeResponse:
@@ -125,9 +125,11 @@ class TestQueryAiModel(unittest.TestCase):
 class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         import discord_bot
+        import core.security as core_security
         self.discord_bot = discord_bot
-        self.discord_bot.ALLOWED_USER_ID = None
+        core_security.ALLOWED_USER_ID = None
         import agent_station_core.ai_service as ai_service
         self.ai_service = ai_service
         self._orig = ai_service.httpx.AsyncClient
@@ -137,6 +139,7 @@ class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
         self.ai_service.httpx.AsyncClient = self._orig
         if str(ROOT_DIR / "discord-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_models_cmd_labels_fallback_when_gateway_unreachable(self):
         class DummyChannel:
