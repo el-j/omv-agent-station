@@ -1,64 +1,12 @@
 """
-AI Gateway and Intelligence Querying Service.
-Handles LiteLLM client interactions, smart model fallbacks, and model capability guides.
+Model capability guide generation for /modelhelp.
 """
 
 import os
 from pathlib import Path
 
-import httpx
 import yaml
-from openai import AsyncOpenAI
-from .config import LITELLM_BASE, LITELLM_KEY, logger
-
-# Global Async AI Client
-ai_client = AsyncOpenAI(
-    api_key=LITELLM_KEY,
-    base_url=f"{LITELLM_BASE}/v1",
-    timeout=120.0
-)
-
-async def query_ai_model(prompt: str, model: str = "coder-smart", system_prompt: str = "") -> dict:
-    """Dispatches a prompt to LiteLLM with automatic fallback handling."""
-    sys_msg = system_prompt or (
-        "You are the OpenMediaVault AI Assistant running on a self-hosted server. "
-        "Provide concise, practical, and highly accurate answers with code examples when appropriate."
-    )
-    try:
-        response = await ai_client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": sys_msg},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-            max_tokens=2048,
-        )
-        answer = response.choices[0].message.content or "No response received."
-        return {"success": True, "answer": answer, "model": model}
-    except Exception as e:
-        logger.error(f"AI query failed on model {model}: {e}")
-        return {"success": False, "error": str(e), "model": model}
-
-async def list_ai_models() -> tuple[list[str], bool]:
-    """Retrieves active models from the LiteLLM proxy.
-
-    Returns (models, live) -- live is False whenever the proxy call failed
-    and the hardcoded fallback list is being returned instead, so callers
-    can tell users the list may be stale rather than presenting it as a
-    confirmed-reachable live gateway read."""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{LITELLM_BASE}/models",
-                headers={"Authorization": f"Bearer {LITELLM_KEY}"}
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                return [m.get("id") for m in data.get("data", [])], True
-    except Exception as e:
-        logger.warning(f"Could not fetch models from LiteLLM: {e}")
-    return ["coder-smart", "gemini-3.6-flash", "github-gpt-4o", "reasoning-heavy", "claude"], False
+from .config import logger
 
 # Usage/description blurbs for the virtual routers -- this is the one piece of
 # /modelhelp that genuinely can't be derived from litellm/config.yaml (it's
@@ -88,10 +36,7 @@ def _find_litellm_config_path() -> Path | None:
     """Locates litellm/config.yaml. Checks LITELLM_CONFIG_YAML_PATH first (set
     by docker-compose.yml, which mounts the real file into every bot
     container), then walks up from this module's directory looking for a
-    `litellm/config.yaml` sibling -- this works both for the root
-    agent_station_core/ package (used by tests) and the per-bot copies
-    (telegram-agent-bot/agent_station_core/, etc.) without any hardcoded
-    path-depth assumption."""
+    `litellm/config.yaml` sibling."""
     env_path = os.environ.get("LITELLM_CONFIG_YAML_PATH")
     if env_path and Path(env_path).is_file():
         return Path(env_path)

@@ -65,9 +65,32 @@ async def models_cmd(ctx: commands.Context):
     await ctx.reply(f"🤖 **{label} ({len(models)}):**\n\n{model_str}\n\n*Routers:* `coder-smart`, `reasoning-heavy`")
 
 
+def _chunk_message(text: str, limit: int = 1900) -> list[str]:
+    """Splits text into Discord-safe chunks (hard cap 2000 chars per message)
+    on line boundaries so a single long reply (e.g. /modelhelp, now generated
+    live from litellm/config.yaml and no longer a fixed short string) can't
+    trip discord.HTTPException for exceeding the message length limit."""
+    lines = text.split("\n")
+    chunks: list[str] = []
+    current = ""
+    for line in lines:
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) > limit and current:
+            chunks.append(current)
+            current = line
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks or [text[:limit]]
+
+
 async def modelhelp_cmd(ctx: commands.Context):
     """Replies with the detailed model-tier/fallback-chain capability reference."""
     if not await check_auth(ctx):
         return
     text = get_modelhelp_markdown().replace("*", "**")
-    await ctx.reply(text)
+    chunks = _chunk_message(text)
+    await ctx.reply(chunks[0])
+    for chunk in chunks[1:]:
+        await ctx.send(chunk)

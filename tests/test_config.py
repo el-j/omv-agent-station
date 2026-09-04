@@ -111,6 +111,43 @@ class TestConfig(unittest.TestCase):
         missing = sorted(v for v in referenced_vars if v not in env_content)
         self.assertEqual(missing, [], f"env.example is missing variables referenced by litellm/config.yaml: {missing}")
 
+    def test_env_example_covers_every_python_env_var(self):
+        """Regression coverage for issue #70: every os.environ.get/os.getenv/
+        os.environ[...] key actually read by agent_station_core and the three
+        bot entrypoints/handlers must have a corresponding entry in
+        env.example, so a var the code reads silently can't stay undocumented
+        the way WORKSPACE_PATH, SIGNAL_CLI_URL, and friends did."""
+        scan_targets = [
+            *(ROOT_DIR / "agent_station_core").glob("*.py"),
+            ROOT_DIR / "telegram-agent-bot" / "bot.py",
+            *(ROOT_DIR / "telegram-agent-bot" / "core").glob("*.py"),
+            *(ROOT_DIR / "telegram-agent-bot" / "handlers").glob("*.py"),
+            ROOT_DIR / "discord-agent-bot" / "discord_bot.py",
+            ROOT_DIR / "signal-agent-bot" / "signal_bot.py",
+        ]
+        scan_targets = [p for p in scan_targets if p.exists()]
+        self.assertTrue(scan_targets, "Expected to find at least one source file to scan")
+
+        pattern = re.compile(
+            r"os\.environ\.get\(\s*[\"']([A-Z0-9_]+)[\"']"
+            r"|os\.getenv\(\s*[\"']([A-Z0-9_]+)[\"']"
+            r"|os\.environ\[\s*[\"']([A-Z0-9_]+)[\"']\s*\]"
+        )
+
+        referenced_vars = set()
+        for path in scan_targets:
+            for match in pattern.finditer(path.read_text(encoding="utf-8")):
+                referenced_vars.add(next(g for g in match.groups() if g))
+
+        self.assertTrue(referenced_vars, "Expected at least one os.environ/os.getenv reference in the scanned files")
+
+        env_content = (ROOT_DIR / "env.example").read_text(encoding="utf-8")
+        missing = sorted(v for v in referenced_vars if v not in env_content)
+        self.assertEqual(
+            missing, [],
+            f"env.example is missing variables read by agent_station_core/the bots: {missing}",
+        )
+
     def test_omv_datamodel_schema_validity(self):
         import json
         datamodel_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "datamodels"

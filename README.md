@@ -145,10 +145,16 @@ If your primary direct Anthropic subscription hits a rate limit (HTTP 429) or to
 4️⃣ GitHub Copilot (GitHub Models: GPT-4o / o3-mini)
 ```
 
+*(This illustrates what happens once a request reaches the Claude tier of a router's pool. In practice `coder-smart` tries free OpenRouter models and Gemini first -- see the exact pool order below.)*
+
 ### Virtual Router Aliases in `litellm/config.yaml`:
-- **`coder-fast`**: Ultra-fast triage, search, and repository mapping using **Gemini 3.7 Flash** (fallback: Gemini 2.5 Flash, Claude 3.5 Haiku).
-- **`coder-smart`**: Primary agentic loop model using **Claude 3.7 Sonnet** (fallback: Vertex AI Claude 3.7 Sonnet, Gemini 3.7 Pro, GitHub GPT-4o).
-- **`reasoning-heavy`**: Deep architecture design & mathematical reasoning using **Claude 3.7 Sonnet Thinking** & **Gemini 3.7 Pro** (fallback: GitHub o3-mini).
+Each router is a pool of deployments tried in the order listed below (LiteLLM's `usage-based-routing` picks the least-used one); if free API keys aren't configured those entries fail instantly and fall through. If the *entire* pool is exhausted, `router_settings.fallbacks` sends the request to a different router/model entirely (listed as "router fallback" below).
+
+- **`coder-fast`**: Ultra-fast triage, search, and repository mapping. Pool order: free OpenRouter models (Nemotron 3.5 Lightning, Laguna XS) ➔ **Gemini 3.6/3.7 Flash & Flash Latest** ➔ Claude 3.5 Haiku. *Router fallback:* Gemini 3.7 Flash, Gemini 2.5 Flash, GitHub GPT-4o.
+- **`coder-smart`**: Primary agentic loop model. Pool order: free OpenRouter models (Laguna-S, North Mini Code, Nemotron Super) ➔ **Gemini 3.6/3.7 Flash & Gemini 3.7 Pro** ➔ GitHub GPT-4o ➔ **Claude 3.7 Sonnet** (direct) ➔ Claude 3.7 Sonnet (Vertex AI). *Router fallback:* Gemini 3.7 Pro, Gemini 3.7 Flash, GitHub GPT-4o, Gemini 2.5 Flash.
+- **`reasoning-heavy`**: Deep architecture design & mathematical reasoning. Pool order: free OpenRouter models (GLM 5.2, Nemotron Ultra) ➔ **Gemini 3.6 Flash & Gemini 3.7 Pro** ➔ GitHub DeepSeek-R1/o3-mini/o1 ➔ **Claude 3.7 Sonnet** (direct). *Router fallback:* Gemini 3.7 Pro, GitHub DeepSeek-R1, GitHub o3-mini, Gemini 3.7 Flash.
+
+> 💡 The free OpenRouter deployments only activate once you set `OPENROUTER_API_KEY` — see [Free-Tier Models via OpenRouter](OMV_AI_SERVER_HANDBOOK.md#3-free-tier-models-via-openrouter-optional-4th-redundancy-layer) in the handbook for the tradeoffs (tighter rate limits, lower quality than the paid models below them) and why this list needs periodic re-checking against OpenRouter's catalog.
 
 ---
 
@@ -234,6 +240,7 @@ Once the bot is running, message it in your Telegram app:
 - `/note <Title> | <Content>`: Save a quick note directly into your Obsidian `Inbox/` folder.
 - `/models`: Check live model endpoints and connectivity in the LiteLLM proxy.
 - `/status`: Check server uptime, disk space, and active background tmux sessions.
+- `/cancel` (alias `/stop`): Stop the `/task`, `/claude`, or `/exec` command currently running in this chat.
 
 ---
 
