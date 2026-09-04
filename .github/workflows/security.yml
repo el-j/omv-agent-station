@@ -28,7 +28,13 @@ jobs:
       - name: Run Bandit Vulnerability Scan
         uses: PyCQA/bandit-action@v1
         with:
-          path: "."
-          level: "medium"
+          # bandit-action's real inputs are targets/severity/confidence/configfile,
+          # not path/level/arguments -- those don't exist on this action, so they
+          # were silently ignored and Bandit ran with zero config, scanning tests/
+          # (which pyproject.toml's [tool.bandit] deliberately excludes) with no
+          # severity floor. That reproduced 130+ already-triaged/nosec'd findings
+          # as fresh github-advanced-security alerts on every push.
+          targets: "."
+          severity: "medium"
           confidence: "medium"
-          arguments: "-c pyproject.toml"
+          configfile: "pyproject.toml"
