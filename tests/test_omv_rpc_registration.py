@@ -138,5 +138,21 @@ class TestOmvRpcRegistrationExecuted(unittest.TestCase):
         self.assertEqual(res.stdout.strip(), "REJECTED")
 
 
+class TestRestartServicesAndGetLogsAreWired(unittest.TestCase):
+    """Regression coverage for issue #73: restartServices and getLogs were
+    registered and implemented in agentstation.inc but no component.d yaml
+    ever referenced them, making both permanently unreachable from the
+    WebGUI. Both are now wired into the Diagnostics page."""
+
+    def test_restart_services_and_get_logs_referenced_in_workbench(self):
+        component_dir = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault"
+            / "workbench" / "component.d"
+        )
+        combined = "\n".join(p.read_text(encoding="utf-8") for p in component_dir.glob("*.yaml"))
+        self.assertIn("restartServices", combined, "restartServices is registered but never called from any component.d yaml")
+        self.assertIn("getLogs", combined, "getLogs is registered but never called from any component.d yaml")
+
+
 if __name__ == "__main__":
     unittest.main()

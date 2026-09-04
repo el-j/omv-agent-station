@@ -75,6 +75,22 @@ data:
         value: ""
         hint: _("Paste your DeepSeek API key from platform.deepseek.com")
       - type: divider
+        title: _("Custom / Self-Hosted OpenAI-Compatible Endpoint (LM Studio, Ollama, Private Gateway)")
+      - type: checkbox
+        name: enable_custom
+        label: _("Enable Custom OpenAI-Compatible Provider")
+        value: false
+      - type: textInput
+        name: custom_api_base
+        label: _("Custom Endpoint Base URL")
+        value: ""
+        hint: _("e.g. http://192.168.1.50:11434/v1 -- exposed to LiteLLM as the \"custom-llm\" model")
+      - type: passwordInput
+        name: custom_api_key
+        label: _("Custom Endpoint API Key")
+        value: ""
+        hint: _("Leave blank if your self-hosted endpoint does not require authentication")
+      - type: divider
         title: _("Anthropic Direct API (Claude 3.7 Sonnet & 3.5)")
       - type: checkbox
         name: enable_anthropic
