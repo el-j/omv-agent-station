@@ -64,6 +64,16 @@ class TestVaultService(unittest.TestCase):
         self.assertFalse(res["success"])
         self.assertIn("error", res)
 
+    def test_save_obsidian_note_merges_extra_tags(self):
+        res = self.vault_service.save_obsidian_note("Title", "content", extra_tags=["docker", "backups"])
+        text = (self.vault / res["path"]).read_text(encoding="utf-8")
+        self.assertIn("tags: [quick-capture, second-brain, docker, backups]", text)
+
+    def test_save_obsidian_note_dedupes_extra_tags_against_base(self):
+        res = self.vault_service.save_obsidian_note("Title", "content", extra_tags=["second-brain", "docker"])
+        text = (self.vault / res["path"]).read_text(encoding="utf-8")
+        self.assertIn("tags: [quick-capture, second-brain, docker]", text)
+
     # -- list_vault_notes ----------------------------------------------------
 
     def test_list_vault_notes_missing_vault_returns_error(self):

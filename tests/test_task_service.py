@@ -237,6 +237,114 @@ class TestTaskService(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_run_claude_cli_returns_error_dict_on_unexpected_exception(self):
+        async def scenario():
+            async def fake_exec(*args, **kwargs):
+                raise RuntimeError("kernel said no")
+
+            asyncio.create_subprocess_exec = fake_exec
+            res = await self.task_service.run_claude_cli(Path("/tmp"), "hi")
+
+            self.assertFalse(res["success"])
+            self.assertIn("kernel said no", res["error"])
+
+        asyncio.run(scenario())
+
+    # -- agent credential passthrough ------------------------------------
+
+    def test_autonomous_task_forwards_mounted_anthropic_token(self):
+        """The OMV plugin mounts the Claude credential at /root/.anthropic/token;
+        if it stops being forwarded to aider, every agent run silently loses
+        access to the Anthropic-backed models."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            token_file = Path(tmpdir) / "token"
+            token_file.write_text("sk-ant-test\n")
+
+            def token_exists(self, *args, **kwargs):
+                if str(self) == "/root/.anthropic/token":
+                    return True
+                return _real_path_exists(self, *args, **kwargs)
+
+            def token_read(self, *args, **kwargs):
+                if str(self) == "/root/.anthropic/token":
+                    return "sk-ant-test\n"
+                return token_file.read_text()
+
+            async def scenario():
+                calls = []
+
+                async def fake_exec(*args, **kwargs):
+                    calls.append(list(args))
+                    return FakeProc(returncode=0, stdout=b"ok")
+
+                asyncio.create_subprocess_exec = fake_exec
+                await self.task_service.run_autonomous_task(
+                    Path(tmpdir), "x", "task_tok", "agent/task_tok")
+                aider_call = next(c for c in calls if c[0] == self.task_service.AIDER_BIN)
+                self.assertIn("--anthropic-api-key", aider_call)
+                self.assertEqual(aider_call[aider_call.index("--anthropic-api-key") + 1], "sk-ant-test")
+
+            with patch.object(Path, "exists", token_exists), \
+                    patch.object(Path, "read_text", token_read):
+                asyncio.run(scenario())
+
+    # -- telemetry --------------------------------------------------------
+
+    def test_get_ram_usage_parses_proc_meminfo(self):
+        import builtins
+        meminfo = "MemTotal:       2048000 kB\nMemFree:  100000 kB\nMemAvailable:   1024000 kB\n"
+        real_open = builtins.open
+
+        def fake_open(path, *args, **kwargs):
+            if path == "/proc/meminfo":
+                import io
+                return io.StringIO(meminfo)
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(builtins, "open", fake_open):
+            self.assertEqual(self.task_service.get_ram_usage(), "1000 MB used of 2000 MB (50%)")
+
+    def test_get_ram_usage_returns_na_when_proc_is_unavailable(self):
+        import builtins
+        real_open = builtins.open
+
+        def fake_open(path, *args, **kwargs):
+            if path == "/proc/meminfo":
+                raise FileNotFoundError(path)
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(builtins, "open", fake_open):
+            self.assertEqual(self.task_service.get_ram_usage(), "N/A")
+
+    def test_get_system_status_collects_all_four_metrics(self):
+        outputs = {
+            self.task_service.TMUX_BIN: "agent: 1 windows",
+            self.task_service.UPTIME_BIN: "up 3 days,  1 user",
+            self.task_service.DF_BIN: "Filesystem Size Used Avail Use%\n/dev/sda1 100G 50G 50G 50% /data",
+        }
+
+        def fake_check_output(args, **kwargs):
+            return outputs[args[0]]
+
+        with patch.object(self.task_service.subprocess, "check_output", fake_check_output):
+            status = self.task_service.get_system_status()
+
+        self.assertEqual(status["tmux"], "agent: 1 windows")
+        self.assertEqual(status["uptime"], "up 3 days,  1 user")
+        self.assertIn("/dev/sda1", status["disk"])
+        self.assertIn(status["ram"], (status["ram"],))
+
+    def test_get_system_status_degrades_gracefully_when_binaries_missing(self):
+        def fake_check_output(args, **kwargs):
+            raise FileNotFoundError(args[0])
+
+        with patch.object(self.task_service.subprocess, "check_output", fake_check_output):
+            status = self.task_service.get_system_status()
+
+        self.assertEqual(status["tmux"], "No active tmux sessions.")
+        self.assertEqual(status["uptime"], "N/A")
+        self.assertEqual(status["disk"], "N/A")
+
 
 if __name__ == "__main__":
     unittest.main()

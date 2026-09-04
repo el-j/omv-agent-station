@@ -7,7 +7,7 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
   title="AI Models, Gateway & Smart Routing" 
   description="Multi-tier model redundancy, automated fallback cascades, LiteLLM gateway configuration, and model selection syntax."
   category="AI Intelligence"
-  prevPage={{ title: "Quickstart & Installation", href: `${baseUrl}/docs/quickstart` }}
+  prevPage={{ title: "Standalone / Raspberry Pi Install", href: `${baseUrl}/docs/standalone-install` }}
   nextPage={{ title: "Telegram Bot Handbook", href: `${baseUrl}/docs/telegram` }}
 >
   <div class="docs-callout docs-callout-info">
@@ -29,28 +29,35 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
     <tbody>
       <tr>
         <td><code>gemini-3.6-flash</code></td>
-        <td><code>gemini/gemini-2.0-flash</code></td>
+        <td><code>gemini/gemini-3.6-flash</code></td>
         <td>1,048,576 tokens</td>
         <td>⚡ Ultra-Fast (~80 tps)</td>
         <td>Default conversational chat, quick code snippets, refactoring, and large repo scans.</td>
       </tr>
       <tr>
+        <td><code>coder-fast</code> (Router)</td>
+        <td>Free OpenRouter models ➔ <code>gemini-3.6-flash</code> / <code>gemini-3.7-flash</code> / <code>gemini-flash-latest</code> ➔ <code>claude-3-5-haiku</code></td>
+        <td>Up to 1M tokens</td>
+        <td>⚡ Fast Multi-Tier</td>
+        <td>Triage, search, and repository mapping with automatic fallback.</td>
+      </tr>
+      <tr>
         <td><code>coder-smart</code> (Router)</td>
-        <td><code>gemini-2.0-flash</code> ➔ <code>claude-3-7-sonnet</code> ➔ <code>deepseek-r1</code></td>
+        <td>Free OpenRouter models ➔ <code>gemini-3.6-flash</code> / <code>gemini-3.7-flash</code> / <code>gemini-3.7-pro</code> ➔ <code>github-gpt-4o</code> ➔ <code>claude-3-7-sonnet-direct</code> ➔ <code>claude-3-7-sonnet-vertex</code></td>
         <td>Up to 1M tokens</td>
         <td>🚀 Smart Multi-Tier</td>
         <td>Multi-tier autonomous coding agent loop with automatic fallback.</td>
       </tr>
       <tr>
         <td><code>reasoning-heavy</code> (Router)</td>
-        <td><code>deepseek/deepseek-r1</code> ➔ <code>gemini-2.5-pro</code></td>
+        <td>Free OpenRouter models ➔ <code>gemini-3.6-flash</code> / <code>gemini-3.7-pro</code> ➔ <code>github-deepseek-r1</code> / <code>github-o3-mini</code> / <code>github-o1</code> ➔ <code>claude-3-7-sonnet-direct</code></td>
         <td>128,000 tokens</td>
         <td>🧠 Deep Chain-of-Thought</td>
         <td>Complex algorithmic logic, schema architecture, and intricate debugging.</td>
       </tr>
       <tr>
         <td><code>github-gpt-4o</code></td>
-        <td><code>github/gpt-4o</code></td>
+        <td><code>openai/gpt-4o</code> (via GitHub Models)</td>
         <td>128,000 tokens</td>
         <td>⚡ High Quality</td>
         <td>Querying OpenAI GPT-4o via free GitHub Marketplace personal access tokens.</td>
@@ -86,27 +93,70 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   <h2>🔄 Redundancy & Failover Configuration</h2>
   <p>
-    The LiteLLM gateway configuration is defined in <code>/usr/share/openmediavault/agent-station/litellm_config.yaml</code>:
+    The LiteLLM gateway configuration lives in <code>litellm/config.yaml</code> at the root of your Agent Station install, mounted read-only into the <code>litellm-proxy</code> container at <code>/app/config.yaml</code>. The excerpts below are copied verbatim from that file so they can't silently drift from what's actually deployed -- a CI check fails the build if they ever stop matching.
+  </p>
+  <p>
+    First two deployments of the <code>coder-fast</code> pool (free OpenRouter models are listed first in every router; see <a href="#free-tier-models-via-openrouter">Free-Tier Models via OpenRouter</a> below for the full per-router breakdown):
   </p>
 
-  <pre><code>model_list:
-  - model_name: coder-smart
+  <pre><code>  - model_name: coder-fast
     litellm_params:
-      model: gemini/gemini-2.0-flash
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: coder-smart
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-fast
     litellm_params:
-      model: anthropic/claude-3-7-sonnet-20250219
-      api_key: os.environ/ANTHROPIC_API_KEY
-  - model_name: coder-smart
-    litellm_params:
-      model: deepseek/deepseek-chat
-      api_key: os.environ/DEEPSEEK_API_KEY
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_API_KEY</code></pre>
 
-router_settings:
-  routing_strategy: latency-based-routing
+  <p>The router-level settings, applied to every virtual router above:</p>
+
+  <pre><code>router_settings:
+  routing_strategy: usage-based-routing
+  set_verbose: false
   num_retries: 3
-  timeout: 45
+  timeout: 120
+  retry_after: 5
+  cooldown_time: 30 # Cooldown provider for 30s when a 429 occurs
+  allowed_fails: 2
   fallbacks:
-    - coder-smart: ["github-gpt-4o", "gemini-3.6-flash"]</code></pre>
+    - coder-smart: ["gemini-3.7-pro", "gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - coder-fast: ["gemini-3.7-flash", "gemini-2.5-flash", "github-gpt-4o"]
+    - reasoning-heavy: ["gemini-3.7-pro", "github-deepseek-r1", "github-o3-mini", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-direct: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - claude-3-7-sonnet-vertex: ["gemini-3.7-pro", "github-gpt-4o", "gemini-3.7-flash"]
+    - gemini-3.7-pro: ["gemini-3.7-flash", "github-gpt-4o", "gemini-2.5-flash"]
+    - gemini-3.7-flash: ["gemini-2.5-flash", "github-gpt-4o"]</code></pre>
+
+  <h2 id="free-tier-models-via-openrouter">🆓 Free-Tier Models via OpenRouter</h2>
+  <div class="docs-callout docs-callout-info">
+    Setting <code>OPENROUTER_API_KEY</code> (get one at <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-secondary);">openrouter.ai/keys</a>) unlocks a $0-cost tier tried <em>before</em> Gemini/Claude/GPT-4o in every router above. It's optional, purely additive, and safe to enable -- without the key those deployments just fail instantly and the router falls through to the paid tiers exactly as before.
+  </div>
+  <table class="docs-table">
+    <thead>
+      <tr>
+        <th>Virtual Router</th>
+        <th>Free OpenRouter Deployments (tried first)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>coder-fast</code></td>
+        <td><code>nvidia/nemotron-3.5-lightning:free</code>, <code>poolside/laguna-xs-2.1:free</code></td>
+      </tr>
+      <tr>
+        <td><code>coder-smart</code></td>
+        <td><code>poolside/laguna-s-2.1:free</code>, <code>cohere/north-mini-code:free</code>, <code>nvidia/nemotron-3-super-120b-a12b:free</code></td>
+      </tr>
+      <tr>
+        <td><code>reasoning-heavy</code></td>
+        <td><code>z-ai/glm-5.2:free</code>, <code>nvidia/nemotron-3-ultra-550b-a55b:free</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Tradeoff:</strong> free models carry tighter rate limits and are generally lower quality for hard agentic coding tasks than the paid deployments they sit in front of -- LiteLLM's cooldown logic skips a failing/rate-limited one automatically, so the practical cost is occasionally weaker answers rather than downtime.
+  </p>
+  <p>
+    <strong>This is a point-in-time snapshot:</strong> OpenRouter adds and retires free models over time. To re-check what's currently free, query <a href="https://openrouter.ai/api/v1/models" target="_blank" style="color: var(--accent-secondary);">https://openrouter.ai/api/v1/models</a> and filter for entries where <code>pricing.prompt == "0"</code>, then compare against <code>litellm/config.yaml</code>.
+  </p>
 </DocsLayout>

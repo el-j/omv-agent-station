@@ -12,7 +12,7 @@ from pathlib import Path
 # Load test isolation stubs
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 class TestMutationSurvivalAnalysis(unittest.TestCase):
     """Verifies that artificial bugs/mutants are caught and killed by tests."""
@@ -63,12 +63,14 @@ class TestMutationSurvivalAnalysis(unittest.TestCase):
             
             # Real function properly catches and returns None (mutant killed)
             sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+            stubs.purge_bot_modules("core", "handlers", "bot")
             try:
                 import bot as real_bot
                 self.assertIsNone(real_bot.sanitize_project_path(ws, "../../evil"))
             finally:
                 if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
                     sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+                stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_mutation_kill_router_fallbacks(self):
         """Mutant 3: Corrupt fallback chain in LiteLLM config."""

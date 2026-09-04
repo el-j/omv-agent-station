@@ -49,8 +49,12 @@ git checkout -b feature/my-feature-name
 pip install -r telegram-agent-bot/requirements.txt
 pip install -r signal-agent-bot/requirements.txt
 pip install -r discord-agent-bot/requirements.txt
-pip install pytest flake8 bandit pyyaml httpx openai websockets
+pip install pytest pytest-cov "flake8>=7.3.0" mypy bandit pyyaml httpx openai websockets
 ```
+
+> `flake8>=7.3.0` matters: older pycodestyle releases misattribute `E401` on
+> Python 3.13 (a PEP 701 f-string tokenizer interaction), which fails the lint
+> job on the version Debian trixie actually ships.
 
 ### 3. Validation Suite Commands
 Before opening a Pull Request, run the local quality checks:
@@ -60,11 +64,67 @@ Before opening a Pull Request, run the local quality checks:
 make all
 
 # Run specific check suites
-make test        # 24 Unit, Blackbox & Mutation Tests (100% kill rate)
-make lint        # Flake8 and YAML schema validation
+make test        # Unit, Blackbox & Mutation tests + the coverage gate
+make lint        # Flake8, mypy type checks, and YAML schema validation
 make security    # Bandit security audit and secret leak scanning
 make deb         # Native Debian package builder
 ```
+
+### 4. Coverage gate
+
+`scripts/test.sh` runs pytest under `pytest-cov` and **fails the build** if
+total line coverage drops below the threshold. CI enforces the same number on
+every Python version in the matrix (3.11, 3.12, 3.13).
+
+* **Current threshold: 75%.** It lives in one place — `COVERAGE_MIN` at the top
+  of `scripts/test.sh`.
+* **Measured coverage as of the last change: 77%.** The gate deliberately sits a
+  couple of points under the real number so an unrelated PR isn't blocked by
+  normal churn.
+* **What is measured** is configured under `[tool.coverage.run]` in
+  `pyproject.toml`: `agent_station_core/`, the three bot directories, and
+  `scripts/`. The byte-identical `agent_station_core` copies vendored inside
+  each bot directory (they exist so each Docker build context is
+  self-contained) are omitted — counting them would triple the denominator with
+  files the tests never import.
+
+**To raise the threshold** (please do, whenever you add meaningful tests):
+
+```bash
+bash scripts/test.sh                    # read the reported TOTAL
+# then edit COVERAGE_MIN in scripts/test.sh to a couple of points below it
+```
+
+Raise it in the same PR that earns the coverage. Never lower it to make a build
+pass — add the missing tests instead. To run the suite without the gate while
+iterating locally: `COVERAGE_MIN=0 bash scripts/test.sh`.
+
+### 5. Type checking
+
+`scripts/lint.sh` runs `mypy` alongside flake8. The configuration
+(`[tool.mypy]` in `pyproject.toml`) is intentionally permissive —
+`ignore_missing_imports = true`, no `disallow_untyped_defs` — so it passes today
+and can be tightened one module at a time. mypy is invoked **once per bot
+directory** because all three ship same-named `core`/`handlers` packages (each
+runs as its own container) and mypy refuses to run when two files map to one
+module name.
+
+### 6. PHP checks
+
+The OpenMediaVault RPC service (`engined/rpc/agentstation.inc`) has its own
+harness under `tests/php/`, run by CI's `test-php` job:
+
+```bash
+cd tests/php
+composer install
+composer check     # phpstan analyse, then phpunit
+```
+
+PHPStan runs at **level 5** (`tests/php/phpstan.neon`). Level 6 is not yet
+reachable: it reports ~63 missing parameter/return annotations, essentially all
+on the OMV framework boundary that `tests/php/stubs/OmvStubs.php` stands in for,
+and the real classes aren't installable off an OMV box. Raise the level as those
+stubs grow closer to the real API.
 
 ---
 
