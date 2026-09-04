@@ -6,20 +6,27 @@ Captures notes into inbox and manages project specifications.
 from datetime import datetime
 from .config import OBSIDIAN_VAULT, logger
 
-def save_obsidian_note(title: str, content: str) -> dict:
-    """Saves a structured markdown note with frontmatter to the Obsidian vault Inbox."""
+def save_obsidian_note(title: str, content: str, extra_tags: list[str] | None = None) -> dict:
+    """Saves a structured markdown note with frontmatter to the Obsidian vault Inbox.
+
+    extra_tags (e.g. from ai_service.suggest_tags) are merged in after the
+    fixed base tags and deduplicated; omitting them reproduces the exact
+    frontmatter this function has always written."""
     try:
         note_dir = OBSIDIAN_VAULT / "Inbox"
         note_dir.mkdir(parents=True, exist_ok=True)
         safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "-", "_")).strip() or "Quick Note"
         note_file = note_dir / f"{safe_title}.md"
 
+        all_tags = list(dict.fromkeys(["quick-capture", "second-brain", *(extra_tags or [])]))
+        tags_str = ", ".join(all_tags)
+
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         note_body = (
             f"---\n"
             f"date: {now_str}\n"
             f"author: Agent Station\n"
-            f"tags: [quick-capture, second-brain]\n"
+            f"tags: [{tags_str}]\n"
             f"---\n\n"
             f"# {title}\n\n"
             f"{content}\n"

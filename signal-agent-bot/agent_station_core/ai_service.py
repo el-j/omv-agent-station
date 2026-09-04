@@ -40,6 +40,38 @@ async def query_ai_model(prompt: str, model: str = "coder-smart", system_prompt:
         logger.error(f"AI query failed on model {model}: {e}")
         return {"success": False, "error": str(e), "model": model}
 
+async def suggest_tags(text: str, max_tags: int = 5, model: str = "coder-fast") -> list[str]:
+    """Asks the LLM gateway for a short list of keyword tags describing `text`.
+
+    Mirrors list_ai_models' fallback discipline: never raises, and returns an
+    empty list (not an error) on any failure so callers can unconditionally
+    merge the result into an existing tag list."""
+    if not text or not text.strip():
+        return []
+    try:
+        response = await ai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"Extract up to {max_tags} short keyword tags for the given text. "
+                        "Reply with ONLY the tags as a comma-separated list, lowercase, "
+                        "no numbering, no explanation, no hashtags."
+                    ),
+                },
+                {"role": "user", "content": text[:4000]},
+            ],
+            temperature=0.2,
+            max_tokens=64,
+        )
+        raw = response.choices[0].message.content or ""
+        tags = [t.strip().lower().replace(" ", "-") for t in raw.split(",")]
+        return [t for t in tags if t][:max_tags]
+    except Exception as e:
+        logger.warning(f"Tag suggestion failed on model {model}: {e}")
+        return []
+
 async def list_ai_models() -> tuple[list[str], bool]:
     """Retrieves active models from the LiteLLM proxy.
 

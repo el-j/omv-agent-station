@@ -1057,6 +1057,16 @@ class TestTelegramVault(TelegramHandlerTestCase):
         self.assertEqual(len(written), 1)
         self.assertNotIn("/", written[0].name)
 
+    def test_note_cmd_keeps_base_tags_when_tag_suggestion_unavailable(self):
+        """The `openai` module is stubbed to a MagicMock in this test
+        environment (tests/stubs.py), so suggest_tags's await on the fake
+        client's response can never succeed -- it must swallow that and
+        leave the note with just its base tags rather than raising."""
+        update, context = DummyUpdate(), DummyContext(args=["T", "|", "some content"])
+        self.arun(self.vault.note_cmd(update, context))
+        note = self.obsidian / "Inbox" / "T.md"
+        self.assertIn("tags: [telegram, quick-capture]", note.read_text())
+
     def test_note_cmd_reports_write_failure(self):
         self.patch(self.vault, "OBSIDIAN_VAULT", self.obsidian / "README.md")
         (self.obsidian / "README.md").write_text("not a directory")

@@ -7,6 +7,40 @@ from pathlib import Path
 
 import yaml
 from .config import logger
+from .git_auth import ai_client
+
+
+async def suggest_tags(text: str, max_tags: int = 5, model: str = "coder-fast") -> list[str]:
+    """Asks the LLM gateway for a short list of keyword tags describing `text`.
+
+    Mirrors get_modelhelp_markdown's fallback discipline: never raises, and
+    returns an empty list (not an error) on any failure so callers can
+    unconditionally merge the result into an existing tag list."""
+    if not text or not text.strip():
+        return []
+    try:
+        response = await ai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"Extract up to {max_tags} short keyword tags for the given text. "
+                        "Reply with ONLY the tags as a comma-separated list, lowercase, "
+                        "no numbering, no explanation, no hashtags."
+                    ),
+                },
+                {"role": "user", "content": text[:4000]},
+            ],
+            temperature=0.2,
+            max_tokens=64,
+        )
+        raw = response.choices[0].message.content or ""
+        tags = [t.strip().lower().replace(" ", "-") for t in raw.split(",")]
+        return [t for t in tags if t][:max_tags]
+    except Exception as e:
+        logger.warning(f"Tag suggestion failed on model {model}: {e}")
+        return []
 
 # Usage/description blurbs for the virtual routers -- this is the one piece of
 # /modelhelp that genuinely can't be derived from litellm/config.yaml (it's

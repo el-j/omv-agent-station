@@ -240,7 +240,8 @@ class TestSignalHandlers(unittest.TestCase):
         self.assertTrue(any("1 day" in m for m in self.messages()))
 
     def test_note_saves_note(self):
-        self.patch(self.vault, "save_obsidian_note", lambda title, content: {"success": True, "path": "Inbox/Test.md"})
+        self.patch(self.vault, "save_obsidian_note", lambda title, content, extra_tags=None: {"success": True, "path": "Inbox/Test.md"})
+        self.patch(self.vault, "suggest_tags", AsyncMock(return_value=[]))
         self.arun(self.signal_bot.handle_signal_command("+1555", "/note Test Note | some content"))
         self.assertTrue(any("Saved" in m for m in self.messages()))
 
