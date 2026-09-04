@@ -7,10 +7,15 @@ on:
       - develop
       - 'feature/**'
       - 'fix/**'
-  pull_request:
-    branches:
-      - develop
-      - main
+      - 'chore/**'
+      - 'test/**'
+      - 'docs/**'
+      - 'redesign/**'
+  # No branches filter here: stacked PRs (e.g. a hardening PR based on another
+  # open feature PR's branch instead of develop/main) still need full CI --
+  # restricting this to develop/main silently skipped this whole pipeline on
+  # any PR targeting a non-standard base branch.
+  pull_request: {}
 
 jobs:
   test-and-lint:
