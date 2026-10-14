@@ -14,6 +14,8 @@ Run this single command on your OpenMediaVault SSH console to clone, configure, 
 git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station && cd /srv/dev-data/omv-agent-station && cp env.example .env && nano .env && ./setup.sh
 ```
 
+> Not on OpenMediaVault? The exact same command works on any Debian-based Linux — Debian, Ubuntu, or a 64-bit Raspberry Pi OS — just clone it wherever you like instead of `/srv/dev-data`. See [Installation: OpenMediaVault or Any Debian-Based Linux](#-installation-openmediavault-or-any-debian-based-linux) below.
+
 ---
 
 ## 📑 Table of Contents
@@ -23,12 +25,11 @@ git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-
 3. [Tested Hardware & Verified Benchmarks](#-tested-hardware--verified-benchmarks)
 4. [Stack Components & Synergy](#-stack-components--synergy)
 5. [Multi-Tier AI Redundancy & Smart Failover](#-multi-tier-ai-redundancy--smart-failover)
-6. [OpenMediaVault (OMV) GUI & OMV-Extras Compose Template](#-openmediavault-omv-gui--omv-extras-compose-template)
-7. [Step-by-Step Setup Guide](#-step-by-step-setup-guide)
-8. [Messenger Bot Commands & Workflow](#-messenger-bot-commands--workflow)
-9. [Obsidian & Syncthing Integration](#-obsidian--syncthing-integration)
-10. [Live Terminal & Session Multiplexing](#-live-terminal--session-multiplexing)
-11. [Troubleshooting & Maintenance](#-troubleshooting--maintenance)
+6. [Installation: OpenMediaVault or Any Debian-Based Linux](#-installation-openmediavault-or-any-debian-based-linux)
+7. [Messenger Bot Commands & Workflow](#-messenger-bot-commands--workflow)
+8. [Obsidian & Syncthing Integration](#-obsidian--syncthing-integration)
+9. [Live Terminal & Session Multiplexing](#-live-terminal--session-multiplexing)
+10. [Troubleshooting & Maintenance](#-troubleshooting--maintenance)
 
 ---
 
@@ -144,57 +145,64 @@ If your primary direct Anthropic subscription hits a rate limit (HTTP 429) or to
 4️⃣ GitHub Copilot (GitHub Models: GPT-4o / o3-mini)
 ```
 
+*(This illustrates what happens once a request reaches the Claude tier of a router's pool. In practice `coder-smart` tries free OpenRouter models and Gemini first -- see the exact pool order below.)*
+
 ### Virtual Router Aliases in `litellm/config.yaml`:
-- **`coder-fast`**: Ultra-fast triage, search, and repository mapping using **Gemini 3.7 Flash** (fallback: Gemini 2.5 Flash, Claude 3.5 Haiku).
-- **`coder-smart`**: Primary agentic loop model using **Claude 3.7 Sonnet** (fallback: Vertex AI Claude 3.7 Sonnet, Gemini 3.7 Pro, GitHub GPT-4o).
-- **`reasoning-heavy`**: Deep architecture design & mathematical reasoning using **Claude 3.7 Sonnet Thinking** & **Gemini 3.7 Pro** (fallback: GitHub o3-mini).
+Each router is a pool of deployments tried in the order listed below (LiteLLM's `usage-based-routing` picks the least-used one); if free API keys aren't configured those entries fail instantly and fall through. If the *entire* pool is exhausted, `router_settings.fallbacks` sends the request to a different router/model entirely (listed as "router fallback" below).
+
+- **`coder-fast`**: Ultra-fast triage, search, and repository mapping. Pool order: free OpenRouter models (Nemotron 3.5 Lightning, Laguna XS) ➔ **Gemini 3.6/3.7 Flash & Flash Latest** ➔ Claude 3.5 Haiku. *Router fallback:* Gemini 3.7 Flash, Gemini 2.5 Flash, GitHub GPT-4o.
+- **`coder-smart`**: Primary agentic loop model. Pool order: free OpenRouter models (Laguna-S, North Mini Code, Nemotron Super) ➔ **Gemini 3.6/3.7 Flash & Gemini 3.7 Pro** ➔ GitHub GPT-4o ➔ **Claude 3.7 Sonnet** (direct) ➔ Claude 3.7 Sonnet (Vertex AI). *Router fallback:* Gemini 3.7 Pro, Gemini 3.7 Flash, GitHub GPT-4o, Gemini 2.5 Flash.
+- **`reasoning-heavy`**: Deep architecture design & mathematical reasoning. Pool order: free OpenRouter models (GLM 5.2, Nemotron Ultra) ➔ **Gemini 3.6 Flash & Gemini 3.7 Pro** ➔ GitHub DeepSeek-R1/o3-mini/o1 ➔ **Claude 3.7 Sonnet** (direct). *Router fallback:* Gemini 3.7 Pro, GitHub DeepSeek-R1, GitHub o3-mini, Gemini 3.7 Flash.
+
+> 💡 The free OpenRouter deployments only activate once you set `OPENROUTER_API_KEY` — see [Free-Tier Models via OpenRouter](OMV_AI_SERVER_HANDBOOK.md#3-free-tier-models-via-openrouter-optional-4th-redundancy-layer) in the handbook for the tradeoffs (tighter rate limits, lower quality than the paid models below them) and why this list needs periodic re-checking against OpenRouter's catalog.
 
 ---
 
-## 🌐 OpenMediaVault Integration Options (Plugin, GUI, CLI)
+## 🌐 Installation: OpenMediaVault or Any Debian-Based Linux
 
-You have 3 easy ways to run and manage this stack on your server:
+The stack itself (Docker Compose, LiteLLM, the bots) has **no OpenMediaVault dependency at all** — it runs the same way on plain Debian, Ubuntu Server, or a 64-bit Raspberry Pi OS install. OpenMediaVault users get an extra, optional WebGUI management layer on top of that same stack. Pick the path that matches your box:
 
-### 🏆 Option A: Native OpenMediaVault Plugin (`openmediavault-agent-station`)
-A full native OpenMediaVault plugin that adds **Services $\to$ Agent Station** directly into the OMV WebGUI Workbench:
-1. Build or download the `.deb` package:
-   ```bash
-   ./build-deb.sh
-   ```
-2. Install the package on your OMV server:
-   ```bash
-   sudo dpkg -i openmediavault-agent-station_1.0.0_all.deb
-   ```
-3. Refresh your OpenMediaVault WebGUI $\to$ Click **Services $\to$ Agent Station**:
-   - Toggle **Enable**
-   - Enter your **Google AI Pro**, **Claude Pro**, and **GitHub Copilot** keys in the WebGUI form
-   - Click **Save** & **Apply**! The plugin automatically manages Docker containers and logs.
+### 🏆 OpenMediaVault (WebGUI-managed)
 
-### 📋 Option B: OMV-Extras Compose Plugin (WebGUI Templates)
+**Option A: Native Plugin (`openmediavault-agent-station`)** — adds **Services → Agent Station** to the OMV Workbench:
+1. Build or download the `.deb` package: `./build-deb.sh`
+2. Install it: `sudo dpkg -i openmediavault-agent-station_*_all.deb`
+3. Refresh the WebGUI → **Services → Agent Station** → toggle **Enable**, enter your API keys in the form, click **Save** & **Apply**. The plugin manages the Docker containers and logs for you.
+
+**Option B: OMV-Extras Compose Plugin (WebGUI Templates)** — no `.deb` install needed:
 1. In the OMV WebGUI, navigate to **Services → Compose → Files**.
-2. Click **+** (Add) and load [omv-compose-template.yaml](file:///Users/rex-fab-alt/Documents/code/playground/omv-stack/omv-compose-template.yaml) or `docker-compose.yml`.
+2. Click **+** (Add) and load [`omv-compose-template.yaml`](omv-compose-template.yaml) or `docker-compose.yml`.
 3. In **Environment**, paste your keys from `env.example`.
 4. Click **Apply** and **Up**.
 
-### ⚡ Option C: 1-Liner Terminal Quick-Start (SSH)
-```bash
-git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station && cd /srv/dev-data/omv-agent-station && cp env.example .env && nano .env && ./setup.sh
-```
+### 🐧 Any Debian-Based Linux — Debian, Ubuntu, Raspberry Pi OS (CLI-managed)
+
+No OMV required. This is the same stack, managed directly with `docker compose`. Confirmed to build and run on `arm64` (Raspberry Pi 4/5, 64-bit OS, 4GB+ RAM recommended) as well as `amd64`.
+
+**1. Install Docker**, if you don't already have it:
 ```bash
 sudo apt update && sudo apt install -y docker.io docker-compose-plugin
 ```
 
-### 2. Clone and Configure
+**2. Clone and configure:**
 ```bash
-git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-station
-cd /srv/dev-data/omv-agent-station
+git clone https://github.com/el-j/omv-agent-station.git ~/agent-station
+cd ~/agent-station
 cp env.example .env
-nano .env
+nano .env   # fill in your API keys and bot token(s) — see Key Variables below
 ```
+
+**3. Start the stack:**
+```bash
+./setup.sh
+# or, on a completely fresh box with no Docker installed yet:
+./setup.sh --install-deps
+```
+`setup.sh` detects Docker/Compose, notes when it's running on ARM64, creates the data directories, and brings the stack up with `docker compose`. Manage it afterwards with plain `docker compose {ps,logs,restart,down}` from the same directory — there's no extra CLI to learn.
 
 #### Key Variables in `.env`:
 ```ini
-DATA_DIR=/srv/dev-data
+DATA_DIR=/srv/dev-data   # any writable path — doesn't need to be an OMV mount
 TZ=Europe/Berlin
 LITELLM_MASTER_KEY=sk-omv-secret-master-key-change-me
 
@@ -217,11 +225,6 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_ALLOWED_USER_ID=your_numeric_user_id
 ```
 
-### 3. Start the Stack
-```bash
-./setup.sh
-```
-
 ---
 
 ## 📱 Telegram Bot Commands & Workflow
@@ -237,6 +240,7 @@ Once the bot is running, message it in your Telegram app:
 - `/note <Title> | <Content>`: Save a quick note directly into your Obsidian `Inbox/` folder.
 - `/models`: Check live model endpoints and connectivity in the LiteLLM proxy.
 - `/status`: Check server uptime, disk space, and active background tmux sessions.
+- `/cancel` (alias `/stop`): Stop the `/task`, `/claude`, or `/exec` command currently running in this chat.
 
 ---
 

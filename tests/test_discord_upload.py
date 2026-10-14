@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class DummyReplyMessage:
@@ -58,21 +58,29 @@ class DummyMessage:
 
 class TestDiscordFileUpload(unittest.TestCase):
     def setUp(self):
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
         import discord_bot
+        import core.security as core_security
+        import handlers.upload as upload
+        import handlers.topics as topics
         import agent_station_core.task_registry as task_registry
         import agent_station_core.topics_service as topics_service
         self.discord_bot = discord_bot
+        self.upload = upload
+        self.topics = topics
         self.task_registry = task_registry
         self.topics_service = topics_service
         self.task_registry._active.clear()
-        self.discord_bot.ALLOWED_USER_ID = None
+        core_security.ALLOWED_USER_ID = None
 
         self._tmpdir = tempfile.TemporaryDirectory()
         self.workspace = Path(self._tmpdir.name) / "workspace"
         self.project_dir = self.workspace / "myproj"
         (self.project_dir / ".git").mkdir(parents=True)
-        self.discord_bot.WORKSPACE = self.workspace
+        # WORKSPACE is imported independently into every module that uses it.
+        for mod in (self.upload, self.topics):
+            mod.WORKSPACE = self.workspace
         self.topics_service.WORKSPACE = self.workspace
         self.topics_service.TOPICS_FILE = self.workspace / ".agent_topics.json"
 
@@ -81,11 +89,12 @@ class TestDiscordFileUpload(unittest.TestCase):
         self._tmpdir.cleanup()
         if str(ROOT_DIR / "discord-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_rejects_when_no_project_bound(self):
         async def scenario():
             msg = DummyMessage(channel_id=111, attachments=[DummyAttachment()])
-            await self.discord_bot.handle_discord_upload(msg)
+            await self.upload.handle_discord_upload(msg)
             self.assertTrue(any("No project bound" in r for r in msg.replies))
             self.assertIsNone(self.task_registry.get("111", None))
 
@@ -107,7 +116,7 @@ class TestDiscordFileUpload(unittest.TestCase):
                     self.replies.append(content)
 
             ctx = BindCtx(channel_id=222)
-            await self.discord_bot.bind_cmd(ctx, project_name="myproj")
+            await self.topics.bind_cmd(ctx, project_name="myproj")
             self.assertTrue(any("bound to project" in r for r in ctx.replies))
 
             git_calls = []
@@ -133,7 +142,7 @@ class TestDiscordFileUpload(unittest.TestCase):
             asyncio.create_subprocess_exec = fake_create_subprocess_exec
             try:
                 msg = DummyMessage(channel_id=222, content="docs/report.pdf", attachments=[DummyAttachment()])
-                await asyncio.wait_for(self.discord_bot.handle_discord_upload(msg), timeout=1.0)
+                await asyncio.wait_for(self.upload.handle_discord_upload(msg), timeout=1.0)
 
                 for _ in range(100):
                     if self.task_registry.get("222", None) is None:
@@ -155,7 +164,7 @@ class TestDiscordFileUpload(unittest.TestCase):
         async def scenario():
             self.topics_service.set_bound_project("333", None, "myproj")
             msg = DummyMessage(channel_id=333, attachments=[DummyAttachment(size=self.discord_bot.MAX_UPLOAD_BYTES + 1)])
-            await self.discord_bot.handle_discord_upload(msg)
+            await self.upload.handle_discord_upload(msg)
             self.assertTrue(any("max upload size" in r for r in msg.replies))
             self.assertIsNone(self.task_registry.get("333", None))
 
@@ -165,7 +174,7 @@ class TestDiscordFileUpload(unittest.TestCase):
         async def scenario():
             self.topics_service.set_bound_project("444", None, "myproj")
             msg = DummyMessage(channel_id=444, content="../../etc/passwd", attachments=[DummyAttachment()])
-            await self.discord_bot.handle_discord_upload(msg)
+            await self.upload.handle_discord_upload(msg)
             self.assertTrue(any("Invalid target path" in r for r in msg.replies))
             self.assertIsNone(self.task_registry.get("444", None))
 
@@ -178,7 +187,7 @@ class TestDiscordFileUpload(unittest.TestCase):
             self.task_registry.start("555", None, label="existing", asyncio_task=t)
             try:
                 msg = DummyMessage(channel_id=555, attachments=[DummyAttachment()])
-                await self.discord_bot.handle_discord_upload(msg)
+                await self.upload.handle_discord_upload(msg)
                 self.assertTrue(any("already running" in r for r in msg.replies))
             finally:
                 await self.task_registry.cancel("555", None)

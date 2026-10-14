@@ -1,0 +1,73 @@
+[tool.mypy]
+# Issue #55: deliberately permissive so it passes today and can be tightened
+# incrementally. The bot libraries (python-telegram-bot, discord.py, openai,
+# httpx) are not installed in the lint job, so their imports resolve to Any --
+# this checks OUR annotations against each other, which is where the bugs the
+# type hints were supposed to prevent actually live.
+# No python_version pin: the CI matrix runs 3.11/3.12/3.13, and checking each
+# job against its own interpreter is the point of having a matrix at all.
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+# Each bot dir vendors a byte-identical copy of agent_station_core for its
+# Docker build context; mypy refuses to run at all when two files map to the
+# same module name, so only the root package is checked. Same reason
+# scripts/lint.sh invokes mypy once per bot rather than once for all three:
+# their `core`/`handlers` packages collide with each other too.
+exclude = "(telegram-agent-bot|discord-agent-bot|signal-agent-bot)/agent_station_core/"
+
+# Tighten these to `false` one module at a time as annotations get filled in.
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+[tool.coverage.run]
+source = [
+    "agent_station_core",
+    "telegram-agent-bot",
+    "discord-agent-bot",
+    "signal-agent-bot",
+    "scripts",
+]
+omit = [
+    # Each bot dir ships a byte-identical vendored copy of agent_station_core so
+    # its Docker build context is self-contained. Measuring the copies would
+    # triple the denominator with files that can never be exercised (the tests
+    # import the root package), dragging the reported total down ~20 points
+    # while telling us nothing the root package's own numbers don't.
+    "*/telegram-agent-bot/agent_station_core/*",
+    "*/discord-agent-bot/agent_station_core/*",
+    "*/signal-agent-bot/agent_station_core/*",
+    "*/__pycache__/*",
+    "*/build-pkg/*",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.bandit]
+# Issue #57: the previous bare-YAML `.bandit` file was never actually parsed --
+# bandit's project-level discovery expects INI with a [bandit] section, so it
+# logged "Unable to parse config file" and every skip/exclude below was inert.
+# bandit reads [tool.bandit] out of pyproject.toml natively, which is both the
+# documented format and the one that cannot silently no-op.
+exclude_dirs = [
+    "tests",
+    "website",
+    "build-pkg",
+    ".github",
+    "node_modules",
+    ".venv",
+    "venv",
+]
+skips = [
+    "B101",  # assert statements in tests
+    "B102",  # exec in test sandbox
+    "B404",  # import subprocess (managed via strict list arguments and binary resolution)
+    "B603",  # subprocess without shell=True
+    "B607",  # subprocess partial path (resolved via shutil.which)
+]

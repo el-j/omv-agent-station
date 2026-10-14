@@ -69,3 +69,109 @@ data:
               buttons:
                 stop:
                   hidden: true
+      - text: _("Restart Services")
+        icon: "mdi:restart"
+        execute:
+          type: confirmationDialog
+          confirmationDialog:
+            title: _("Restart Agent Station Services")
+            message: _("Do you really want to restart all Agent Station Docker containers (LiteLLM, Web Terminal, Syncthing, Chat Bots)? Active sessions in the Web Terminal will be interrupted.")
+            confirm:
+              type: request
+              request:
+                service: AgentStation
+                method: restartServices
+                progressMessage: _("Restarting Agent Station services…")
+                successMessage: _("Agent Station services have been restarted.")
+      - text: _("View LiteLLM Logs")
+        icon: "mdi:text-box-search-outline"
+        execute:
+          type: formDialog
+          formDialog:
+            config:
+              title: _("LiteLLM Gateway Logs (last 100 lines)")
+              width: 75%
+              request:
+                service: AgentStation
+                get:
+                  method: getLogs
+                  params:
+                    service: "litellm"
+              fields:
+                - type: textarea
+                  name: logs
+                  label: _("Log Output")
+                  value: ""
+                  readonly: true
+                  rows: 24
+              buttons:
+                - template: cancel
+      - text: _("View Web Terminal Logs")
+        icon: "mdi:text-box-search-outline"
+        execute:
+          type: formDialog
+          formDialog:
+            config:
+              title: _("Web Terminal Logs (last 100 lines)")
+              width: 75%
+              request:
+                service: AgentStation
+                get:
+                  method: getLogs
+                  params:
+                    service: "web-terminal"
+              fields:
+                - type: textarea
+                  name: logs
+                  label: _("Log Output")
+                  value: ""
+                  readonly: true
+                  rows: 24
+              buttons:
+                - template: cancel
+      - text: _("View Syncthing Logs")
+        icon: "mdi:text-box-search-outline"
+        execute:
+          type: formDialog
+          formDialog:
+            config:
+              title: _("Syncthing Logs (last 100 lines)")
+              width: 75%
+              request:
+                service: AgentStation
+                get:
+                  method: getLogs
+                  params:
+                    service: "syncthing"
+              fields:
+                - type: textarea
+                  name: logs
+                  label: _("Log Output")
+                  value: ""
+                  readonly: true
+                  rows: 24
+              buttons:
+                - template: cancel
+      - text: _("View Telegram Bot Logs")
+        icon: "mdi:text-box-search-outline"
+        execute:
+          type: formDialog
+          formDialog:
+            config:
+              title: _("Telegram Bot Logs (last 100 lines)")
+              width: 75%
+              request:
+                service: AgentStation
+                get:
+                  method: getLogs
+                  params:
+                    service: "telegram-bot"
+              fields:
+                - type: textarea
+                  name: logs
+                  label: _("Log Output")
+                  value: ""
+                  readonly: true
+                  rows: 24
+              buttons:
+                - template: cancel

@@ -12,8 +12,55 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
 >
   <div class="docs-callout docs-callout-info">
     <strong>📡 Multi-Messenger Single Source of Truth Architecture:</strong><br />
-    All messenger bots (<strong>Telegram</strong>, <strong>Discord</strong>, and <strong>Signal</strong>) share the unified <code>agent_station_core</code> engine. Every single feature—autonomous coding agent loops (<code>/task</code>), smart AI router querying (<code>/chat</code>, <code>/gemini</code>, <code>/gpt4</code>), GitHub auto-cloning (<code>/clone</code>, <code>/newrepo</code>), git branches/diffs, Obsidian notes (<code>/note</code>, <code>/vault</code>), and user-defined dynamic shortcuts (<code>/addcmd</code>)—works identically across every messenger!
+    All messenger bots (<strong>Telegram</strong>, <strong>Discord</strong>, and <strong>Signal</strong>) share the unified <code>agent_station_core</code> engine. The core commands—autonomous coding agent loops (<code>/task</code>), smart AI router querying (<code>/chat</code>, <code>/gemini</code>, <code>/gpt4</code>), GitHub cloning (<code>/clone</code>, <code>/newrepo</code>), git branches/diffs, Obsidian notes (<code>/note</code>, <code>/vault</code>), and user-defined dynamic shortcuts (<code>/addcmd</code>)—are shared across every messenger. A handful of conveniences are Telegram-only (see the parity table below) since they depend on Telegram-specific platform features like Forum Topics.
   </div>
+
+  <h2>🧩 Feature Parity Across Messengers</h2>
+  <table class="docs-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Telegram</th>
+        <th>Discord</th>
+        <th>Signal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Core commands (<code>/task</code>, <code>/chat</code>, <code>/clone</code>, <code>/newrepo</code>, <code>/pull</code>, <code>/push</code>, <code>/branch</code>, <code>/diff</code>, <code>/status</code>, <code>/models</code>, <code>/modelhelp</code>, <code>/cancel</code>)</td>
+        <td>✅</td>
+        <td>✅</td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>File upload → auto-commit to bound repo</td>
+        <td>✅</td>
+        <td>✅</td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Auto-creates/binds a project-scoped Forum Topic on <code>/clone</code> / <code>/newrepo</code></td>
+        <td>✅</td>
+        <td>❌ (no Forum Topic equivalent on Discord/Signal)</td>
+        <td>❌</td>
+      </tr>
+      <tr>
+        <td>Bare GitHub URL pasted in chat auto-triggers a clone (no <code>/clone</code> needed)</td>
+        <td>✅</td>
+        <td>❌ (must use <code>/clone &lt;url&gt;</code> explicitly)</td>
+        <td>✅</td>
+      </tr>
+      <tr>
+        <td>Free-text messages (no slash prefix) routed to the <code>coder-smart</code> AI router</td>
+        <td>✅</td>
+        <td>❌ (Discord only responds to attachments and slash commands)</td>
+        <td>✅</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Telegram-only conveniences, explicitly:</strong> automatic Forum Topic creation/binding on <code>/clone</code> and <code>/newrepo</code>, and inline-keyboard interactive dashboards (<code>/models</code>, <code>/modelhelp</code>) with tap-to-ask buttons. Everything else in the table above works the same way across all three messengers.
+  </p>
 
   <h2>🏛️ Shared Engine Architecture</h2>
   <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; font-family: monospace; font-size: 0.9rem; line-height: 1.6; color: #94a3b8;">

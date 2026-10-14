@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class DummyReplyMessage:
@@ -54,23 +54,28 @@ class DummyContext:
 
 class TestDiscordCancelCommand(unittest.TestCase):
     def setUp(self):
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
         import discord_bot
+        import core.security as core_security
+        import handlers.system as system
         import agent_station_core.task_registry as task_registry
         self.discord_bot = discord_bot
+        self.system = system
         self.task_registry = task_registry
         self.task_registry._active.clear()
-        self.discord_bot.ALLOWED_USER_ID = None
+        core_security.ALLOWED_USER_ID = None
 
     def tearDown(self):
         self.task_registry._active.clear()
         if str(ROOT_DIR / "discord-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_cancel_with_nothing_running_replies_informatively(self):
         async def scenario():
             ctx = DummyContext(channel_id=111)
-            await self.discord_bot.cancel_cmd(ctx)
+            await self.system.cancel_cmd(ctx)
             self.assertTrue(any("Nothing is currently running" in r for r in ctx.replies))
 
         asyncio.run(scenario())
@@ -102,7 +107,7 @@ class TestDiscordCancelCommand(unittest.TestCase):
             orig = asyncio.create_subprocess_shell
             asyncio.create_subprocess_shell = fake_create_subprocess_shell
             try:
-                await asyncio.wait_for(self.discord_bot.exec_cmd(ctx, shell_cmd="sleep 999"), timeout=1.0)
+                await asyncio.wait_for(self.system.exec_cmd(ctx, shell_cmd="sleep 999"), timeout=1.0)
 
                 for _ in range(100):
                     entry = self.task_registry.get("222", None)
@@ -113,7 +118,7 @@ class TestDiscordCancelCommand(unittest.TestCase):
                     self.fail("background exec task never attached its subprocess in time")
 
                 cancel_ctx = DummyContext(channel_id=222)
-                await asyncio.wait_for(self.discord_bot.cancel_cmd(cancel_ctx), timeout=1.0)
+                await asyncio.wait_for(self.system.cancel_cmd(cancel_ctx), timeout=1.0)
                 await asyncio.sleep(0.05)
 
                 self.assertTrue(fake_proc.killed)
@@ -142,10 +147,10 @@ class TestDiscordCancelCommand(unittest.TestCase):
             orig = asyncio.create_subprocess_shell
             asyncio.create_subprocess_shell = fake_create_subprocess_shell
             try:
-                await asyncio.wait_for(self.discord_bot.exec_cmd(ctx, shell_cmd="sleep 999"), timeout=1.0)
+                await asyncio.wait_for(self.system.exec_cmd(ctx, shell_cmd="sleep 999"), timeout=1.0)
 
                 second_ctx = DummyContext(channel_id=333)
-                await asyncio.wait_for(self.discord_bot.exec_cmd(second_ctx, shell_cmd="ls"), timeout=1.0)
+                await asyncio.wait_for(self.system.exec_cmd(second_ctx, shell_cmd="ls"), timeout=1.0)
 
                 self.assertTrue(any("already running" in r for r in second_ctx.replies))
             finally:
@@ -160,7 +165,7 @@ class TestDiscordCancelCommand(unittest.TestCase):
             self.task_registry.start("444", None, label="chan-a", asyncio_task=t1)
 
             ctx_b = DummyContext(channel_id=555)
-            await self.discord_bot.cancel_cmd(ctx_b)
+            await self.system.cancel_cmd(ctx_b)
             self.assertTrue(any("Nothing is currently running" in r for r in ctx_b.replies))
 
             self.assertIsNotNone(self.task_registry.get("444", None))

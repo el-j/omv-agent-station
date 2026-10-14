@@ -25,15 +25,23 @@ async def run_autonomous_task(
     instructions: str,
     session_id: str,
     task_branch: str,
+    resume: bool = False,
     on_proc: Optional[Callable[[asyncio.subprocess.Process], None]] = None,
 ) -> dict:
     """Executes the autonomous agent (Aider with LiteLLM proxy), auto-commits, and pushes branch.
     If on_proc is given, it is called with the live subprocess handle as soon as it's spawned,
-    so a caller can kill it (e.g. in response to a user /cancel) without waiting for completion."""
+    so a caller can kill it (e.g. in response to a user /cancel) without waiting for completion.
+
+    resume=True continues a previously-used task_branch (plain checkout, no -B)
+    and restores aider's prior chat history for this project_dir instead of
+    starting a fresh branch/conversation -- see task_sessions.py, which is what
+    decides whether a given /task call should resume or start over."""
     try:
         is_git = (project_dir / ".git").exists()
         if is_git:
-            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
+            checkout_args = ["checkout", task_branch] if resume else ["checkout", "-B", task_branch]
+            checkout_proc = await asyncio.create_subprocess_exec(GIT_BIN, *checkout_args, cwd=str(project_dir))  # nosec B603,B607
+            await checkout_proc.wait()
 
         cmd = [
             AIDER_BIN,
@@ -42,12 +50,21 @@ async def run_autonomous_task(
             "--model", "openai/coder-smart",
             "--message", instructions,
             "--auto-commits",
-            "--no-git-commit-verify"
+            "--no-git-commit-verify",
+            "--yes-always",
         ]
+        if resume:
+            cmd.append("--restore-chat-history")
 
-        agent_auth_file = Path("/root/.anthropic/token")
-        if agent_auth_file.exists():
-            cmd.extend(["--anthropic-api-key", agent_auth_file.read_text().strip()])
+        try:
+            agent_auth_file = Path("/root/.anthropic/token")
+            if agent_auth_file.exists():
+                cmd.extend(["--anthropic-api-key", agent_auth_file.read_text().strip()])
+        except OSError:
+            # Path.exists() can raise (not just return False) when /root
+            # itself isn't readable by the current user -- optional auth,
+            # never worth failing the whole task over.
+            pass
 
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             *cmd,

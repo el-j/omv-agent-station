@@ -89,7 +89,10 @@ EOF
     OPENROUTER_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('openrouter_api_key', ''))" 2>/dev/null || echo "")
     ENABLE_DEEPSEEK=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_deepseek', False))" 2>/dev/null || echo "False")
     DEEPSEEK_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('deepseek_api_key', ''))" 2>/dev/null || echo "")
-    
+    ENABLE_CUSTOM=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_custom', False))" 2>/dev/null || echo "False")
+    CUSTOM_BASE=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('custom_api_base', ''))" 2>/dev/null || echo "")
+    CUSTOM_KEY=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('custom_api_key', ''))" 2>/dev/null || echo "")
+
     # Git
     ENABLE_GIT=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('enable_git', True))" 2>/dev/null || echo "True")
     GIT_NAME=$(python3 -c "import json; d=json.load(open('$CONFIG_FILE')); print(d.get('git_author_name', 'OMV AI Agent'))" 2>/dev/null || echo "OMV AI Agent")
@@ -150,6 +153,9 @@ ENABLE_OPENROUTER=$ENABLE_OPENROUTER
 OPENROUTER_API_KEY=$OPENROUTER_KEY
 ENABLE_DEEPSEEK=$ENABLE_DEEPSEEK
 DEEPSEEK_API_KEY=$DEEPSEEK_KEY
+ENABLE_CUSTOM=$ENABLE_CUSTOM
+CUSTOM_API_BASE=$CUSTOM_BASE
+CUSTOM_API_KEY=$CUSTOM_KEY
 ENABLE_GIT=$ENABLE_GIT
 GIT_AUTHOR_NAME=$GIT_NAME
 GIT_AUTHOR_EMAIL=$GIT_EMAIL

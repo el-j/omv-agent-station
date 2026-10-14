@@ -111,6 +111,43 @@ class TestConfig(unittest.TestCase):
         missing = sorted(v for v in referenced_vars if v not in env_content)
         self.assertEqual(missing, [], f"env.example is missing variables referenced by litellm/config.yaml: {missing}")
 
+    def test_env_example_covers_every_python_env_var(self):
+        """Regression coverage for issue #70: every os.environ.get/os.getenv/
+        os.environ[...] key actually read by agent_station_core and the three
+        bot entrypoints/handlers must have a corresponding entry in
+        env.example, so a var the code reads silently can't stay undocumented
+        the way WORKSPACE_PATH, SIGNAL_CLI_URL, and friends did."""
+        scan_targets = [
+            *(ROOT_DIR / "agent_station_core").glob("*.py"),
+            ROOT_DIR / "telegram-agent-bot" / "bot.py",
+            *(ROOT_DIR / "telegram-agent-bot" / "core").glob("*.py"),
+            *(ROOT_DIR / "telegram-agent-bot" / "handlers").glob("*.py"),
+            ROOT_DIR / "discord-agent-bot" / "discord_bot.py",
+            ROOT_DIR / "signal-agent-bot" / "signal_bot.py",
+        ]
+        scan_targets = [p for p in scan_targets if p.exists()]
+        self.assertTrue(scan_targets, "Expected to find at least one source file to scan")
+
+        pattern = re.compile(
+            r"os\.environ\.get\(\s*[\"']([A-Z0-9_]+)[\"']"
+            r"|os\.getenv\(\s*[\"']([A-Z0-9_]+)[\"']"
+            r"|os\.environ\[\s*[\"']([A-Z0-9_]+)[\"']\s*\]"
+        )
+
+        referenced_vars = set()
+        for path in scan_targets:
+            for match in pattern.finditer(path.read_text(encoding="utf-8")):
+                referenced_vars.add(next(g for g in match.groups() if g))
+
+        self.assertTrue(referenced_vars, "Expected at least one os.environ/os.getenv reference in the scanned files")
+
+        env_content = (ROOT_DIR / "env.example").read_text(encoding="utf-8")
+        missing = sorted(v for v in referenced_vars if v not in env_content)
+        self.assertEqual(
+            missing, [],
+            f"env.example is missing variables read by agent_station_core/the bots: {missing}",
+        )
+
     def test_omv_datamodel_schema_validity(self):
         import json
         datamodel_dir = ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault" / "datamodels"
@@ -239,11 +276,70 @@ class TestDocsMatchCode(unittest.TestCase):
 
         for bot_file, marker in (
             ("telegram-agent-bot/handlers/system.py", "upload it into the bound project's repo"),
-            ("discord-agent-bot/discord_bot.py", "destination path"),
-            ("signal-agent-bot/signal_bot.py", "destination path"),
+            ("discord-agent-bot/handlers/system.py", "destination path"),
+            ("signal-agent-bot/handlers/system.py", "destination path"),
         ):
             text = (ROOT_DIR / bot_file).read_text(encoding="utf-8")
             self.assertIn(marker, text, f"{bot_file} doesn't mention the file-upload feature in its help text")
+
+
+class TestCustomLlmEndpointReachable(unittest.TestCase):
+    """Regression coverage for issue #74: litellm/config.yaml's "custom-llm"
+    model reads os.environ/CUSTOM_API_BASE and os.environ/CUSTOM_API_KEY, and
+    env.example documents both as a self-hosted OpenAI-compatible endpoint --
+    but neither compose file previously forwarded them into the litellm
+    container, and the plugin's write_env_file()/WebGUI never set them. Every
+    install path must actually be able to populate these two variables."""
+
+    def test_docker_compose_forwards_custom_llm_vars_to_litellm(self):
+        compose_path = ROOT_DIR / "docker-compose.yml"
+        with open(compose_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        litellm_env = data["services"]["litellm"]["environment"]
+        joined = "\n".join(litellm_env)
+        self.assertIn("CUSTOM_API_BASE", joined)
+        self.assertIn("CUSTOM_API_KEY", joined)
+
+    def test_omv_compose_template_forwards_custom_llm_vars_to_litellm(self):
+        template_path = ROOT_DIR / "omv-compose-template.yaml"
+        with open(template_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        litellm_env = data["services"]["litellm"]["environment"]
+        joined = "\n".join(litellm_env)
+        self.assertIn("CUSTOM_API_BASE", joined)
+        self.assertIn("CUSTOM_API_KEY", joined)
+
+    def test_write_env_file_emits_custom_llm_vars(self):
+        script_text = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "sbin" / "omv-agent-station"
+        ).read_text(encoding="utf-8")
+        self.assertIn("custom_api_base", script_text)
+        self.assertIn("custom_api_key", script_text)
+        self.assertIn("CUSTOM_API_BASE=", script_text)
+        self.assertIn("CUSTOM_API_KEY=", script_text)
+
+    def test_webgui_has_custom_llm_form_fields(self):
+        form_path = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault"
+            / "workbench" / "component.d" / "omv-services-agentstation-aimodels-form-page.yaml"
+        )
+        with open(form_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        field_names = {f.get("name") for f in data["data"]["config"]["fields"] if isinstance(f, dict)}
+        self.assertIn("custom_api_base", field_names)
+        self.assertIn("custom_api_key", field_names)
+
+    def test_setsettings_datamodel_accepts_custom_llm_fields(self):
+        import json
+        datamodel_path = (
+            ROOT_DIR / "openmediavault-agent-station" / "usr" / "share" / "openmediavault"
+            / "datamodels" / "rpc.agentstation.setsettings.json"
+        )
+        with open(datamodel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        properties = data["params"]["properties"]
+        self.assertIn("custom_api_base", properties)
+        self.assertIn("custom_api_key", properties)
 
 
 if __name__ == "__main__":

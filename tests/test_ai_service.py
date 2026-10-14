@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class FakeResponse:
@@ -122,12 +122,56 @@ class TestQueryAiModel(unittest.TestCase):
         self.assertEqual(res["model"], "reasoning-heavy")
 
 
+class TestSuggestTags(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.ai_service as ai_service
+        self.ai_service = ai_service
+        self._orig_create = ai_service.ai_client.chat.completions.create
+
+    def tearDown(self):
+        self.ai_service.ai_client.chat.completions.create = self._orig_create
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    def test_empty_text_returns_empty_list_without_calling_the_model(self):
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(side_effect=AssertionError("should not be called"))
+        self.assertEqual(asyncio.run(self.ai_service.suggest_tags("   ")), [])
+
+    def test_success_parses_comma_separated_tags(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="Docker, Home Server, Backups"))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        tags = asyncio.run(self.ai_service.suggest_tags("Set up nightly backups for the OMV Docker stack."))
+
+        self.assertEqual(tags, ["docker", "home-server", "backups"])
+
+    def test_result_is_capped_at_max_tags(self):
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="a, b, c, d, e, f, g"))]
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        tags = asyncio.run(self.ai_service.suggest_tags("some text", max_tags=3))
+
+        self.assertEqual(tags, ["a", "b", "c"])
+
+    def test_failure_returns_empty_list_not_an_exception(self):
+        self.ai_service.ai_client.chat.completions.create = AsyncMock(side_effect=ConnectionError("gateway down"))
+
+        tags = asyncio.run(self.ai_service.suggest_tags("some text"))
+
+        self.assertEqual(tags, [])
+
+
 class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
         import discord_bot
+        import core.security as core_security
         self.discord_bot = discord_bot
-        self.discord_bot.ALLOWED_USER_ID = None
+        core_security.ALLOWED_USER_ID = None
         import agent_station_core.ai_service as ai_service
         self.ai_service = ai_service
         self._orig = ai_service.httpx.AsyncClient
@@ -137,6 +181,7 @@ class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
         self.ai_service.httpx.AsyncClient = self._orig
         if str(ROOT_DIR / "discord-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "discord-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "discord_bot")
 
     def test_models_cmd_labels_fallback_when_gateway_unreachable(self):
         class DummyChannel:
@@ -181,6 +226,56 @@ class TestDiscordModelsCommandLabelsFallback(unittest.TestCase):
         ctx = DummyCtx()
         asyncio.run(self.discord_bot.models_cmd(ctx))
         self.assertTrue(any("Active AI Models" in r and "Fallback" not in r for r in ctx.replies))
+
+
+class TestGetModelhelpMarkdown(unittest.TestCase):
+    """Regression coverage for issue #68: /modelhelp used to be a hand-maintained
+    string that went stale every time litellm/config.yaml changed (this already
+    happened once, per issue #13). It's now generated live from the config, so
+    these tests mostly guard against the generator throwing or silently
+    producing something that doesn't reflect the real file."""
+
+    def setUp(self):
+        sys.path.insert(0, str(ROOT_DIR))
+        import agent_station_core.ai_service as ai_service
+        self.ai_service = ai_service
+
+    def tearDown(self):
+        if str(ROOT_DIR) in sys.path:
+            sys.path.remove(str(ROOT_DIR))
+
+    def test_generation_does_not_throw_and_covers_every_model_group(self):
+        import yaml
+        config = yaml.safe_load((ROOT_DIR / "litellm" / "config.yaml").read_text(encoding="utf-8"))
+        model_names = {d["model_name"] for d in config["model_list"]}
+
+        text = self.ai_service.get_modelhelp_markdown()
+
+        self.assertIsInstance(text, str)
+        for name in model_names:
+            self.assertIn(name, text, f"/modelhelp output is missing model_name group '{name}'")
+
+    def test_generation_reflects_concrete_real_values(self):
+        """A couple of hand-checked assertions so a generator that silently
+        produces garbage (e.g. empty pools everywhere) can't pass the
+        group-coverage check above vacuously."""
+        text = self.ai_service.get_modelhelp_markdown()
+        self.assertIn("coder-smart", text)
+        self.assertIn("openrouter/poolside/laguna-s-2.1:free", text)
+        self.assertIn("anthropic/claude-3-7-sonnet-20250219", text)
+        # Router-level fallback chain for coder-smart, read straight out of
+        # router_settings.fallbacks -- not hand-maintained anywhere.
+        self.assertIn("gemini-3.7-pro", text)
+
+    def test_missing_config_file_falls_back_gracefully(self):
+        orig = self.ai_service._find_litellm_config_path
+        self.ai_service._find_litellm_config_path = lambda: None
+        try:
+            text = self.ai_service.get_modelhelp_markdown()
+            self.assertIsInstance(text, str)
+            self.assertGreater(len(text), 0)
+        finally:
+            self.ai_service._find_litellm_config_path = orig
 
 
 if __name__ == "__main__":

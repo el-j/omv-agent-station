@@ -18,32 +18,43 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class TestSignalCancelCommand(unittest.TestCase):
     def setUp(self):
+        stubs.purge_bot_modules("core", "handlers", "signal_bot")
         sys.path.insert(0, str(ROOT_DIR / "signal-agent-bot"))
         import signal_bot
+        import core.security as core_security
+        import handlers.system as system
         import agent_station_core.task_registry as task_registry
         self.signal_bot = signal_bot
+        self.system = system
         self.task_registry = task_registry
         self.task_registry._active.clear()
-        self.signal_bot.SIGNAL_ALLOWED_NUMBER = ""
+        core_security.SIGNAL_ALLOWED_NUMBER = ""
 
         self.sent = []
 
         async def fake_send(recipient, message):
             self.sent.append((recipient, message))
 
-        self._orig_send = signal_bot.send_signal_message
-        signal_bot.send_signal_message = fake_send
+        # send_signal_message is imported independently into signal_bot.py
+        # (for the unauthorized-access reply) and handlers/system.py (for
+        # /cancel and /exec) -- patch both.
+        self._send_modules = [signal_bot, system]
+        self._orig_send = {mod: mod.send_signal_message for mod in self._send_modules}
+        for mod in self._send_modules:
+            mod.send_signal_message = fake_send
 
     def tearDown(self):
-        self.signal_bot.send_signal_message = self._orig_send
+        for mod, orig in self._orig_send.items():
+            mod.send_signal_message = orig
         self.task_registry._active.clear()
         if str(ROOT_DIR / "signal-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "signal-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "signal_bot")
 
     def test_cancel_with_nothing_running_replies_informatively(self):
         async def scenario():

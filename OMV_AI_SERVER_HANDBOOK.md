@@ -1,5 +1,7 @@
 # Complete Handbook: 24/7 Autonomous AI Agent Stack on HP ProLiant Gen8 (OMV)
 
+> This handbook documents the reference setup: an HP ProLiant Gen8 running OpenMediaVault. The underlying stack has no OMV dependency, though, and runs the same way on any Debian-based Linux — including a Raspberry Pi 4/5 (64-bit OS). See the README's [Installation: OpenMediaVault or Any Debian-Based Linux](README.md#-installation-openmediavault-or-any-debian-based-linux) section for that path.
+
 ---
 
 ## 1. System Architecture Overview
@@ -57,7 +59,7 @@ This production stack turns your **HP ProLiant MicroServer Gen8 (running OpenMed
 - **Official Docs:** [Anthropic Developer Documentation](https://docs.anthropic.com/en/docs/about-claude/models)
 - **API Key Source:** [https://console.anthropic.com/](https://console.anthropic.com/) (and Claude Code CLI authentication)
 - **Strengths:** Unrivaled code synthesis, Hybrid Thinking mode, and Prompt Caching (90% discount on cached tokens).
-- **Role in Stack:** Primary reasoning engine for autonomous multi-file coding loops (`coder-smart`).
+- **Role in Stack:** Reasoning engine for autonomous multi-file coding loops (`coder-smart`) -- direct Anthropic API is tried after the free OpenRouter and Gemini tiers in that router's pool (see [Multi-Tier AI Redundancy](README.md#-multi-tier-ai-redundancy--smart-failover) in the README for the exact current order), not first.
 
 ### C. GitHub Copilot Pro (GitHub / Microsoft)
 - **Official Docs:** [GitHub Models Documentation](https://docs.github.com/en/github-models)
@@ -67,7 +69,29 @@ This production stack turns your **HP ProLiant MicroServer Gen8 (running OpenMed
 
 ---
 
-## 3. Quick-Start Deployment Options on OpenMediaVault
+## 3. Free-Tier Models via OpenRouter (Optional 4th Redundancy Layer)
+
+The WebGUI's **Services ➔ Agent Station ➔ AI Models** form lets you paste an [OpenRouter](https://openrouter.ai/keys) API key. Doing so silently unlocks a **fourth, $0-cost tier** that's now tried *before* the three paid subscriptions above in every virtual router's pool -- you don't have to configure or select anything else, it's wired directly into `litellm/config.yaml`.
+
+### What it is
+OpenRouter aggregates many providers behind one API and periodically publishes a set of `:free`-suffixed model IDs that cost nothing per token (rate-limited, and typically running on the provider's spare/shared capacity rather than dedicated hardware). LiteLLM's `usage-based-routing` tries each router's deployments in list order, so with `OPENROUTER_API_KEY` set, free models get first crack at every request; without it, those deployments fail authentication instantly and the request falls through to Gemini/Claude/GPT-4o exactly as before -- so setting the key is purely additive and safe to try.
+
+### Which free models map to which router (as configured in `litellm/config.yaml`)
+| Virtual Router | Free OpenRouter Deployments (tried first) |
+| :--- | :--- |
+| `coder-fast` | `nvidia/nemotron-3.5-lightning:free`, `poolside/laguna-xs-2.1:free` |
+| `coder-smart` | `poolside/laguna-s-2.1:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-super-120b-a12b:free` |
+| `reasoning-heavy` | `z-ai/glm-5.2:free`, `nvidia/nemotron-3-ultra-550b-a55b:free` |
+
+### The tradeoff
+Free OpenRouter models come with **tighter rate limits** than a paid subscription and are generally **lower quality** for hard agentic coding tasks than the direct/Vertex Claude, Gemini Pro, or GPT-4o deployments they sit in front of. LiteLLM's cooldown/fallback logic (see [Multi-Tier AI Redundancy](README.md#-multi-tier-ai-redundancy--smart-failover) in the README) means a rate-limited or failing free model gets skipped automatically within seconds, so the practical cost is occasionally weaker answers on your fastest/cheapest requests -- not downtime.
+
+### This is a snapshot, not a guarantee
+OpenRouter adds and retires free models over time. The list above reflects what's wired into `litellm/config.yaml` as of this writing; to check what's *currently* free upstream, query `https://openrouter.ai/api/v1/models` and filter for entries where `pricing.prompt == "0"`. If a model in the table above has been retired, or a better free model has appeared, update the corresponding `openrouter/...:free` deployment in `litellm/config.yaml` and re-verify this table.
+
+---
+
+## 4. Quick-Start Deployment Options on OpenMediaVault
 
 ### Option 1: Native OpenMediaVault WebGUI Plugin
 1. Build package: `./build-deb.sh`
@@ -87,7 +111,7 @@ git clone https://github.com/el-j/omv-agent-station.git /srv/dev-data/omv-agent-
 
 ---
 
-## 4. Telegram Bot Commands & Workflow
+## 5. Telegram Bot Commands & Workflow
 
 Once launched, open your Telegram chat with your bot and try:
 
@@ -101,6 +125,7 @@ Once launched, open your Telegram chat with your bot and try:
 | `/note <Title> \| <Body>` | Instantly save a new note to `Inbox/` in your Obsidian vault |
 | `/models` | Query the LiteLLM proxy for active provider endpoints and health |
 | `/status` | View server uptime, RAM usage, disk space, and active tmux sessions |
+| `/cancel` (alias `/stop`) | Stop the `/task`, `/claude`, or `/exec` command currently running in this chat |
 
 ### Uploading Files to a Repository by Sending Them to the Bot
 
@@ -116,7 +141,7 @@ This isn't a slash command -- send a file, photo, or document directly to a chat
 
 ---
 
-## 5. Integrating Obsidian (Second Brain) & Syncthing
+## 6. Integrating Obsidian (Second Brain) & Syncthing
 
 1. Open the Syncthing Web UI on `http://<YOUR-OMV-IP>:8384`.
 2. Add your laptop and phone as connected devices.
@@ -129,7 +154,7 @@ This isn't a slash command -- send a file, photo, or document directly to a chat
 
 ---
 
-## 6. Accessing the Live Terminal (cmux / tmux)
+## 7. Accessing the Live Terminal (cmux / tmux)
 
 If you want to view a running agent live from a browser:
 
@@ -142,7 +167,7 @@ If you want to view a running agent live from a browser:
 
 ---
 
-## 7. Service Maintenance & Logs
+## 8. Service Maintenance & Logs
 
 To check live logs from your server:
 

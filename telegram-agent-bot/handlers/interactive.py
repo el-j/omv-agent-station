@@ -55,11 +55,19 @@ async def interactive_text_handler(update: Update, context: ContextTypes.DEFAULT
             context.args = text.split()
             await exec_cmd(update, context)
             return
+        # The exact prompt titles are matched before the loose keyword fallbacks:
+        # "Clone Git Repository" also contains "Repository", so the broad
+        # `"repo" in parent_text.lower()` test below used to swallow every reply
+        # to the /clone prompt and hand it to newrepo_cmd instead.
+        elif "Clone Git Repository" in parent_text:
+            context.args = text.split()
+            await clone_cmd(update, context)
+            return
         elif "GitHub Repository" in parent_text or "repo" in parent_text.lower():
             context.args = shlex.split(text) if ("\"" in text or "'" in text) else text.split()
             await newrepo_cmd(update, context)
             return
-        elif "Clone Git Repository" in parent_text or "clone" in parent_text.lower() or "git" in parent_text.lower():
+        elif "clone" in parent_text.lower() or "git" in parent_text.lower():
             context.args = text.split()
             await clone_cmd(update, context)
             return

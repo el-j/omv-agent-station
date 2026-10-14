@@ -10,7 +10,6 @@ import os
 import re
 import shutil
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent

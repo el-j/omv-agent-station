@@ -25,6 +25,8 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - CUSTOM_API_BASE=${CUSTOM_API_BASE:-}
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY:-}
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
       - ./credentials:/app/credentials:ro
@@ -71,6 +73,7 @@ services:
       - TELEGRAM_ALLOWED_USER_ID=${TELEGRAM_ALLOWED_USER_ID}
       - LITELLM_API_BASE=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
+      - LITELLM_CONFIG_YAML_PATH=/litellm/config.yaml
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
@@ -81,8 +84,11 @@ services:
       - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STACK_REPO_PATH=${STACK_REPO_PATH:-/stack}
+      - GITHUB_REPO_SLUG=${GITHUB_REPO_SLUG:-el-j/omv-agent-station}
     volumes:
       - ./telegram-agent-bot:/app:ro
+      - ./litellm/config.yaml:/litellm/config.yaml:ro
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
       - ${DATA_DIR:-/srv/dev-data}/.agent-auth:/root/.claude
@@ -90,6 +96,11 @@ services:
       - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
       - ./ssh:/root/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Read-only view of the deployed stack checkout itself, so /selftest,
+      # /selfheal and /update can report the running commit/branch and how far
+      # behind origin it is (via the GitHub compare API) without ever needing
+      # write access to pull or rebuild anything from inside the container.
+      - ${STACK_DIR:-/srv/dev-data/omv-agent-station}:/stack:ro
 
   # ============================================================================
   # 4. Sandboxed AI Agent Workspace & Web Terminal
@@ -153,6 +164,7 @@ services:
       - SIGNAL_ALLOWED_PHONE_NUMBER=${SIGNAL_ALLOWED_PHONE_NUMBER}
       - LITELLM_API_BASE=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
+      - LITELLM_CONFIG_YAML_PATH=/litellm/config.yaml
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
@@ -164,6 +176,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
+      - ./litellm/config.yaml:/litellm/config.yaml:ro
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
       - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro
@@ -187,6 +200,7 @@ services:
       - DISCORD_ALLOWED_USER_ID=${DISCORD_ALLOWED_USER_ID}
       - LITELLM_API_BASE=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-omv-master-key}
+      - LITELLM_CONFIG_YAML_PATH=/litellm/config.yaml
       - OBSIDIAN_VAULT_PATH=/data/obsidian
       - WORKSPACE_PATH=/data/workspace
       - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-OMV AI Agent}
@@ -198,6 +212,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
+      - ./litellm/config.yaml:/litellm/config.yaml:ro
       - ${DATA_DIR:-/srv/dev-data}/obsidian:/data/obsidian
       - ${DATA_DIR:-/srv/dev-data}/workspace:/data/workspace
       - ${DATA_DIR:-/srv/dev-data}/ssh:/root/.ssh:ro

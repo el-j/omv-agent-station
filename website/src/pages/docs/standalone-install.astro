@@ -1,0 +1,57 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout
+  title="Standalone Install: Any Debian-Based Linux & Raspberry Pi"
+  description="Run the stack directly with docker compose on Debian, Ubuntu, or a 64-bit Raspberry Pi OS — no OpenMediaVault required."
+  category="Getting Started"
+  prevPage={{ title: "Quickstart & Installation", href: `${baseUrl}/docs/quickstart` }}
+  nextPage={{ title: "AI Models & Multi-Tier Routing", href: `${baseUrl}/docs/ai-models` }}
+>
+  <div class="docs-callout docs-callout-info">
+    <strong>🐧 No OpenMediaVault Required:</strong><br />
+    The stack — LiteLLM, Syncthing, the messenger bots, and the web terminal — is plain Docker Compose underneath. OpenMediaVault users get an optional WebGUI layer on top (see <a href={`${baseUrl}/docs/quickstart`}>Quickstart & Installation</a>), but everything below runs identically on any Debian-based Linux: Debian 12/13, Ubuntu 22.04/24.04, or a 64-bit Raspberry Pi OS (Bookworm) install.
+  </div>
+
+  <h2>✅ Confirmed Platforms</h2>
+  <ul>
+    <li><strong>amd64:</strong> any modern Debian/Ubuntu server.</li>
+    <li><strong>arm64:</strong> Raspberry Pi 4 or 5 running the 64-bit Raspberry Pi OS. Every image the stack pulls or builds (LiteLLM, Syncthing, <code>signal-cli</code>, <code>ttyd</code>, Python/Node base images) publishes a native <code>linux/arm64</code> build — nothing runs under emulation.</li>
+  </ul>
+  <p>
+    <strong>Recommended for Raspberry Pi:</strong> 4GB+ RAM, and a USB SSD rather than the SD card for the workspace/LiteLLM volumes — this stack does sustained read/write I/O that wears SD cards out quickly.
+  </p>
+
+  <h2>1. Install Docker</h2>
+  <p>Skip this step if <code>docker</code> and the Compose plugin are already installed.</p>
+  <pre><code>sudo apt update && sudo apt install -y docker.io docker-compose-plugin</code></pre>
+
+  <h2>2. Clone and Configure</h2>
+  <pre><code>git clone https://github.com/el-j/omv-agent-station.git ~/agent-station
+cd ~/agent-station
+cp env.example .env
+nano .env   # fill in your API keys and messenger bot token</code></pre>
+
+  <h2>3. Start the Stack</h2>
+  <pre><code>./setup.sh
+# or, on a completely fresh box with no Docker installed yet:
+./setup.sh --install-deps</code></pre>
+  <p>
+    <code>setup.sh</code> detects Docker/Compose, prints a note when it's running on ARM64, creates the data directories under <code>DATA_DIR</code> (default <code>/srv/dev-data</code> — any writable path works, it doesn't need to be an OMV-managed mount), and brings the stack up.
+  </p>
+
+  <h2>4. Manage It Directly</h2>
+  <p>There's no separate CLI to learn — it's plain <code>docker compose</code> from the directory you cloned into:</p>
+  <pre><code>docker compose ps
+docker compose logs -f telegram-bot
+docker compose restart litellm
+docker compose down</code></pre>
+
+  <div class="docs-callout docs-callout-success">
+    <strong>Optional relays:</strong> Discord and Signal are off by default (they run behind Compose <em>profiles</em>). Enable one with:
+    <pre><code>docker compose --profile discord up -d
+docker compose --profile signal up -d</code></pre>
+  </div>
+</DocsLayout>

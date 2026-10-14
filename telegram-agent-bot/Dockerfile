@@ -19,7 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install CLI coding agents (Aider, Claude Code, etc.)
-RUN pip install --no-cache-dir aider-chat \
+RUN pip install --no-cache-dir aider-chat==0.86.2 \
     && npm install -g @anthropic-ai/claude-code
 
 COPY bot.py .

@@ -84,11 +84,22 @@ jobs:
 
       - name: Build Debian Package
         run: |
+          rm -f openmediavault-agent-station_*.deb CHECKSUMS.txt
           AGENT_STATION_VERSION="${{ steps.versioning.outputs.version }}" bash build-deb.sh
+
+      - name: Verify Expected Debian Artifact
+        id: artifact
+        run: |
+          EXPECTED_DEB="openmediavault-agent-station_${{ steps.versioning.outputs.version }}_all.deb"
+          if [[ ! -f "$EXPECTED_DEB" ]]; then
+            echo "Expected artifact not found: $EXPECTED_DEB"
+            exit 1
+          fi
+          echo "deb_file=$EXPECTED_DEB" >> "$GITHUB_OUTPUT"
 
       - name: Generate Checksums
         run: |
-          sha256sum openmediavault-agent-station_*.deb > CHECKSUMS.txt
+          sha256sum "${{ steps.artifact.outputs.deb_file }}" > CHECKSUMS.txt
           cat CHECKSUMS.txt
 
       - name: Create GitHub Release
@@ -97,7 +108,7 @@ jobs:
           tag_name: ${{ steps.versioning.outputs.tag_name }}
           name: ${{ steps.versioning.outputs.tag_name }}
           files: |
-            openmediavault-agent-station_*.deb
+            ${{ steps.artifact.outputs.deb_file }}
             CHECKSUMS.txt
           generate_release_notes: true
           draft: false

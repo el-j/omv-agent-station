@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class DummyStatusMessage:
@@ -73,12 +73,14 @@ class DummyContext:
 class TestUploadCaptionParsing(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         import handlers.upload as upload
         self.upload = upload
 
     def tearDown(self):
         if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_no_caption_returns_none_none(self):
         self.assertEqual(self.upload.parse_upload_caption(None), (None, None))
@@ -120,6 +122,7 @@ class TestUploadCaptionParsing(unittest.TestCase):
 class TestSanitizeRelativePath(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         import core.security as security
         self.security = security
         self._tmpdir = tempfile.TemporaryDirectory()
@@ -129,6 +132,7 @@ class TestSanitizeRelativePath(unittest.TestCase):
         self._tmpdir.cleanup()
         if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_simple_relative_path_allowed(self):
         result = self.security.sanitize_relative_path(self.base, "docs/notes.md")
@@ -157,6 +161,7 @@ class TestSanitizeRelativePath(unittest.TestCase):
 class TestUploadHandlerEndToEnd(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         import handlers.upload as upload
         import handlers.topics as topics
         import core.task_registry as task_registry
@@ -169,6 +174,7 @@ class TestUploadHandlerEndToEnd(unittest.TestCase):
         self.task_registry._active.clear()
         if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_rejects_when_no_project_bound(self):
         async def scenario():

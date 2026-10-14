@@ -31,6 +31,8 @@ services:
       - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID}
       - VERTEX_LOCATION=${VERTEX_LOCATION:-europe-west1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/vertex_creds.json
+      - CUSTOM_API_BASE=${CUSTOM_API_BASE:-}
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY:-}
       - STORE_MODEL_IN_DB=False
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro

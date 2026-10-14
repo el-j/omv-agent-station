@@ -8,6 +8,7 @@ from telegram import Update, ForceReply
 from telegram.ext import ContextTypes
 from core.config import OBSIDIAN_VAULT, logger
 from core.security import check_auth
+from core.ai_service import suggest_tags
 
 async def vault_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists recent Obsidian notes and specs."""
@@ -59,12 +60,16 @@ async def note_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         note_dir.mkdir(parents=True, exist_ok=True)
         note_file = note_dir / f"{safe_title}.md"
 
+        tags = await suggest_tags(content)
+        all_tags = list(dict.fromkeys(["telegram", "quick-capture", *tags]))
+        tags_str = ", ".join(all_tags)
+
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         note_body = (
             f"---\n"
             f"date: {now_str}\n"
             f"author: Telegram Bot\n"
-            f"tags: [telegram, quick-capture]\n"
+            f"tags: [{tags_str}]\n"
             f"---\n\n"
             f"# {title}\n\n"
             f"{content}\n"

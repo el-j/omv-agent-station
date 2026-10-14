@@ -85,6 +85,11 @@ from handlers.vault import (
     vault_cmd,
     note_cmd,
 )
+from handlers.maintenance import (
+    selftest_cmd,
+    selfheal_cmd,
+    update_cmd,
+)
 from handlers.interactive import interactive_text_handler
 from handlers.callbacks import help_callback_handler
 from handlers.upload import upload_file_handler
@@ -263,6 +268,9 @@ def main():
     app.add_handler(CommandHandler("exec", exec_cmd))
     app.add_handler(CommandHandler("cancel", cancel_cmd))
     app.add_handler(CommandHandler("stop", cancel_cmd))
+    app.add_handler(CommandHandler("selftest", selftest_cmd))
+    app.add_handler(CommandHandler("selfheal", selfheal_cmd))
+    app.add_handler(CommandHandler("update", update_cmd))
 
     # Interactive Inline Keyboard Callback Handler
     app.add_handler(CallbackQueryHandler(help_callback_handler))

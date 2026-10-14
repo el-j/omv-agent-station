@@ -5,7 +5,7 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <DocsLayout 
   title="Telegram Bot Handbook & Command Index" 
-  description="Comprehensive reference for all 25 Telegram commands, Forum Topics auto-binding, ForceReply interactive prompts, and natural language chat."
+  description="Comprehensive reference for all 27 Telegram commands, Forum Topics auto-binding, ForceReply interactive prompts, and natural language chat."
   category="Messenger Bots"
   prevPage={{ title: "AI Models & Multi-Tier Routing", href: `${baseUrl}/docs/ai-models` }}
   nextPage={{ title: "Discord & Signal Relays", href: `${baseUrl}/docs/discord-signal` }}
@@ -15,7 +15,7 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
     The bot implements Telegram's native <code>setMyCommands</code> API with rich icons, <code>ForceReply</code> interactive prompts for mobile devices, and Telegram Supergroup <strong>Forum Topics</strong> to automatically bind project contexts to dedicated sub-channels.
   </div>
 
-  <h2>📋 Full 25-Command Reference Index</h2>
+  <h2>📋 Full 27-Command Reference Index</h2>
   <table class="docs-table">
     <thead>
       <tr>
@@ -54,6 +54,16 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
         <td><code>/exec</code></td>
         <td><code>/exec &lt;shell-command&gt;</code></td>
         <td>Runs shell commands inside <code>/data/workspace</code> safely.</td>
+      </tr>
+      <tr>
+        <td><code>/cancel</code></td>
+        <td><code>/cancel</code></td>
+        <td>Stops the <code>/task</code>, <code>/claude</code>, or <code>/exec</code> command currently running in this chat.</td>
+      </tr>
+      <tr>
+        <td><code>/stop</code></td>
+        <td><code>/stop</code></td>
+        <td>Alias for <code>/cancel</code>.</td>
       </tr>
       <tr>
         <td><code>/projects</code></td>

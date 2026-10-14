@@ -28,7 +28,19 @@ jobs:
       - name: Run Bandit Vulnerability Scan
         uses: PyCQA/bandit-action@v1
         with:
-          path: "."
-          level: "medium"
+          # bandit-action's real inputs are targets/severity/confidence/skips/exclude,
+          # not path/level/arguments -- those don't exist on this action, so they were
+          # silently ignored and Bandit ran with zero config, scanning tests/ (which
+          # pyproject.toml's [tool.bandit] deliberately excludes) with no severity
+          # floor. That reproduced 130+ already-triaged/nosec'd findings as fresh
+          # github-advanced-security alerts on every push.
+          #
+          # configfile can't point at pyproject.toml here: the pinned v1 tag installs
+          # plain `bandit[sarif]` (no `toml` extra), so a TOML config file always fails
+          # with "toml parser not available". Mirror pyproject.toml's [tool.bandit]
+          # exclude_dirs/skips directly via this action's native inputs instead.
+          targets: "."
+          severity: "medium"
           confidence: "medium"
-          arguments: "-c .bandit"
+          skips: "B101,B102,B404,B603,B607"
+          exclude: ".svn,CVS,.bzr,.hg,.git,__pycache__,.tox,.eggs,*.egg,./tests,./website,./build-pkg,./.github,./node_modules,./.venv,./venv"

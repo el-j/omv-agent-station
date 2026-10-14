@@ -23,9 +23,10 @@ from core.config import (
 )
 from core.security import check_auth, sanitize_project_path
 from core import task_registry
+from core.task_sessions import get_task_session, set_task_session, clear_task_session
 from .topics import resolve_project_context, get_bound_project
 
-def _chat_scope(update: Update) -> tuple[int, int | None]:
+def chat_scope(update: Update) -> tuple[int, int | None]:
     """Returns the (chat_id, thread_id) scope key used to track this chat's active task."""
     chat_id = update.effective_chat.id if update.effective_chat else 0
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
@@ -57,6 +58,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/note <Title> | <Content>` — Quick note into Obsidian vault\n"
         "• `/models` — Check LiteLLM AI Gateway provider status\n"
         "• `/status` — Server CPU/RAM, disk & tmux sessions\n"
+        "• `/selftest` — Full health check: gateway, disk, version, providers\n"
+        "• `/selfheal` — Diagnose problems & get the exact fix command\n"
+        "• `/update` — Check how far behind the latest version you are\n"
         "• `/help` — Full handbook & Telegram Forum Topics guide"
     )
     await update.effective_message.reply_text(welcome_text, parse_mode="Markdown")
@@ -94,7 +98,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "6️⃣ *Obsidian Second-Brain Sync:*\n"
         "   • Syncthing (Port 8384) syncs notes from your laptop/phone to `/data/obsidian`.\n"
         "   • `/note Design Doc | System architecture requirements`\n"
-        "   • `/vault` — Inspect recent notes & specs available to AI agents."
+        "   • `/vault` — Inspect recent notes & specs available to AI agents.\n\n"
+        "7️⃣ *Housekeeping (check-and-report, never auto-applies):*\n"
+        "   • `/selftest` — Uptime/RAM/disk, LiteLLM reachability, deployed version, active task, configured providers\n"
+        "   • `/selfheal` — Same checks, but only lists what's actually wrong plus the exact SSH command to fix it\n"
+        "   • `/update` — How many commits behind `develop` you are, with the commit list"
     )
     keyboard = [
         [
@@ -116,10 +124,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Provides real-time system metrics, uptime, disk space, and active tmux sessions."""
-    if not await check_auth(update):
-        return
+def gather_status() -> dict:
+    """Collects uptime/RAM/disk/tmux metrics. Shared by /status and /selftest so
+    there's exactly one place that knows how to read /proc/meminfo etc."""
     try:
         tmux_out = subprocess.check_output(  # nosec B603,B607
             [TMUX_BIN, "list-sessions"],
@@ -136,6 +143,14 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uptime_out = "N/A"
         df_out = "N/A"
 
+    disk_pct = None
+    try:
+        # df's "Use%" column, e.g. "...  42% /data/workspace" -> 42
+        pct_field = next(f for f in df_out.split() if f.endswith("%"))
+        disk_pct = int(pct_field.rstrip("%"))
+    except Exception:
+        pass
+
     try:
         meminfo = {}
         with open("/proc/meminfo", "r", encoding="utf-8") as f:
@@ -145,17 +160,30 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_mb = meminfo["MemTotal"] // 1024
         avail_mb = meminfo.get("MemAvailable", meminfo["MemTotal"]) // 1024
         used_mb = max(0, total_mb - avail_mb)
-        pct = round((used_mb / total_mb) * 100) if total_mb else 0
-        ram_out = f"{used_mb} MB used of {total_mb} MB ({pct}%)"
+        ram_pct = round((used_mb / total_mb) * 100) if total_mb else 0
+        ram_out = f"{used_mb} MB used of {total_mb} MB ({ram_pct}%)"
     except Exception:
         ram_out = "N/A"
 
+    return {
+        "uptime": uptime_out,
+        "ram": ram_out,
+        "disk": df_out,
+        "disk_pct": disk_pct,
+        "tmux": tmux_out,
+    }
+
+async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Provides real-time system metrics, uptime, disk space, and active tmux sessions."""
+    if not await check_auth(update):
+        return
+    s = gather_status()
     report = (
         f"🖥️ *OMV Server Status*\n\n"
-        f"⏱️ *Uptime:* `{uptime_out}`\n"
-        f"🧠 *RAM:* `{ram_out}`\n"
-        f"💾 *Disk Space:* `{df_out}`\n\n"
-        f"🧵 *Active Agent Sessions:*\n```\n{tmux_out}\n```"
+        f"⏱️ *Uptime:* `{s['uptime']}`\n"
+        f"🧠 *RAM:* `{s['ram']}`\n"
+        f"💾 *Disk Space:* `{s['disk']}`\n\n"
+        f"🧵 *Active Agent Sessions:*\n```\n{s['tmux']}\n```"
     )
     await update.effective_message.reply_text(report, parse_mode="Markdown")
 
@@ -174,7 +202,7 @@ async def exec_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    chat_id, thread_id = _chat_scope(update)
+    chat_id, thread_id = chat_scope(update)
     if task_registry.get(chat_id, thread_id):
         await update.effective_message.reply_text(
             "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
@@ -213,9 +241,18 @@ async def run_exec_task(chat_id: int, thread_id: int | None, status_msg, cmd: st
         task_registry.finish(chat_id, thread_id)
 
 async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dispatches autonomous coding agent on a project branch."""
+    """Dispatches autonomous coding agent on a project branch. A leading
+    --new abandons any resumed session for this topic and starts fresh --
+    otherwise a /task in a topic that already has one resumes the same
+    branch and aider chat history (see core/task_sessions.py) instead of
+    starting over from a blank slate every single call."""
     if not await check_auth(update):
         return
+
+    raw_args = list(context.args) if context.args else []
+    fresh = bool(raw_args) and raw_args[0] == "--new"
+    if fresh:
+        context.args = raw_args[1:]
 
     project_name, remaining_args = resolve_project_context(update, context)
     if not project_name or not remaining_args:
@@ -225,7 +262,8 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🚀 *Autonomous Coding Agent Task*\n\n"
             "Please type your project & coding task instructions below:\n"
             "• Syntax: `[project-name] <instructions>`\n"
-            "• Example: `my-api \"Add Redis caching layer\"`",
+            "• Example: `my-api \"Add Redis caching layer\"`\n"
+            "• Prefix with `--new` to abandon a resumed session and start over.",
             parse_mode="Markdown",
             reply_markup=ForceReply(
                 selective=True,
@@ -234,7 +272,7 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    chat_id, thread_id = _chat_scope(update)
+    chat_id, thread_id = chat_scope(update)
     if task_registry.get(chat_id, thread_id):
         await update.effective_message.reply_text(
             "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
@@ -249,29 +287,53 @@ async def task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(f"❌ Project directory `{project_name}` does not exist in `/data/workspace`.", parse_mode="Markdown")
         return
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_id = f"task_{timestamp}"
-    task_branch = f"agent/{session_id}"
+    existing = None if fresh else get_task_session(chat_id, thread_id)
+    resume = bool(existing and existing.get("project") == project_name)
+    if resume and existing is not None:
+        session_id, task_branch = existing["session_id"], existing["branch"]
+    else:
+        if fresh:
+            clear_task_session(chat_id, thread_id)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_id = f"task_{timestamp}"
+        task_branch = f"agent/{session_id}"
 
-    msg = await update.effective_message.reply_text(
-        f"🚀 *Launching Autonomous Agent Task*\n\n"
-        f"📁 Project: `{project_name}`\n"
-        f"🌿 Branch: `{task_branch}`\n"
-        f"🆔 Session: `{session_id}`\n"
-        f"📝 Instruction: _{instructions}_\n\n"
-        f"Agent is starting ReAct loop in background...",
-        parse_mode="Markdown"
-    )
+    if resume:
+        msg = await update.effective_message.reply_text(
+            f"🔄 *Continuing Session*\n\n"
+            f"📁 Project: `{project_name}`\n"
+            f"🌿 Branch: `{task_branch}`\n"
+            f"🆔 Session: `{session_id}`\n"
+            f"📝 Instruction: _{instructions}_\n\n"
+            f"Agent is resuming where it left off...",
+            parse_mode="Markdown"
+        )
+    else:
+        msg = await update.effective_message.reply_text(
+            f"🚀 *Launching Autonomous Agent Task*\n\n"
+            f"📁 Project: `{project_name}`\n"
+            f"🌿 Branch: `{task_branch}`\n"
+            f"🆔 Session: `{session_id}`\n"
+            f"📝 Instruction: _{instructions}_\n\n"
+            f"Agent is starting ReAct loop in background...",
+            parse_mode="Markdown"
+        )
 
-    t = asyncio.create_task(run_agent_task(chat_id, thread_id, msg, project_dir, instructions, session_id, task_branch))
+    t = asyncio.create_task(run_agent_task(chat_id, thread_id, msg, project_dir, instructions, session_id, task_branch, resume))
     task_registry.start(chat_id, thread_id, label=f"task: {instructions}", asyncio_task=t)
 
-async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str):
-    """Executes the autonomous agent (Aider with LiteLLM proxy), commits, and pushes branch."""
+async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, project_dir: Path, instructions: str, session_id: str, task_branch: str, resume: bool = False):
+    """Executes the autonomous agent (Aider with LiteLLM proxy), commits, and pushes branch.
+
+    resume=True continues a previously-used task_branch (plain checkout, no
+    -B) and restores aider's prior chat history for this project_dir instead
+    of starting a fresh branch/conversation."""
     try:
         is_git = (project_dir / ".git").exists()
         if is_git:
-            await asyncio.create_subprocess_exec(GIT_BIN, "checkout", "-B", task_branch, cwd=str(project_dir))  # nosec B603,B607
+            checkout_args = ["checkout", task_branch] if resume else ["checkout", "-B", task_branch]
+            checkout_proc = await asyncio.create_subprocess_exec(GIT_BIN, *checkout_args, cwd=str(project_dir))  # nosec B603,B607
+            await checkout_proc.wait()
 
         cmd = [
             AIDER_BIN,
@@ -280,12 +342,21 @@ async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, projec
             "--model", "openai/coder-smart",
             "--message", instructions,
             "--auto-commits",
-            "--no-git-commit-verify"
+            "--no-git-commit-verify",
+            "--yes-always",
         ]
+        if resume:
+            cmd.append("--restore-chat-history")
 
-        agent_auth_file = Path("/root/.anthropic/token")
-        if agent_auth_file.exists():
-            cmd.extend(["--anthropic-api-key", agent_auth_file.read_text().strip()])
+        try:
+            agent_auth_file = Path("/root/.anthropic/token")
+            if agent_auth_file.exists():
+                cmd.extend(["--anthropic-api-key", agent_auth_file.read_text().strip()])
+        except OSError:
+            # Path.exists() can raise (not just return False) when /root
+            # itself isn't readable by the current user -- optional auth,
+            # never worth failing the whole task over.
+            pass
 
         proc = await asyncio.create_subprocess_exec(  # nosec B603,B607
             *cmd,
@@ -302,6 +373,10 @@ async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, projec
             push_proc = await asyncio.create_subprocess_exec(GIT_BIN, "push", "-u", "origin", task_branch, cwd=str(project_dir))  # nosec B603,B607
             await push_proc.communicate()
 
+        # Recorded so the *next* /task in this scope resumes this branch and
+        # aider's chat history instead of starting over.
+        set_task_session(chat_id, thread_id, project=project_dir.name, session_id=session_id, branch=task_branch)
+
         summary = out if len(out) > 0 else err
         if len(summary) > 3500:
             summary = summary[:3500] + "\n...(truncated)"
@@ -315,6 +390,7 @@ async def run_agent_task(chat_id: int, thread_id: int | None, status_msg, projec
             parse_mode="Markdown"
         )
     except asyncio.CancelledError:
+        set_task_session(chat_id, thread_id, project=project_dir.name, session_id=session_id, branch=task_branch)
         await status_msg.edit_text(
             f"🛑 *Task Cancelled*\n\n📁 Project: `{project_dir.name}`\n🌿 Branch: `{task_branch}`",
             parse_mode="Markdown"
@@ -354,7 +430,7 @@ async def claude_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    chat_id, thread_id = _chat_scope(update)
+    chat_id, thread_id = chat_scope(update)
     if task_registry.get(chat_id, thread_id):
         await update.effective_message.reply_text(
             "⚠️ Another task is already running here. Use `/cancel` to stop it first.",
@@ -410,7 +486,7 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
         return
 
-    chat_id, thread_id = _chat_scope(update)
+    chat_id, thread_id = chat_scope(update)
     label = await task_registry.cancel(chat_id, thread_id)
 
     if label is None:

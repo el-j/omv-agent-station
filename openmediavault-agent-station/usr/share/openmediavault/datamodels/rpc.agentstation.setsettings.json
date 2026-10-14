@@ -51,6 +51,15 @@
       "deepseek_api_key": {
         "type": ["string", "null"]
       },
+      "enable_custom": {
+        "type": ["boolean", "string", "null"]
+      },
+      "custom_api_base": {
+        "type": ["string", "null"]
+      },
+      "custom_api_key": {
+        "type": ["string", "null"]
+      },
       "enable_git": {
         "type": ["boolean", "string", "null"]
       },

@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
-import stubs  # noqa: F401
+import stubs
 
 
 class DummyStatusMessage:
@@ -66,6 +66,7 @@ class TestTaskRegistry(unittest.TestCase):
 
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         import core.task_registry as task_registry
         self.task_registry = task_registry
         self.task_registry._active.clear()
@@ -74,6 +75,7 @@ class TestTaskRegistry(unittest.TestCase):
         self.task_registry._active.clear()
         if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_cancel_returns_none_when_nothing_running(self):
         result = asyncio.run(self.task_registry.cancel(1, None))
@@ -126,6 +128,7 @@ class TestCancelCommandHandler(unittest.TestCase):
 
     def setUp(self):
         sys.path.insert(0, str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
         import handlers.system as system
         import core.task_registry as task_registry
         self.system = system
@@ -136,6 +139,7 @@ class TestCancelCommandHandler(unittest.TestCase):
         self.task_registry._active.clear()
         if str(ROOT_DIR / "telegram-agent-bot") in sys.path:
             sys.path.remove(str(ROOT_DIR / "telegram-agent-bot"))
+        stubs.purge_bot_modules("core", "handlers", "bot")
 
     def test_cancel_with_nothing_running_replies_informatively(self):
         async def scenario():

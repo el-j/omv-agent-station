@@ -21,6 +21,11 @@ LITELLM_BASE = os.environ.get("LITELLM_API_BASE", "http://litellm:4000")
 LITELLM_KEY = os.environ.get("LITELLM_MASTER_KEY", "sk-omv-secret-master-key")
 WORKSPACE = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
 OBSIDIAN_VAULT = Path(os.environ.get("OBSIDIAN_VAULT", "/workspace/ObsidianVault"))
+# Read-only mount of the stack's own git checkout (see docker-compose.yml's
+# STACK_DIR), used only to read the deployed commit/branch for /selftest,
+# /selfheal and /update -- never written to.
+STACK_REPO = Path(os.environ.get("STACK_REPO_PATH", "/stack"))
+GITHUB_REPO_SLUG = os.environ.get("GITHUB_REPO_SLUG", "el-j/omv-agent-station")
 
 # Git Binary & Identity Credentials
 GIT_BIN = os.environ.get("GIT_BIN", "git")
@@ -43,11 +48,13 @@ AIDER_BIN = os.environ.get("AIDER_BIN", "aider")
 TOPICS_FILE = WORKSPACE / ".agent_topics.json"
 CUSTOM_CMDS_FILE = WORKSPACE / ".custom_commands.json"
 OBSIDIAN_CMDS_FILE = OBSIDIAN_VAULT / "Config" / "commands.json"
+TASK_SESSIONS_FILE = WORKSPACE / ".agent_task_sessions.json"
 
 # Set of Built-in Commands Reserved by System
 BUILTIN_COMMANDS = {
     "start", "help", "status", "models", "modelhelp", "aihelp", "projects", "newrepo", "create",
     "bind", "unbind", "clone", "pull", "push", "branch", "diff", "vault",
     "note", "chat", "gemini", "gpt4", "task", "claude", "exec", "cancel", "stop", "addcmd", "alias", "delcmd",
-    "removecmd", "customcmds", "cmds", "aliases", "createtopic", "topic"
+    "removecmd", "customcmds", "cmds", "aliases", "createtopic", "topic",
+    "selftest", "selfheal", "update",
 }
